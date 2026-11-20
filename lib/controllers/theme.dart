@@ -343,10 +343,11 @@ class ThemeController extends GetxController {
             ),
           );
     return base.copyWith(
-      fontFamily: 'Segoe UI',
-      fontFamilyFallback: const ['Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC'],
       textTheme: base.textTheme.apply(fontFamilyFallback: const [
-        'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC',
+        'Segoe UI',
+        'Microsoft YaHei UI',
+        'Microsoft YaHei',
+        'Noto Sans CJK SC',
       ]),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
