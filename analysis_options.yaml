@@ -13,7 +13,8 @@ analyzer:
   exclude:
     - "packages/**/example/**"
     - "packages/*/example/**"
-    - "packages/smooth_sheets-0.15.0/test/**"
+    - "packages/**/test/**"
+    - "packages/*/test/**"
     - "packages/smooth_sheets-0.15.0/analysis_options.yaml"
 
 linter:
