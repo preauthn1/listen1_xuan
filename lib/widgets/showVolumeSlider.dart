@@ -27,7 +27,7 @@ void showVolumeSlider() async {
   _overlayEntry?.remove();
   _overlayEntry = null;
   _overlayEntry = _createOverlayEntry();
-  Overlay.of(Get.context!).insert(_overlayEntry!);
+  Overlay.of(Get.context!, rootOverlay: true).insert(_overlayEntry!);
   _startAutoCloseTimer();
 }
 

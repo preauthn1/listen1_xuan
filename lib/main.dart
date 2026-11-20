@@ -391,12 +391,14 @@ class MyApp extends StatelessWidget {
 
               // 然后应用 MediaQuery 设置
               return MediaQuery(
-                ///设置文字大小不随系统设置改变
-                data: MediaQuery.of(context)
-                    .copyWith(textScaleFactor: 1.0)
-                    .copyWith(
-                      padding: mediaQuery.padding.copyWith(top: safeTop),
-                    ),
+                // Desktop chrome keeps a stable density; mobile retains the
+                // user's accessibility text scale.
+                data: mediaQuery.copyWith(
+                  textScaler: isDesktop
+                      ? const TextScaler.linear(1.0)
+                      : mediaQuery.textScaler,
+                  padding: mediaQuery.padding.copyWith(top: safeTop),
+                ),
                 child: widget,
               );
             },

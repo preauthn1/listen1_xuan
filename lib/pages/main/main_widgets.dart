@@ -49,12 +49,13 @@ Widget get _leftBar => Scaffold(
             ).sbwh(double.infinity, 34),
       LayoutBuilder(
         builder: (context, constraints) {
-          XSearchController searchController = Get.find<XSearchController>();
+          final searchController = Get.find<XSearchController>();
+          final searchSettings = Get.find<SettingsController>();
           bool useFocusNode = !searchController.showSearchArea.value;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             searchController.leftBarWidth.value = constraints.maxWidth;
           });
-          if (constraints.maxWidth > 200) {
+          if (constraints.maxWidth > searchSettings.showSearchAreaWidth) {
             if (searchController.showSearchArea.value) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 searchController.showSearchArea.value = false;

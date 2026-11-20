@@ -167,20 +167,25 @@ Widget playH() {
                         )
                       : Obx(() {
                           final mediaState = _playController.mediaState.value;
+                          final durationMs =
+                              mediaState.duration.inMilliseconds.toDouble();
+                          if (_playController.nowPlayingTrackRx.value == null ||
+                              durationMs <= 0) {
+                            return const SizedBox(height: 20);
+                          }
+                          final maxMs = durationMs > 0 ? durationMs : 1.0;
+                          final value = mediaState.position.inMilliseconds
+                              .toDouble()
+                              .clamp(0.0, maxMs)
+                              .toDouble();
                           return MaterialWaveSlider(
                             key: materialWaveSliderStateKeyH,
                             height: 20,
                             paused:
                                 !mediaState.playing ||
                                 Get.find<ThemeController>().disSomeEffect,
-                            value:
-                                (mediaState.position.inMilliseconds
-                                        .toDouble()) >
-                                    (mediaState.duration.inMilliseconds
-                                        .toDouble())
-                                ? mediaState.duration.inMilliseconds.toDouble()
-                                : mediaState.position.inMilliseconds.toDouble(),
-                            max: mediaState.duration.inMilliseconds.toDouble(),
+                            value: value,
+                            max: maxMs,
                             onChanged: (value) {
                               globalSeek(Duration(milliseconds: value.toInt()));
                             },

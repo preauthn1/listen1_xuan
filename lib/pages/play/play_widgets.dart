@@ -412,41 +412,39 @@ Widget get _positionSlider => StreamBuilder<MediaState>(
                   ),
                 ),
                 child: Obx(
-                  () => _playController.loading
-                      ? LinearProgressIndicator()
-                      : MaterialWaveSlider(
-                          key: materialWaveSliderStateKeyV,
-                          height: 60.w,
-                          amplitude: 8.w,
-                          velocity: 1800.0,
-                          paused: mediaState?.playing == false,
-                          transitionOnChange: false,
-                          thumbWidth: 8.w,
-                          value:
-                              (mediaState?.position.inMilliseconds.toDouble() ??
-                                      0.0) >
-                                  (mediaState?.duration.inMilliseconds
-                                          .toDouble() ??
-                                      0.0)
-                              ? (mediaState?.duration.inMilliseconds
-                                        .toDouble() ??
-                                    0.0)
-                              : (mediaState?.position.inMilliseconds
-                                            .toDouble() ??
-                                        0.0)
-                                    .clamp(
-                                      0.0,
-                                      mediaState?.duration.inMilliseconds
-                                              .toDouble() ??
-                                          0.0,
-                                    ),
-                          max:
-                              mediaState?.duration.inMilliseconds.toDouble() ??
-                              0.0,
-                          onChanged: (value) {
-                            globalSeek(Duration(milliseconds: value.toInt()));
-                          },
-                        ),
+                  () {
+                    if (_playController.loading) {
+                      return const LinearProgressIndicator();
+                    }
+                    final durationMs =
+                        (mediaState?.duration ?? Duration.zero)
+                            .inMilliseconds
+                            .toDouble();
+                    if (_playController.nowPlayingTrackRx.value == null ||
+                        durationMs <= 0) {
+                      return const SizedBox(height: 4);
+                    }
+                    final maxMs = durationMs > 0 ? durationMs : 1.0;
+                    final value = (mediaState?.position.inMilliseconds
+                                .toDouble() ??
+                            0.0)
+                        .clamp(0.0, maxMs)
+                        .toDouble();
+                    return MaterialWaveSlider(
+                      key: materialWaveSliderStateKeyV,
+                      height: 60.w,
+                      amplitude: 8.w,
+                      velocity: 1800.0,
+                      paused: mediaState?.playing == false,
+                      transitionOnChange: false,
+                      thumbWidth: 8.w,
+                      value: value,
+                      max: maxMs,
+                      onChanged: (value) {
+                        globalSeek(Duration(milliseconds: value.toInt()));
+                      },
+                    );
+                  },
                 ),
               ),
             ),
