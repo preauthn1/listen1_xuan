@@ -195,7 +195,11 @@ Listener _mainContent() => Listener(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const SizedBox(width: 80),
+                IconButton(
+                  tooltip: "返回",
+                  onPressed: routerPop,
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 13),
+                ),
                 Obx(
                   () => Container(
                     width:
