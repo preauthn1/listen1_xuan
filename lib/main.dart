@@ -782,10 +782,12 @@ class _MyHomePageState extends State<MyHomePage>
   @override
   void onWindowMaximize() {
     Get.find<SettingsController>().onWindowMaximize();
+    if (mounted) setState(() {});
   }
 
   @override
   void onWindowUnmaximize() {
     Get.find<SettingsController>().onWindowUnmaximize();
+    if (mounted) setState(() {});
   }
 }
