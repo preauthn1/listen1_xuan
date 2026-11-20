@@ -282,11 +282,18 @@ class Bilibili extends BaseProvider {
 
   @override
   Future<void> login(BuildContext context) async {
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _BilibiliLoginForm(provider: this),
+      useRootNavigator: true,
+      barrierDismissible: true,
+      barrierColor: Colors.black54,
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 620),
+          child: _BilibiliLoginForm(provider: this),
+        ),
+      ),
     );
     await getUser();
   }
@@ -1302,13 +1309,15 @@ class _BilibiliLoginFormState extends State<_BilibiliLoginForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
     child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).bottomSheetTheme.backgroundColor ?? Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -1321,7 +1330,9 @@ class _BilibiliLoginFormState extends State<_BilibiliLoginForm> {
                 final loggedIn = await Navigator.of(context).push<bool>(
                   MaterialPageRoute(builder: (_) => BilibiliQrLoginPage(provider: widget.provider)),
                 );
-                if (loggedIn == true && context.mounted) Navigator.of(context).pop();
+                if (loggedIn == true && context.mounted) {
+                  Navigator.of(context, rootNavigator: true).pop();
+                }
               },
             ),
             ElevatedButton(
@@ -1358,6 +1369,7 @@ class _BilibiliLoginFormState extends State<_BilibiliLoginForm> {
           ],
         ),
       ),
+    ),
     ),
   );
 }

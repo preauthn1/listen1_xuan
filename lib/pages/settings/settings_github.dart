@@ -51,9 +51,10 @@ class Github {
 
       showInfoSnackbar('设置成功', null);
       onCompleted?.call();
-    } catch (e) {
-      Clipboard.setData(ClipboardData(text: e.toString() + res));
-      showInfoSnackbar('设置失败，错误信息已复制到剪切板$e\n网络请求返回值：$res', null);
+    } catch (e, stackTrace) {
+      debugPrint('GitHub 授权设置失败: $e\n$stackTrace\n响应: $res');
+      await Clipboard.setData(ClipboardData(text: '$e\n$res'));
+      showErrorSnackbar('设置失败', '授权服务暂时不可用，详细信息已复制到剪贴板');
     }
   }
 

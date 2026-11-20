@@ -209,12 +209,13 @@ class _MyPlaylistState extends State<MyPlaylist> {
                     opacity: iconOnly ? 0.0 : 1.0,
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          title,
-                          style: TextStyle(fontSize: compact ? 15 : 20),
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: compact ? 14 : 15,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -230,7 +231,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
                 ),
             ],
           ),
-        ).sbh(compact ? 44 : 56),
+        ).sbh(compact ? 44 : 48),
       ),
     );
   }

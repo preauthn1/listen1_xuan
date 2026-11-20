@@ -55,12 +55,13 @@ Future<dynamic> song_dialog(
   Offset? position,
 }) async {
   final screenSize = MediaQuery.of(context).size;
-  final dialogWidth = screenSize.width * 0.5;
-  final dialogHeight = screenSize.height * 1;
+  final dialogWidth = (screenSize.width * 0.5).clamp(360.0, 720.0).toDouble();
+  final dialogHeight = (screenSize.height * 0.86).clamp(420.0, 760.0).toDouble();
   bool horizon = screenSize.height > screenSize.width ? false : true;
   XSearchController xSearchController = Get.find<XSearchController>();
   return await showDialog(
     context: context,
+    useRootNavigator: true,
     builder: (BuildContext context) {
       // 根据手指按下的位置动态调整弹窗位置和大小
 

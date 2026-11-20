@@ -820,9 +820,11 @@ class UpdController extends GetxController {
         // 有新版本可用
         _showReleaseUpdateDialog(latestRelease, latestBuild);
       }
-    } catch (e) {
-      // debugPrint('检查 Releases 更新失败: $e');
-      showErrorSnackbar('检查 Releases 更新失败', e.toString());
+    } catch (e, stackTrace) {
+      debugPrint('检查 Releases 更新失败: $e\n$stackTrace');
+      // Update checks are opportunistic. Do not surface network internals or
+      // interrupt the main workspace when GitHub is unavailable.
+      showDebugSnackbar('暂时无法检查更新', '将在下次启动时自动重试');
     }
   }
 
