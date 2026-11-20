@@ -83,7 +83,7 @@ class ToastOverlayManager {
     );
 
     _entries[id] = _ToastEntry(entry: entry, controller: controller);
-    Overlay.of(ctx).insert(entry);
+    Overlay.of(ctx, rootOverlay: true).insert(entry);
 
     return controller;
   }

@@ -1344,14 +1344,10 @@ class _BilibiliLoginFormState extends State<_BilibiliLoginForm> {
             TextField(
               controller: _controller,
               focusNode: _focusNode,
-              decoration: const InputDecoration(labelText: '请输入B站cookie'),
-              onChanged: (value) async {
-                try {
-                  await widget.provider.saveToken(value, refreshUser: false);
-                } catch (e) {
-                  showErrorSnackbar('保存Cookie时出错', '$e');
-                }
-              },
+              decoration: const InputDecoration(
+                labelText: '请输入 B 站 Cookie',
+                hintText: '粘贴后按回车保存',
+              ),
               onSubmitted: (value) async {
                 if (_saving) return;
                 _saving = true;

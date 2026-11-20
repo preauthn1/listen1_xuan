@@ -1,16 +1,16 @@
 name: test
 
 on:
+  workflow_dispatch:
   push:
     branches: ["main"]
     paths:
-      # - "**/*.dart"
-      # - "pubspec.yaml"
+      - "**/*.dart"
+      - "pubspec.yaml"
       - "**/dart_test.yml"
 
 jobs:
   build:
-    if: "contains(github.event.head_commit.message, 'test')"
     runs-on: ubuntu-latest
     steps:
       - name: Output Commit Information
@@ -21,4 +21,13 @@ jobs:
           GITHASH=$(echo "${{ github.sha }}" | cut -c1-7)
           echo "GITHASH=$GITHASH" >> $GITHUB_ENV
           echo "GITHASH (前7位): $GITHASH"
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.41.9'
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test --no-pub
       

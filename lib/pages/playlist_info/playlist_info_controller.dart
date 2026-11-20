@@ -204,11 +204,12 @@ class PlaylistInfoController extends GetxController {
       0.0,
       1.0,
     );
+    hideScrollBar();
     scrollBarVisible = true;
     scrollBarOverlayEntry = createOverlayEntry();
     final context = Get.overlayContext;
     if (context != null) {
-      Overlay.of(context).insert(scrollBarOverlayEntry!);
+      Overlay.of(context, rootOverlay: true).insert(scrollBarOverlayEntry!);
     }
     startAutoCloseTimer();
   }

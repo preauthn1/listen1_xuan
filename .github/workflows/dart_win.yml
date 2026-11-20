@@ -1,6 +1,7 @@
 name: win
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" , "feat/dual-build-ffmpeg"]
     paths:
@@ -15,7 +16,6 @@ on:
 
 jobs:
   build:
-    if: "contains(github.event.head_commit.message, 'win')"
     runs-on: windows-latest
     steps:
       - name: Output Commit Information
