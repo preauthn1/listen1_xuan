@@ -91,8 +91,10 @@ Widget playH() {
                           duration: Duration(milliseconds: 200),
                           transitionBuilder: horTitleTextTra,
                           child: Text(
-                            key: ValueKey(mediaItem?.id ?? 'null'),
-                            '${mediaItem?.title ?? 'null'}  -  ${mediaItem?.artist ?? 'null'}',
+                            key: ValueKey(mediaItem?.id ?? 'no-song'),
+                            mediaItem == null
+                                ? '暂无播放'
+                                : '${mediaItem.title ?? '未知歌曲'}  -  ${mediaItem.artist ?? '未知艺人'}',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

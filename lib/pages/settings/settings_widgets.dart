@@ -254,67 +254,82 @@ Widget _buildSupabasePanel() {
   });
 }
 
+Widget _buildProviderLoginRow(BuildContext context, BaseProvider provider) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 34,
+          child: Center(
+            child: ColorFiltered(
+              colorFilter: ColorFilter.mode(
+                Theme.of(context).colorScheme.onSurfaceVariant,
+                BlendMode.srcIn,
+              ),
+              child: provider.loginIcon,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Obx(() {
+            switch (provider.loginStatus.value) {
+              case LoginStatus.processing:
+                return const Align(alignment: Alignment.centerLeft, child: LinearProgressIndicator());
+              case LoginStatus.loggedIn:
+                return Text(provider.currentUser.value?.name ?? '已连接');
+              case LoginStatus.failed:
+                return Tooltip(message: provider.loginError.value, child: const Text('登录状态获取失败'));
+              case LoginStatus.noLogin:
+                return Text('未连接', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant));
+            }
+          }),
+        ),
+        const SizedBox(width: 16),
+        FilledButton.tonal(
+          onPressed: () => provider.login(context),
+          child: Text(provider.loginButtonText),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildGithubLoginRow(BuildContext context) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 34,
+          child: Iconify(Mdi.github, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Obx(() => Text(Github.getStatusText(), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)))),
+        const SizedBox(width: 16),
+        FilledButton.tonal(
+          onPressed: () => Github.openAuthUrl(),
+          child: const Text('登录 GitHub'),
+        ),
+      ],
+    ),
+  );
+}
+
 Widget _buildThirdPartyLoginPanel(BuildContext context) {
-  final settingsController = Get.find<SettingsController>();
   return Column(
     children: <Widget>[
-      Table(
-        columnWidths: const {
-          0: IntrinsicColumnWidth(),
-          1: FlexColumnWidth(),
-          2: IntrinsicColumnWidth(),
-        },
-        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-        children: [
-          for (final provider in music_providers.provider.getLoginProviders())
-            TableRow(
-              children: [
-                provider.loginIcon.paddingOnly(right: 8.0),
-                Obx(() {
-                  switch (provider.loginStatus.value) {
-                    case LoginStatus.processing:
-                      return Center(child: globalLoadingAnime);
-                    case LoginStatus.loggedIn:
-                      return Text(provider.currentUser.value?.name ?? '未知用户');
-                    case LoginStatus.failed:
-                      return Tooltip(
-                        message: provider.loginError.value,
-                        child: const Text('登录状态获取失败'),
-                      );
-                    case LoginStatus.noLogin:
-                      return const Text('cookie未设置或失效');
-                  }
-                }),
-
-                ElevatedButton(
-                  onPressed: () => provider.login(context),
-                  child: Text(provider.loginButtonText),
-                ),
-              ],
-            ),
-          TableRow(
+      Builder(
+        builder: (context) {
+          return Column(
             children: [
-              Iconify(
-                Mdi.github,
-                color: AdaptiveTheme.of(context).theme.iconTheme.color,
-              ).paddingOnly(right: 8.0),
-              Obx(() {
-                if (settingsController.loginDataLoading.contains(
-                  PlantformCodes.github,
-                )) {
-                  return Center(child: globalLoadingAnime);
-                }
-                settingsController.loginData[PlantformCodes.github];
-                return Text(Github.getStatusText());
-              }),
-
-              ElevatedButton(
-                onPressed: () => Github.openAuthUrl(),
-                child: const Text('登录Github(建议使用魔法'),
-              ),
+              for (final provider in music_providers.provider.getLoginProviders())
+                _buildProviderLoginRow(context, provider),
+              _buildGithubLoginRow(context),
             ],
-          ),
-        ],
+          );
+        },
       ),
 
       Wrap(

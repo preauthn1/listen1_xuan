@@ -12,7 +12,7 @@ Widget get _leftBar => Scaffold(
   resizeToAvoidBottomInset: false,
   body: Column(
     children: [
-      10.sbh,
+      16.sbh,
       isDesktop
           ? _leftBarTitleDragArea(
               Listener(
@@ -29,13 +29,12 @@ Widget get _leftBar => Scaffold(
                 },
                 child: Tooltip(
                   message: '右键以最小化,中键以关闭',
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text('Listen1', style: TextStyle(fontSize: 24)),
-                      );
-                    },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Listen1', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600)),
+                    ),
                   ).sbwh(double.infinity, 34),
                 ),
               ),
@@ -72,35 +71,41 @@ Widget get _leftBar => Scaffold(
           final inputFontSize = (constraints.maxWidth / 6)
               .clamp(12.0, 16.0)
               .toDouble();
-          return ValueListenableBuilder<String?>(
-            valueListenable: startupTipsService.searchHint,
-            builder: (context, tip, _) => Obx(
-              () => TextField(
-                focusNode: useFocusNode ? searchController.focusNode : null,
-                decoration: InputDecoration(
-                  hintText: _searchHintText(tip),
-                  hintStyle: TextStyle(fontSize: inputFontSize),
-                  border: InputBorder.none,
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: ValueListenableBuilder<String?>(
+              valueListenable: startupTipsService.searchHint,
+              builder: (context, tip, _) => Obx(
+                () => TextField(
+                  focusNode: useFocusNode ? searchController.focusNode : null,
+                  decoration: InputDecoration(
+                    hintText: _searchHintText(tip),
+                    hintStyle: TextStyle(fontSize: inputFontSize),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  ),
+                  style: TextStyle(fontSize: inputFontSize),
+                  controller: input_text_Controller,
+                  readOnly: searchController.showSearchArea.value,
+                  onSubmitted: (_) => searchController.onSubmitted(),
+                  onTap: searchController.showSearchArea.value
+                      ? () async {
+                          Get.toNamed(RouteName.searchPage, id: 1);
+                        }
+                      : null,
                 ),
-                style: TextStyle(fontSize: inputFontSize),
-                controller: input_text_Controller,
-                readOnly: searchController.showSearchArea.value,
-                onSubmitted: (_) => searchController.onSubmitted(),
-                onTap: searchController.showSearchArea.value
-                    ? () async {
-                        Get.toNamed(RouteName.searchPage, id: 1);
-                      }
-                    : null,
               ),
             ),
           );
         },
-      ).sbh(56),
+      ).sbh(64),
       Expanded(child: MyPlaylist()),
 
       // SizedBox(),
-      PriorityResponsiveActionRow(
-        hidePriority: const [2, 1, 0, 3],
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        child: PriorityResponsiveActionRow(
+          hidePriority: const [2, 1, 0, 3],
+          mainAxisAlignment: MainAxisAlignment.start,
         children: [
           ThemeToggleButton(iconSize: 24.0, padding: EdgeInsets.all(0)),
           WebSocketHelper.buildReactiveButton(
@@ -119,6 +124,7 @@ Widget get _leftBar => Scaffold(
             },
           ),
         ],
+        ),
       ),
     ],
   ),
@@ -188,13 +194,7 @@ Listener _mainContent() => Listener(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
-                  tooltip: "返回",
-                  onPressed: () {
-                    routerPop();
-                  },
-                  icon: Icon(Icons.arrow_back_ios_new, size: 13),
-                ),
+                const SizedBox(width: 80),
                 Obx(
                   () => Container(
                     width:
@@ -219,8 +219,21 @@ Listener _mainContent() => Listener(
                               windowManager.setSkipTaskbar(true);
                             },
                           ),
+                        FutureBuilder<bool>(
+                          future: windowManager.isMaximized(),
+                          builder: (context, snapshot) => IconButton(
+                            tooltip: snapshot.data == true ? '还原窗口' : '最大化',
+                            icon: Icon(snapshot.data == true ? Icons.filter_none_rounded : Icons.crop_square_rounded, size: 13),
+                            onPressed: () async {
+                              if (await windowManager.isMaximized()) {
+                                await windowManager.unmaximize();
+                              } else {
+                                await windowManager.maximize();
+                              }
+                            },
+                          ),
+                        ),
                         IconButton(
-                          tooltip: "最小化",
                           icon: Icon(Icons.minimize, size: 13),
                           onPressed: () {
                             windowManager.minimize();
@@ -243,7 +256,7 @@ Listener _mainContent() => Listener(
                 ),
               ],
             ),
-          ).sbh(25),
+          ).sbh(32),
         Expanded(
           child: Navigator(
             key: innerKey,

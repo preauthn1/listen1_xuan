@@ -114,12 +114,22 @@ void _showCustomToast({
   }
 }
 
+String _userFacingMessage(String? message) {
+  if (message == null || message.trim().isEmpty) return '请稍后重试';
+  final value = message.trim();
+  if (value.contains('DioException') || value.contains('HttpException') || value.contains('github.com')) {
+    return '网络请求暂时不可用，请检查网络后重试';
+  }
+  return value.length > 180 ? '${value.substring(0, 177)}…' : value;
+}
+
 void showErrorSnackbar(
   String? title,
   String? message, {
   SnackPosition snackPosition = SnackPosition.TOP,
   VoidCallback? onTap,
 }) {
+  final safeMessage = _userFacingMessage(message);
   if (Get.find<SettingsController>().copyErrorMessage) {
     Clipboard.setData(ClipboardData(text: message ?? title ?? ''));
   }
@@ -128,7 +138,7 @@ void showErrorSnackbar(
     icon: Icons.cancel,
     iconColor: Get.theme.colorScheme.error,
     title: title,
-    message: message,
+    message: safeMessage,
     backgroundColor: Get.theme.colorScheme.errorContainer,
     textColor: Get.theme.colorScheme.onErrorContainer,
     onTap: onTap,

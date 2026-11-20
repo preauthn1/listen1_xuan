@@ -6,12 +6,14 @@ class PriorityResponsiveActionRow extends StatefulWidget {
     required this.children,
     required this.hidePriority,
     this.mainAxisSize = MainAxisSize.min,
+    this.mainAxisAlignment = MainAxisAlignment.center,
     this.minVisibleCount = 1,
   });
 
   final List<Widget> children;
   final List<int> hidePriority;
   final MainAxisSize mainAxisSize;
+  final MainAxisAlignment mainAxisAlignment;
   final int minVisibleCount;
 
   @override
@@ -143,6 +145,7 @@ class _PriorityResponsiveActionRowState
             ),
             Row(
               mainAxisSize: widget.mainAxisSize,
+              mainAxisAlignment: widget.mainAxisAlignment,
               children: [
                 for (final index in visibleIndexes) widget.children[index],
               ],

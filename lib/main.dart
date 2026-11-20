@@ -700,25 +700,24 @@ class _MyHomePageState extends State<MyHomePage>
                   ///测试按钮
                   if (kDebugMode && !testBtnoff) testBtn,
 
-                  ///WebSocketClientControlPanel悬浮按钮
-                  Positioned.fill(
-                    child: SafeArea(
-                      top: false,
-                      maintainBottomViewPadding: true,
-                      child: Align(
-                        alignment: Alignment.bottomRight,
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            bottom: globalHorizon ? 76 : 300.w,
-                            right: globalHorizon ? 16 : 40.w,
+                  /// The desktop workspace uses the rail/topbar action instead
+                  /// of a mobile FAB, which otherwise floats over the player.
+                  if (!globalHorizon)
+                    Positioned.fill(
+                      child: SafeArea(
+                        top: false,
+                        maintainBottomViewPadding: true,
+                        child: Align(
+                          alignment: Alignment.bottomRight,
+                          child: Padding(
+                            padding: EdgeInsets.only(bottom: 300.w, right: 40.w),
+                            child: WebSocketClientControlPanel.floatingActionButton,
                           ),
-                          child:
-                              WebSocketClientControlPanel.floatingActionButton,
                         ),
                       ),
                     ),
-                  ),
 
+                  // Windows desktop keeps the player above all workspace content.
                   /// 播放控制栏
                   Positioned.fill(
                     child: KeyboardStablePlayer(child: globalHorizon

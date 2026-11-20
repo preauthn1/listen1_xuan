@@ -647,7 +647,11 @@ Widget formatMediaStateByParts({TextStyle? textStyle}) {
   final state = _playController.mediaState.value;
 
   return Obx(() {
-    bool disSomeEffect = Get.find<ThemeController>().disSomeEffect;
+    final track = _playController.nowPlayingTrackRx.value;
+    if (track == null) {
+      return Text('00:00 / 00:00', style: textStyle);
+    }
+    final disSomeEffect = Get.find<ThemeController>().disSomeEffect;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

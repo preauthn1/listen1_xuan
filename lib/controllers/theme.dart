@@ -313,39 +313,64 @@ class ThemeController extends GetxController {
     final statusBarIconBrightness = brightness == Brightness.light
         ? Brightness.dark
         : Brightness.light;
-    if (useDynamicColor.value) {
-      return ThemeData(
-        useMaterial3: true,
-        brightness: brightness,
-        colorScheme: brightness == Brightness.light
-            ? _light.value
-            : _dark.value,
-        useSystemColors: true,
-        appBarTheme: AppBarTheme(
-          systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: statusBarIconBrightness,
-            systemNavigationBarColor: Get.theme.colorScheme.surface,
-          ),
+    final base = useDynamicColor.value
+        ? ThemeData(
+            useMaterial3: true,
+            brightness: brightness,
+            colorScheme: brightness == Brightness.light ? _light.value : _dark.value,
+            useSystemColors: true,
+            appBarTheme: AppBarTheme(
+              systemOverlayStyle: SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: statusBarIconBrightness,
+                systemNavigationBarColor: Get.theme.colorScheme.surface,
+              ),
+            ),
+          )
+        : ThemeData(
+            useMaterial3: true,
+            brightness: brightness,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: selectedThemeColor.value,
+              brightness: brightness,
+            ),
+            appBarTheme: AppBarTheme(
+              systemOverlayStyle: SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: statusBarIconBrightness,
+                systemNavigationBarColor: Get.theme.colorScheme.surface,
+              ),
+            ),
+          );
+    return base.copyWith(
+      fontFamily: 'Segoe UI',
+      fontFamilyFallback: const ['Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC'],
+      textTheme: base.textTheme.apply(fontFamilyFallback: const [
+        'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC',
+      ]),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: base.colorScheme.surfaceContainerHighest.withOpacity(0.42),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: base.colorScheme.outlineVariant),
         ),
-      );
-    } else {
-      return ThemeData(
-        useMaterial3: true,
-        brightness: brightness,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: selectedThemeColor.value,
-          brightness: brightness,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: base.colorScheme.outlineVariant),
         ),
-        appBarTheme: AppBarTheme(
-          systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: statusBarIconBrightness,
-            systemNavigationBarColor: Get.theme.colorScheme.surface,
-          ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: base.colorScheme.primary, width: 1.5),
         ),
-      );
-    }
+      ),
+      sliderTheme: base.sliderTheme.copyWith(
+        trackHeight: 4,
+        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+      ),
+    );
   }
 
   // 切换主题模式
