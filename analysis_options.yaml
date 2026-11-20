@@ -13,6 +13,8 @@ analyzer:
   exclude:
     - "packages/**/example/**"
     - "packages/*/example/**"
+    - "packages/smooth_sheets-0.15.0/test/**"
+    - "packages/smooth_sheets-0.15.0/analysis_options.yaml"
 
 linter:
   # The lint rules applied to this project can be customized in the
