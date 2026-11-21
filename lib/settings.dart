@@ -165,19 +165,22 @@ class _SettingsPageState extends State<SettingsPage> {
         builder: (context, pageScrollController, pageListController) => CustomScrollView(
           controller: pageScrollController,
           slivers: [
-            SliverAppBar(
-              floating: true,
-              pinned: true,
-              leading: BackButton(onPressed: routerPop),
-              actions: [
-                WebSocketHelper.buildReactiveButton(tooltip: "WebSocket服务器"),
-                WebSocketClientHelper.buildReactiveButton(
-                  tooltip: "WebSocket客户端",
-                ),
-              ],
-              expandedHeight: 120.0,
-              flexibleSpace: FlexibleSpaceBar(title: const Text('Settings')),
-            ),
+            if (!isWindows)
+              SliverAppBar(
+                floating: true,
+                pinned: true,
+                toolbarHeight: 56,
+                expandedHeight: 56,
+                leading: BackButton(onPressed: routerPop),
+                title: const Text('设置'),
+                centerTitle: false,
+                actions: [
+                  WebSocketHelper.buildReactiveButton(tooltip: "WebSocket服务器"),
+                  WebSocketClientHelper.buildReactiveButton(
+                    tooltip: "WebSocket客户端",
+                  ),
+                ],
+              ),
             SliverToBoxAdapter(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
