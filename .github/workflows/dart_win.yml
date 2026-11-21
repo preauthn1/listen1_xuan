@@ -137,7 +137,6 @@ jobs:
         run: |
           powershell Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath release_artifacts/windows-build-artifact-${{ env.GITHASH }}.zip
 
-      # 从 pubspec.yaml 提取版本号
       - name: Extract Version from pubspec.yaml
         id: extract_version
         run: |
@@ -150,7 +149,7 @@ jobs:
       # 删除该 Release 下所有旧的 Windows 构建文件
       - name: Delete Old Windows Assets from Release
         run: |
-          gh release view "${{ env.VERSION }}" --json assets --jq '.assets[].name' | Select-String -Pattern 'windows-build-artifact-.+\.zip$' | ForEach-Object {
+          gh release view "${{ env.VERSION }}" --json assets --jq '.assets[].name' | Select-String -Pattern '^(windows-build-artifact|listen1_xuan)-.+\.(zip|exe)$' | ForEach-Object {
             $asset = $_.Line.Trim()
             Write-Host "Deleting old asset: $asset"
             gh release delete-asset "${{ env.VERSION }}" "$asset" --yes 2>$null
