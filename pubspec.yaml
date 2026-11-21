@@ -63,7 +63,7 @@ dependencies:
   install_plugin:
     path: packages/install_plugin-2.1.0
   flutter_isolate: ^2.1.0
-  adaptive_theme: ^3.6.0
+  adaptive_theme: 3.6.0
   preload_page_view: ^0.2.0
   system_info3: ^4.0.1
   animations: 2.1.1

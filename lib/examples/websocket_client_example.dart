@@ -98,6 +98,7 @@ class _WebSocketClientControlContentState
     extends State<WebSocketClientControlContent> {
   late TextEditingController _reconnectController;
   late TextEditingController _heartbeatController;
+  late TextEditingController _tokenController;
   late ScrollController _scrollController;
   bool _wasConnected = false;
 
@@ -113,6 +114,7 @@ class _WebSocketClientControlContentState
     _heartbeatController = TextEditingController(
       text: controller.heartbeatInterval.toString(),
     );
+    _tokenController = TextEditingController(text: controller.serverToken);
 
     // 初始化ScrollController
     _scrollController = ScrollController(
@@ -136,6 +138,7 @@ class _WebSocketClientControlContentState
   void dispose() {
     _reconnectController.dispose();
     _heartbeatController.dispose();
+    _tokenController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -245,7 +248,10 @@ class _WebSocketClientControlContentState
                                   ? ctrl.cancelConnection
                                   : ctrl.isConnected
                                   ? ctrl.disconnect
-                                  : ctrl.connect,
+                                  : () {
+                                      ctrl.updateServerToken(_tokenController.text);
+                                      ctrl.connect();
+                                    },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: ctrl.isConnected
                                     ? Colors.red.withOpacity(0.9)
@@ -776,8 +782,18 @@ class _WebSocketClientControlContentState
                 _buildConfigSection('连接配置', [
                   Column(
                     children: [
-                      // 服务器地址历史列表和管理
                       _buildServerAddressSection(ctrl),
+                      12.sbh,
+                      TextField(
+                        obscureText: true,
+                        controller: _tokenController,
+                        onSubmitted: ctrl.updateServerToken,
+                        decoration: const InputDecoration(
+                          labelText: '服务器配对令牌',
+                          hintText: '从服务器面板复制令牌后输入',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
                     ],
                   ),
                 ]),
@@ -1378,19 +1394,20 @@ class _WebSocketClientControlContentState
       if (result != null && result.isNotEmpty) {
         final controller = Get.find<WebSocketClientController>();
 
-        // 检查地址是否已存在于历史列表中
-        if (controller.historyAddresses.contains(result)) {
-          // 如果地址已存在，直接选中
-          controller.updateServerAddress(result);
+        // 配对二维码格式为 address|token；旧二维码没有 token，仍允许录入地址但连接会提示缺少令牌。
+        final parts = result.split('|');
+        final address = parts.first;
+        if (parts.length > 1 && parts[1].isNotEmpty) {
+          _tokenController.text = parts[1];
+          controller.updateServerToken(parts[1]);
+        }
 
-          // 显示成功提示
-          showSuccessSnackbar('扫描成功', '已选中历史地址: $result');
+        if (controller.historyAddresses.contains(address)) {
+          controller.updateServerAddress(address);
+          showSuccessSnackbar('扫描成功', '已选中历史地址: $address');
         } else {
-          // 如果地址不存在，添加到历史列表F并选中
-          controller.addHistoryAddress(result);
-
-          // 显示成功提示
-          showSuccessSnackbar('扫描成功', '已添加并选中新地址: $result');
+          controller.addHistoryAddress(address);
+          showSuccessSnackbar('扫描成功', '已添加并选中新地址: $address');
         }
       }
     } catch (e) {

@@ -17,8 +17,9 @@ typedef BilibiliTranscodeProgress =
 class BilibiliMp3Transcoder {
   const BilibiliMp3Transcoder();
 
+  static const int _maxOutputBytes = 64 * 1024 * 1024;
+  static const Duration _maxDuration = Duration(minutes: 10);
   static const _maxErrorLength = 2000;
-
   Future<void> transcode({
     required Dio dio,
     required String sourceUrl,
@@ -35,9 +36,26 @@ class BilibiliMp3Transcoder {
       onProgress: onDownloadProgress,
     );
 
+    final completedSession = Completer<FFmpegSession>();
+    FFmpegSession? runningSession;
+    Timer? timeoutTimer;
+    Future<FFmpegSession>? executeFuture;
     try {
-      final completedSession = Completer<FFmpegSession>();
-      await FFmpegKit.executeWithArgumentsAsync(
+      timeoutTimer = Timer(_maxDuration, () {
+        if (runningSession != null) {
+          FFmpegKit.cancel();
+        } else {
+          // The native plugin may return its session only after completion;
+          // the no-argument cancel is the only portable emergency fallback.
+          FFmpegKit.cancel();
+        }
+        if (!completedSession.isCompleted) {
+          completedSession.completeError(
+            const BilibiliTranscodeException('FFmpeg 转码超时'),
+          );
+        }
+      });
+      executeFuture = FFmpegKit.executeWithArgumentsAsync(
         buildArguments(
           proxy.url.toString(),
           outputPath,
@@ -46,6 +64,7 @@ class BilibiliMp3Transcoder {
           coverPath: coverPath,
         ),
         (session) {
+          runningSession = session;
           if (!completedSession.isCompleted) completedSession.complete(session);
         },
         null,
@@ -56,16 +75,35 @@ class BilibiliMp3Transcoder {
           );
         },
       );
+      await executeFuture;
       final session = await completedSession.future;
+      if (runningSession == null) runningSession = session;
 
       final returnCode = await session.getReturnCode();
       if (!ReturnCode.isSuccess(returnCode)) {
         final output = await session.getOutput();
         throw BilibiliTranscodeException(_errorMessage(output));
       }
+      final outputFile = File(outputPath);
+      if (await outputFile.length() > _maxOutputBytes) {
+        throw const BilibiliTranscodeException('输出音频超过大小限制');
+      }
       await CacheAudioMetadata.validateAudioOutput(outputPath);
     } finally {
+      timeoutTimer?.cancel();
+      if (runningSession != null) {
+        try {
+          final returnCode = await runningSession!.getReturnCode();
+          if (!ReturnCode.isSuccess(returnCode)) {
+            // The session has already terminated or was cancelled.
+          }
+        } catch (_) {}
+      }
       await proxy.close();
+      if (await File(outputPath).exists() &&
+          await File(outputPath).length() > _maxOutputBytes) {
+        await File(outputPath).delete();
+      }
     }
   }
 
@@ -141,6 +179,9 @@ class BilibiliTranscodeException implements Exception {
 }
 
 class _BilibiliAudioProxy {
+  static const int _maxInputBytes = 256 * 1024 * 1024;
+  static const Duration _maxDuration = Duration(minutes: 10);
+  static const int _maxOutputBytes = 64 * 1024 * 1024;
   _BilibiliAudioProxy._({
     required this.server,
     required this.url,
@@ -216,6 +257,9 @@ class _BilibiliAudioProxy {
       final contentLength = int.tryParse(
         upstream.headers.value(HttpHeaders.contentLengthHeader) ?? '',
       );
+      if (contentLength != null && contentLength > _maxInputBytes) {
+        throw const BilibiliTranscodeException('输入音频超过大小限制');
+      }
       if (contentLength != null && contentLength >= 0) {
         response.contentLength = contentLength;
       }
@@ -229,12 +273,17 @@ class _BilibiliAudioProxy {
         contentLength,
       );
       var received = 0;
+      var outputBytes = 0;
       final stream = body.stream.map((chunk) {
         received += chunk.length;
+        outputBytes += chunk.length;
+        if (received > _maxInputBytes || outputBytes > _maxOutputBytes) {
+          throw const BilibiliTranscodeException('音频传输超过大小限制');
+        }
         onProgress?.call(rangeStart + received, total);
         return chunk;
       });
-      await response.addStream(stream);
+      await response.addStream(stream).timeout(_maxDuration);
     } catch (_) {
       if (!responseStarted) response.statusCode = HttpStatus.badGateway;
     } finally {

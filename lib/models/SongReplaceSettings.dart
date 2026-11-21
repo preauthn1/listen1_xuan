@@ -39,17 +39,28 @@ class SongReplaceSettings {
   }
   Track? getReplacedTrack(String originalId) {
     String replacementId = originalId;
-    do {
-      String? toRe = idMappings[replacementId];
+    final visited = <String>{};
+    // A malformed imported setting must not hang the UI isolate forever.
+    while (visited.add(replacementId)) {
+      final toRe = idMappings[replacementId];
       if (toRe == null) {
-        if (replacementId == originalId) {
-          return null;
-        } else {
-          return trackDetails[replacementId];
-        }
+        return replacementId == originalId ? null : trackDetails[replacementId];
       }
       replacementId = toRe;
-    } while (true);
+    }
+    return null;
+  }
+
+  bool _wouldCreateCycle(String originalId, String replacementId) {
+    var current = replacementId;
+    final visited = <String>{};
+    while (visited.add(current)) {
+      if (current == originalId) return true;
+      final next = idMappings[current];
+      if (next == null) return false;
+      current = next;
+    }
+    return true;
   }
 
   /// 构建反向索引
@@ -81,6 +92,17 @@ class SongReplaceSettings {
   /// [replacementId] 替换歌曲ID
   /// [track] 替换歌曲的详细信息（可选）
   void setMapping(String originalId, String replacementId, {Track? track}) {
+    if (originalId.isEmpty || replacementId.isEmpty || originalId == replacementId) {
+      throw ArgumentError('歌曲替换映射必须使用两个不同的非空 ID');
+    }
+    final previous = idMappings[originalId];
+    idMappings.remove(originalId);
+    if (_wouldCreateCycle(originalId, replacementId)) {
+      if (previous != null) idMappings[originalId] = previous;
+      throw ArgumentError('歌曲替换映射不能形成循环');
+    }
+    if (previous != null) idMappings[originalId] = previous;
+
     // 如果原始映射存在，先从反向索引中移除
     if (idMappings.containsKey(originalId)) {
       final oldReplacementId = idMappings[originalId]!;
