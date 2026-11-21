@@ -45,6 +45,7 @@ class WebSocketClientController extends GetxController {
 
   /// 客户端配置
   final RxString _serverAddress = '127.0.0.1:25917'.obs;
+  final RxString _serverToken = ''.obs;
   final RxBool _autoReconnect = false.obs;
   final RxInt _reconnectInterval = 5.obs; // 秒
   final RxInt _heartbeatInterval = 30.obs; // 秒
@@ -122,6 +123,7 @@ class WebSocketClientController extends GetxController {
   bool get isConnecting => i_isConnecting.value;
   bool get isDisconnecting => _isDisconnecting.value;
   String get serverAddress => _serverAddress.value;
+  String get serverToken => _serverToken.value;
   bool get autoReconnect => _autoReconnect.value;
   int get reconnectInterval => _reconnectInterval.value;
   int get heartbeatInterval => _heartbeatInterval.value;
@@ -150,6 +152,8 @@ class WebSocketClientController extends GetxController {
       _wsClientBtnShowFloating.value =
           settings['wsClientBtnShowFloating'] ?? false;
       final address = settings['wsClientAddress'] as String?;
+      final token = settings['wsClientToken'] as String?;
+      if (token != null) _serverToken.value = token;
       final autoReconn = settings['wsClientAutoReconnect'] as bool?;
       final reconnInterval = settings['wsClientReconnectInterval'] as int?;
       final heartInterval = settings['wsClientHeartbeatInterval'] as int?;
@@ -197,6 +201,7 @@ class WebSocketClientController extends GetxController {
       settings['wsClientAutoStart'] = _wsClientAutoStart.value;
       settings['wsClientBtnShow'] = _wsClientBtnShow.value;
       settings['wsClientAddress'] = _serverAddress.value;
+      settings['wsClientToken'] = _serverToken.value;
       settings['wsClientBtnShowFloating'] = _wsClientBtnShowFloating.value;
       settings['wsClientAutoReconnect'] = _autoReconnect.value;
       settings['wsClientReconnectInterval'] = _reconnectInterval.value;
@@ -284,6 +289,11 @@ class WebSocketClientController extends GetxController {
   /// 切换卡片展开状态
   void toggleExpanded() {
     _isExpanded.value = !_isExpanded.value;
+  }
+
+  void updateServerToken(String token) {
+    _serverToken.value = token.trim();
+    saveWebSocketClientSettings();
   }
 
   /// 更新服务器地址
@@ -555,7 +565,13 @@ class WebSocketClientController extends GetxController {
       abortCompleter = Completer<void>();
       _connectAbortCompleter = abortCompleter;
 
-      final connectFuture = WebSocket.connect(uri, customClient: httpClient);
+      final connectFuture = WebSocket.connect(
+        uri,
+        customClient: httpClient,
+        headers: _serverToken.value.isEmpty
+            ? null
+            : {'x-listen1-pairing-token': _serverToken.value},
+      );
 
       // 取消后底层握手若仍成功，立即关闭，避免遗留连接
       connectFuture.then<void>((ws) {
@@ -602,10 +618,11 @@ class WebSocketClientController extends GetxController {
 
       // 监听消息
       _wsSubscription?.cancel();
-      _wsSubscription = _webSocket!.listen(
+      final connectedSocket = _webSocket!;
+      _wsSubscription = connectedSocket.listen(
         _onMessage,
-        onDone: _onDisconnected,
-        onError: _onError,
+        onDone: () => _onDisconnectedFor(connectedSocket),
+        onError: (error) => _onErrorFor(connectedSocket, error),
       );
     } catch (e) {
       if (cancelled()) {
@@ -1044,6 +1061,15 @@ class WebSocketClientController extends GetxController {
     }
   }
 
+  void _onDisconnectedFor(WebSocket socket) {
+    if (!identical(_webSocket, socket)) return;
+    _onDisconnected();
+  }
+
+  void _onErrorFor(WebSocket socket, dynamic error) {
+    if (!identical(_webSocket, socket)) return;
+    _onError(error);
+  }
   /// 处理连接断开
   void _onDisconnected() {
     _logger.i('$_tag WebSocket连接已断开');

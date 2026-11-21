@@ -93,6 +93,11 @@ class WebSocketServerCard extends StatelessWidget {
                     ),
                     if (ctrl.isServerRunning) ...[
                       4.sbh,
+                      SelectableText(
+                        '配对令牌: ${ctrl.accessToken}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      4.sbh,
                       Text(
                         '连接数: ${ctrl.clientCount}',
                         style: TextStyle(fontSize: 14, color: Colors.grey[600]),
@@ -272,17 +277,23 @@ class _WebSocketControlContentState extends State<WebSocketControlContent> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.grey.shade300, width: 2),
                 ),
-                child: Obx(
-                  () => QrImageView(
-                    data: WebSocketAddress(
-                      controller.selectBestAvailableAddress.value,
-                      controller.port,
-                    ).address,
+                child: Obx(() {
+                  // 本机绑定时只展示回环地址；局域网绑定时展示实际监听地址。
+                  final advertisedHost = controller.host == '127.0.0.1' ||
+                          controller.host == '::1'
+                      ? controller.host
+                      : controller.selectBestAvailableAddress.value;
+                  final payload = '${WebSocketAddress(
+                    advertisedHost,
+                    controller.port,
+                  ).address}|${controller.accessToken}';
+                  return QrImageView(
+                    data: payload,
                     version: QrVersions.auto,
                     size: 200.0,
                     backgroundColor: Colors.white,
-                  ),
-                ),
+                  );
+                }),
               ),
 
               20.sbh,
@@ -307,8 +318,7 @@ class _WebSocketControlContentState extends State<WebSocketControlContent> {
                                   controller.selectBestAvailableAddress.value,
                               onSelected: (String? value) {
                                 if (value != null) {
-                                  controller.selectBestAvailableAddress.value =
-                                      value;
+                                  controller.updateBindAddress(value);
                                 }
                               },
                             ),
@@ -329,15 +339,13 @@ class _WebSocketControlContentState extends State<WebSocketControlContent> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(
-                            text: WebSocketAddress(
-                              controller.selectBestAvailableAddress.value,
-                              controller.port,
-                            ).address,
-                          ),
-                        );
-                        showSuccessSnackbar('成功', '地址已复制到剪贴板');
+                        final address = WebSocketAddress(
+                          controller.selectBestAvailableAddress.value,
+                          controller.port,
+                        ).address;
+                        final payload = '$address|${controller.accessToken}';
+                        Clipboard.setData(ClipboardData(text: payload));
+                        showSuccessSnackbar('成功', '地址和配对令牌已复制到剪贴板');
                       },
                       icon: const Icon(Icons.copy, size: 16),
                       label: const Text('复制地址'),
@@ -641,12 +649,10 @@ class WebSocketHelper {
 
   /// 快速启动服务器
   static Future<void> quickStart({
-    String host = '::',
-    int port = 8080,
+    int port = 25917,
     String tag = 'websocket_card',
   }) async {
     final controller = Get.put(WebSocketCardController());
-    // 不再需要设置 host，默认使用双栈监听
     controller.updatePort(port);
     await controller.startServer();
   }

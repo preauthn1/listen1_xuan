@@ -58,7 +58,7 @@ class UpdController extends GetxController {
   }
 
   /// 获取 GitHub OAuth Token
-  Future<String?> _getGithubToken() async {
+  Future<String?> getGithubToken() async {
     final s = Get.find<SettingsController>();
     return await s.getString('githubOauthAccessKey');
   }
@@ -143,44 +143,89 @@ class UpdController extends GetxController {
   /// 检查文件哈希是否匹配 (通用)
   Future<bool> _checkFileHash(
     String filePath,
-    String expectedHash,
+    String? expectedHash,
     List<String> hashCommand,
   ) async {
-    if (!await File(filePath).exists()) {
+    final expected = expectedHash?.trim().toLowerCase() ?? '';
+    if (!RegExp(r'^(sha256:)?[0-9a-f]{64}$').hasMatch(expected)) {
       return false;
     }
+    if (!await File(filePath).exists()) return false;
 
     try {
       final result = await Process.run(hashCommand[0], hashCommand.sublist(1));
-      final hashStr = result.stdout.toString();
-      final actualHash = _extractHash(hashStr, hashCommand[0]);
-      final cleanExpectedHash = expectedHash.replaceAll("sha256:", "").trim();
-
-      debugPrint('文件哈希: $actualHash');
-      debugPrint('预期哈希: $cleanExpectedHash');
-
-      if (actualHash == cleanExpectedHash) {
-        debugPrint('文件已存在且hash一致，跳过下载');
-        return true;
-      }
+      if (result.exitCode != 0) return false;
+      final actualHash = _extractHash(result.stdout.toString(), hashCommand[0]);
+      final cleanExpected = expected.replaceFirst('sha256:', '');
+      return actualHash == cleanExpected;
     } catch (e) {
-      debugPrint('哈希检查失败: $e');
+      debugPrint('哈希检查失败: ${e.runtimeType}');
+      return false;
     }
-    return false;
   }
 
   /// 提取哈希值
   String _extractHash(String output, String command) {
-    if (command == 'certutil') {
-      return output.split('\n')[1].trim();
-    } else if (command == 'shasum') {
-      return output.split(' ')[0].trim();
-    }
-    return '';
+    final matches = RegExp(r'\b[0-9a-fA-F]{64}\b').allMatches(output);
+    if (matches.isEmpty) return '';
+    return matches.first.group(0)!.toLowerCase();
   }
 
-  /// 获取302重定向的实际下载链接
+  bool _isTrustedGithubReleaseUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasPort ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      return false;
+    }
+    if (uri.host == 'github.com') {
+      final segments = uri.pathSegments;
+      return segments.length >= 5 &&
+          segments[0] == 'HBWuChang' &&
+          segments[1] == 'listen1_xuan' &&
+          segments[2] == 'releases' &&
+          segments[3] == 'download';
+    }
+    if (uri.host == 'objects.githubusercontent.com' ||
+        uri.host.endsWith('.blob.core.windows.net')) {
+      return uri.path.isNotEmpty &&
+          (uri.host == 'objects.githubusercontent.com' ||
+              (uri.queryParameters.containsKey('sig') &&
+                  uri.queryParameters.keys.every(
+                    (key) => const {
+                      'sv',
+                      'st',
+                      'se',
+                      'sr',
+                      'sp',
+                      'sig',
+                      'rscd',
+                      'rsct',
+                    }.contains(key),
+                  )));
+    }
+    if (uri.host == 'api.github.com') {
+      final segments = uri.pathSegments;
+      return segments.length >= 6 &&
+          segments[0] == 'repos' &&
+          segments[1] == 'HBWuChang' &&
+          segments[2] == 'listen1_xuan' &&
+          segments[3] == 'actions' &&
+          segments[4] == 'artifacts' &&
+          int.tryParse(segments[5]) != null &&
+          (segments.length == 6 ||
+              (segments.length == 7 && segments[6] == 'zip'));
+    }
+    return false;
+  }
+
   Future<String> _getActualDownloadUrl(String downloadUrl, String token) async {
+    if (!_isTrustedGithubReleaseUrl(downloadUrl)) {
+      throw const FormatException('GitHub 下载地址不受信任');
+    }
     final redirectResponse = await dioWithProxyAdapter.get(
       downloadUrl,
       options: Options(
@@ -191,11 +236,44 @@ class UpdController extends GetxController {
     );
 
     if (redirectResponse.statusCode == 302) {
-      return redirectResponse.headers.value('location') ?? downloadUrl;
+      final location = redirectResponse.headers.value('location');
+      final target = Uri.tryParse(location ?? '');
+      if (target == null ||
+          target.scheme != 'https' ||
+          target.userInfo.isNotEmpty ||
+          target.hasPort ||
+          target.hasFragment ||
+          (target.host != 'objects.githubusercontent.com' &&
+              !target.host.endsWith('.blob.core.windows.net'))) {
+        throw const FormatException('GitHub 重定向地址不受信任');
+      }
+      if (target.host.endsWith('.blob.core.windows.net')) {
+        const allowed = {
+          'sv', 'st', 'se', 'sr', 'sp', 'sig', 'rscd', 'rsct'
+        };
+        if (!target.queryParameters.containsKey('sig') ||
+            target.queryParameters.keys.any((key) => !allowed.contains(key))) {
+          throw const FormatException('GitHub 签名地址参数不受信任');
+        }
+      }
+      return target.toString();
     }
     return downloadUrl;
   }
 
+  Future<bool> _verifySha256File(String filePath, String expectedHash) async {
+    final expected = expectedHash.toLowerCase().replaceFirst('sha256:', '').trim();
+    if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(expected)) return false;
+    final file = File(filePath);
+    if (!await file.exists()) return false;
+    try {
+      final actual = await sha256.bind(file.openRead()).first;
+      return actual.toString().toLowerCase() == expected;
+    } catch (error) {
+      debugPrint('文件校验失败: ${error.runtimeType}');
+      return false;
+    }
+  }
   /// 使用 HyperDownloadController 下载文件
   Future<void> _downloadWithHyperController({
     required String url,
@@ -232,7 +310,7 @@ class UpdController extends GetxController {
 
   Future<void> downloadArtifactWindows() async {
     try {
-      final token = await _getGithubToken();
+      final token = await getGithubToken();
       if (token == null) {
         showWarningSnackbar('请先登录Github', null);
         return;
@@ -253,8 +331,11 @@ class UpdController extends GetxController {
         return;
       }
 
-      // 检查文件哈希
-      final needDownload = !await _checkFileHash(filePath, art["digest"], [
+      final digest = (art['digest'] as String?)?.trim();
+      if (digest == null || digest.isEmpty) {
+        throw const FormatException('构建产物缺少 SHA-256 校验值');
+      }
+      final needDownload = !await _checkFileHash(filePath, digest, [
         'certutil',
         '-hashfile',
         filePath,
@@ -273,6 +354,12 @@ class UpdController extends GetxController {
           savePath: filePath,
           context: Get.context!,
           onComplete: () async {
+            if (!await _verifySha256File(filePath, digest)) {
+              try {
+                await File(filePath).delete();
+              } catch (_) {}
+              throw const FormatException('构建产物校验失败');
+            }
             showSuccessSnackbar('下载成功', null);
             await _performWindowsExtractAndUpdate(tempPath, filePath);
           },
@@ -293,7 +380,7 @@ class UpdController extends GetxController {
         throw Exception("没有权限访问存储空间");
       }
 
-      final token = await _getGithubToken();
+      final token = await getGithubToken();
       if (token == null) {
         showWarningSnackbar('请先登录Github', null);
         return;
@@ -313,6 +400,10 @@ class UpdController extends GetxController {
         return;
       }
 
+      final digest = (selectedArt['digest'] as String?)?.trim();
+      if (digest == null || digest.isEmpty) {
+        throw const FormatException('构建产物缺少 SHA-256 校验值');
+      }
       final downloadUrl = selectedArt["archive_download_url"];
       final actualDownloadUrl = await _getActualDownloadUrl(downloadUrl, token);
 
@@ -320,10 +411,16 @@ class UpdController extends GetxController {
         url: actualDownloadUrl,
         savePath: filePath,
         context: Get.context!,
-        onComplete: () async {
-          showSuccessSnackbar('下载成功', null);
-          await _extractAndInstallApk(tempPath, filePath);
-        },
+          onComplete: () async {
+            if (!await _verifySha256File(filePath, digest)) {
+              try {
+                await File(filePath).delete();
+              } catch (_) {}
+              throw const FormatException('构建产物校验失败');
+            }
+            showSuccessSnackbar('下载成功', null);
+            await _extractAndInstallApk(tempPath, filePath);
+          },
       );
     } catch (e) {
       _closeProgressDialog();
@@ -455,7 +552,7 @@ class UpdController extends GetxController {
 
   Future<void> downloadArtifactMacos() async {
     try {
-      final token = await _getGithubToken();
+      final token = await getGithubToken();
       if (token == null) {
         showWarningSnackbar('请先登录Github', null);
         return;
@@ -482,13 +579,16 @@ class UpdController extends GetxController {
       }
 
       // 检查文件哈希
-      final needDownload = !await _checkFileHash(filePath, art["digest"], [
+      final digest = (art['digest'] as String?)?.trim();
+      if (digest == null || digest.isEmpty) {
+        throw const FormatException('构建产物缺少 SHA-256 校验值');
+      }
+      final needDownload = !await _checkFileHash(filePath, digest, [
         'shasum',
         '-a',
         '256',
         filePath,
       ]);
-
       if (needDownload) {
         final downloadUrl = art["archive_download_url"];
         final actualDownloadUrl = await _getActualDownloadUrl(
@@ -500,7 +600,13 @@ class UpdController extends GetxController {
           url: actualDownloadUrl,
           savePath: filePath,
           context: Get.context!,
-          onComplete: () async {
+            onComplete: () async {
+            if (!await _verifySha256File(filePath, digest)) {
+              try {
+                await File(filePath).delete();
+              } catch (_) {}
+              throw const FormatException('构建产物校验失败');
+            }
             showSuccessSnackbar('下载成功', null);
           },
         );
@@ -984,23 +1090,17 @@ class UpdController extends GetxController {
   ) async {
     try {
       progressText.value = '获取链接';
-
-      // 根据平台选择下载链接和对应的 asset
-      String downloadUrl = latestBuild.browserDownloadUrl;
+      final downloadUrl = _validatedReleaseDownloadUrl(latestBuild);
 
       final tempPath = (await xuanGetdownloadDirectory()).path;
       final fileName = latestBuild.name;
       final filePath = p.join(tempPath, fileName);
 
-      // 检查本地是否已有相同的文件且哈希匹配
       progressText.value = '检查本地';
-      final needDownload = await _checkReleaseFileHash(
-        filePath,
-        latestBuild.digest,
-      );
+      final digest = _requiredReleaseDigest(latestBuild);
+      final needDownload = await _checkReleaseFileHash(filePath, digest);
 
       if (!needDownload) {
-        debugPrint('文件已存在且哈希匹配，跳过下载');
         progressText.value = '正在处理';
         await _processReleaseUpdate(filePath, tempPath);
         isUpdating.value = false;
@@ -1008,8 +1108,6 @@ class UpdController extends GetxController {
       }
 
       progressText.value = '正在下载';
-
-      // 使用 HyperDownloadController 下载文件
       if (Get.isRegistered<HyperDownloadController>()) {
         Get.delete<HyperDownloadController>();
       }
@@ -1021,24 +1119,18 @@ class UpdController extends GetxController {
         threadCount: Platform.numberOfProcessors,
         showDialog: false,
         onProgress: (DownloadProgressInfo info) {
-          // 更新进度文本，显示百分比
           progressText.value = '${(info.progress * 100).toStringAsFixed(1)}%';
         },
         onComplete: () async {
-          try {
-            if (isAndroid &&
-                latestBuild.digest?.isNotEmpty == true &&
-                await _checkReleaseFileHash(filePath, latestBuild.digest)) {
+          if (!await _verifySha256File(filePath, digest)) {
+            try {
               await File(filePath).delete();
-              throw const FormatException('安装包校验失败，请重新下载');
-            }
-            progressText.value = '正在处理';
-            await _processReleaseUpdate(filePath, tempPath);
-          } catch (error) {
-            showErrorSnackbar('更新失败', error.toString());
-          } finally {
-            isUpdating.value = false;
+            } catch (_) {}
+            throw const FormatException('安装包校验失败，请重新下载');
           }
+          progressText.value = '正在处理';
+          await _processReleaseUpdate(filePath, tempPath);
+          isUpdating.value = false;
         },
         onFailed: (String reason) {
           showErrorSnackbar('下载失败', reason);
@@ -1052,14 +1144,46 @@ class UpdController extends GetxController {
     }
   }
 
+  String _requiredReleaseDigest(ReleaseAsset asset) {
+    final digest = asset.digest?.trim() ?? '';
+    final match = RegExp(r'^sha256:[0-9a-fA-F]{64}$').firstMatch(digest);
+    if (match == null) {
+      throw const FormatException('更新包缺少有效的 SHA-256 校验值');
+    }
+    return digest.substring('sha256:'.length).toLowerCase();
+  }
+
+  String _validatedReleaseDownloadUrl(ReleaseAsset asset) {
+    final uri = Uri.tryParse(asset.browserDownloadUrl);
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.host != 'github.com' ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasPort ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      throw const FormatException('更新下载地址不是受信任的 GitHub 地址');
+    }
+    final segments = uri.pathSegments;
+    if (segments.length != 6 ||
+        segments[0] != 'HBWuChang' ||
+        segments[1] != 'listen1_xuan' ||
+        segments[2] != 'releases' ||
+        segments[3] != 'download' ||
+        segments[5] != asset.name) {
+      throw const FormatException('更新下载地址不属于目标仓库');
+    }
+    return uri.toString();
+  }
+
   /// 检查 Release 文件哈希是否匹配
   /// 返回 true 表示需要下载，false 表示文件已存在且哈希匹配
   Future<bool> _checkReleaseFileHash(
     String filePath,
-    String? expectedHash,
+    String expectedHash,
   ) async {
-    if (expectedHash == null || isEmpty(expectedHash)) {
-      // 如果没有哈希值信息，则需要下载
+    final cleanExpectedHash = expectedHash.trim().toLowerCase();
+    if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(cleanExpectedHash)) {
       return true;
     }
 
@@ -1070,8 +1194,7 @@ class UpdController extends GetxController {
     try {
       if (isAndroid) {
         final digest = await sha256.bind(File(filePath).openRead()).first;
-        return digest.toString() !=
-            expectedHash.replaceFirst('sha256:', '').trim();
+        return digest.toString().toLowerCase() != cleanExpectedHash;
       }
       List<String> hashCommand;
       if (isWindows) {
@@ -1079,27 +1202,17 @@ class UpdController extends GetxController {
       } else if (isMacOS) {
         hashCommand = ['shasum', '-a', '256', filePath];
       } else {
-        // 其他平台，需要下载
         return true;
       }
 
       final result = await Process.run(hashCommand[0], hashCommand.sublist(1));
-      final hashStr = result.stdout.toString();
-      final actualHash = _extractHash(hashStr, hashCommand[0]);
-      final cleanExpectedHash = expectedHash.replaceAll('sha256:', '').trim();
-
-      debugPrint('文件哈希: $actualHash');
-      debugPrint('预期哈希: $cleanExpectedHash');
-
-      if (actualHash == cleanExpectedHash) {
-        debugPrint('Release 文件已存在且哈希一致，跳过下载');
-        return false;
-      }
+      if (result.exitCode != 0) return true;
+      final actualHash = _extractHash(result.stdout.toString(), hashCommand[0]);
+      return actualHash.toLowerCase() != cleanExpectedHash;
     } catch (e) {
       debugPrint('Release 文件哈希检查失败: $e');
+      return true;
     }
-
-    return true;
   }
 
   /// 从 Release 中选择对应平台的 Asset

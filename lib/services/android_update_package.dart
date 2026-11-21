@@ -37,10 +37,17 @@ Future<String> extractAndroidUpdate(
   String archivePath,
   String directory,
 ) async {
+  final archiveBytes = await File(archivePath).readAsBytes();
+  if (archiveBytes.length > 256 * 1024 * 1024) {
+    throw const FormatException('安装包 ZIP 文件过大');
+  }
   final archive = ZipDecoder().decodeBytes(
-    await File(archivePath).readAsBytes(),
+    archiveBytes,
     verify: true,
   );
+  if (archive.files.length > 1024) {
+    throw const FormatException('安装包 ZIP 条目过多');
+  }
   final apks = archive.files
       .where((file) => file.isFile && file.name.endsWith('.apk'))
       .toList();
@@ -48,10 +55,20 @@ Future<String> extractAndroidUpdate(
     throw const FormatException('安装包 ZIP 必须包含且仅包含一个 APK');
   }
   final apk = apks.single;
+  final candidate = apk.name.replaceAll('\\', '/');
+  if (candidate.startsWith('/') || candidate.contains('../')) {
+    throw const FormatException('安装包路径非法');
+  }
   if (apk.isSymbolicLink) {
     throw const FormatException('安装包不能是符号链接');
   }
   final content = apk.content as List<int>;
+  if (content.length > 512 * 1024 * 1024) {
+    throw const FormatException('安装包 APK 解压后过大');
+  }
+  if (apk.size > 0 && content.length > apk.size * 100) {
+    throw const FormatException('安装包压缩比异常');
+  }
   if (apk.crc32 != null && getCrc32(content) != apk.crc32) {
     throw const FormatException('安装包 ZIP 校验失败');
   }

@@ -92,5 +92,5 @@ class PlatformCredentials {
   int get hashCode => platform.hashCode ^ _raw.hashCode;
 
   @override
-  String toString() => 'PlatformCredentials(platform: $platform, token: $_raw)';
+  String toString() => 'PlatformCredentials(platform: $platform, token: [REDACTED])';
 }

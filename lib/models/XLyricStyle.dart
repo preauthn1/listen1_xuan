@@ -34,13 +34,21 @@ class XLyricStyle {
   FontWeight? get translationTextWeightValue => 
       toFontWeight(translationTextWeight);
   TextAlign get lineTextAlignValue {
-    return TextAlign.values[lineTextAlign ?? 2];
+    final index = lineTextAlign ?? 2;
+    if (index < 0 || index >= TextAlign.values.length) {
+      return TextAlign.center;
+    }
+    return TextAlign.values[index];
   }
 
   double get lineGapValue => lineGap ?? 25.0;
   double get translationLineGapValue => translationLineGap ?? 8.0;
   CrossAxisAlignment get contentAlignmentValue {
-    return CrossAxisAlignment.values[contentAlignment ?? 2];
+    final index = contentAlignment ?? 2;
+    if (index < 0 || index >= CrossAxisAlignment.values.length) {
+      return CrossAxisAlignment.center;
+    }
+    return CrossAxisAlignment.values[index];
   }
 
   FontWeight? toFontWeight(int? weight) {

@@ -16,6 +16,13 @@ analyzer:
     - "packages/**/test/**"
     - "packages/*/test/**"
     - "packages/smooth_sheets-0.15.0/analysis_options.yaml"
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 
 linter:
   # The lint rules applied to this project can be customized in the

@@ -25,21 +25,8 @@ class BroadcastWsController extends GetxController {
   }
 
   Future<void> startBroadcast(int port) async {
-    try {
-      await stopBroadcast();
-      BonsoirService service = BonsoirService(
-        name: deviceId,
-        type: broadcastType,
-        port: 3030,
-        attributes: {'port': port.toString()},
-      );
-
-      broadcast = BonsoirBroadcast(service: service);
-      await broadcast!.initialize();
-      await broadcast!.start();
-    } catch (e) {
-      showErrorSnackbar('启动地址广播失败', e.toString());
-    }
+    // 当前控制面仅绑定 loopback，广播 LAN 地址会生成不可达配对入口。
+    return;
   }
 
   Future<void> stopBroadcast() async {

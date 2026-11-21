@@ -291,18 +291,36 @@ class SettingsController extends GetxController {
     settings[supabaseUseBackupUrlKey] = value;
   }
 
-  // Supabase 账号密码保存（用于自动重连）
+  // Deprecated compatibility keys: values are intentionally never persisted.
   static const String supabaseEmailKey = 'supabaseEmail';
-  String get supabaseEmail => settings[supabaseEmailKey] ?? '';
-  set supabaseEmail(String value) {
-    settings[supabaseEmailKey] = value;
-  }
-
+  String get supabaseEmail => '';
+  set supabaseEmail(String value) {}
+  static const String githubTokenKey = 'githubOauthAccessKey';
   static const String supabasePasswordKey = 'supabasePassword';
-  String get supabasePassword => settings[supabasePasswordKey] ?? '';
-  set supabasePassword(String value) {
-    settings[supabasePasswordKey] = value;
-  }
+  static const Set<String> exportCredentialKeys = {
+    githubTokenKey,
+    supabaseEmailKey,
+    supabasePasswordKey,
+    'bl',
+    'ne',
+    'kg',
+    'qq',
+  };
+  static const Set<String> _playlistKeyPrefixes = {
+    'myplaylist_',
+    'neplaylist_',
+    'blplaylist_',
+    'kgplaylist_',
+    'qqplaylist_',
+    'biplaylist_',
+  };
+
+  static bool isPlaylistKey(String key) =>
+      _playlistKeyPrefixes.any(key.startsWith);
+
+
+  String get supabasePassword => '';
+  set supabasePassword(String value) {}
 
   static const String supabaseUploadTimeoutDurationOnExitKey =
       'supabaseUploadTimeoutDurationOnExit';
@@ -733,13 +751,35 @@ class SettingsController extends GetxController {
     }
 
     if (clearExisting) {
-      await lyricBox!.clear();
+      final backup = <dynamic, dynamic>{};
+      for (final key in lyricBox!.keys) {
+        backup[key] = lyricBox!.get(key);
+      }
+      try {
+        await lyricBox!.clear();
+        await lyricBox!.putAll(data);
+      } catch (_) {
+        await lyricBox!.clear();
+        await lyricBox!.putAll(backup);
+        rethrow;
+      }
+      return;
     }
 
     await lyricBox!.putAll(data);
   }
 
+  Future<void> _removeLegacyCredentials() async {
+    for (final key in <String>[
+      supabaseEmailKey,
+      supabasePasswordKey,
+    ]) {
+      await remove(key: key);
+    }
+  }
+
   Future<void> loadSettings() async {
+    await _removeLegacyCredentials();
     if (kDebugMode) {
       await _loadSettingsDir();
     } else {
@@ -800,9 +840,13 @@ class SettingsController extends GetxController {
     final play_replace = await getString(PlayController_play_replaceKey);
 
     // 直接解析 JSON 数据（不使用 compute）
-    if (jsonString != null) {
-      settings.value = jsonDecode(jsonString) as Map<String, dynamic>;
-    }
+      if (jsonString != null) {
+        final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
+        decoded.remove(supabaseEmailKey);
+        decoded.remove(supabasePasswordKey);
+        decoded.remove('githubOauthAccessKey');
+        settings.value = decoded;
+      }
     showLyricTranslation.value = settings['showLyricTranslation'] ?? true;
 
     if (localCacheListJson != null) {
@@ -956,7 +1000,11 @@ class SettingsController extends GetxController {
 
     // 应用解析结果
     if (computeResults[0] != null) {
-      settings.value = computeResults[0] as Map<String, dynamic>;
+      final decoded = computeResults[0] as Map<String, dynamic>;
+      decoded.remove(supabaseEmailKey);
+      decoded.remove(supabasePasswordKey);
+      decoded.remove('githubOauthAccessKey');
+      settings.value = decoded;
     }
     showLyricTranslation.value = settings['showLyricTranslation'] ?? true;
 

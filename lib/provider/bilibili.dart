@@ -398,7 +398,7 @@ class Bilibili extends BaseProvider {
 
     var pn = 1;
     var hasMore = true;
-    while (hasMore) {
+    while (hasMore && pn <= 100 && playlists.length < 10000) {
       final response = await dioWithCookieManager.get(
         '$url?pn=$pn&ps=20&up_mid=$userId&platform=web',
         options: Options(headers: {'content-type': 'application/json'}),
@@ -484,7 +484,7 @@ class Bilibili extends BaseProvider {
     var pn = 1;
     var hasMore = true;
     dynamic firstData;
-    while (hasMore) {
+    while (hasMore && pn <= 100 && medias.length < 10000) {
       final response = await dioWithCookieManager.get(
         '${url}pn=$pn&media_id=$mediaId',
         options: Options(headers: headers),
