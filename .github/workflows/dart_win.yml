@@ -1,26 +1,26 @@
-name: win
+name: Build windows artifacts
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ "main" , "feat/dual-build-ffmpeg"]
-    paths:
-      - '**/*.dart'
-      - 'pubspec.yaml'
-      - 'packages/firebase_core_stub/**'
-      - 'packages/firebase_messaging_stub/**'
-      - 'scripts/build.sh'
-      - 'scripts/configure_build.py'
-      - 'scripts/verify_firebase_dependencies.py'
-      - 'inno_build.iss'
-      - 'assets/images/app_icon.ico'
-      - '**/dart_win.yml'
+  workflow_call:
+    secrets:
+      SUPABASE_PROXY_TOKEN:
+        required: false
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    permissions:
-      contents: write
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { ffmpeg: with, label: ffmpeg, installer: listen1_xuan-ffmpeg, installer_artifact: windows-installer-artifact-ffmpeg, build_artifact: windows-build-artifact-ffmpeg }
+          - { ffmpeg: without, label: lite, installer: listen1_xuan, installer_artifact: windows-installer-artifact, build_artifact: windows-build-artifact }
+    permissions:
+      contents: read
     steps:
       - name: Output Commit Information
         env:
@@ -39,117 +39,93 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
-          python-version: "3.13"
+          python-version: '3.13'
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
-          channel: 'stable'
+          channel: stable
           flutter-version: '3.41.9'
       - run: flutter --version
       - name: Exclude Firebase SDKs from this platform
         run: python scripts/configure_build.py firebase stub
         shell: bash
+      - name: Switch FFmpeg config (${{ matrix.label }})
+        run: bash scripts/build.sh ${{ matrix.ffmpeg }}
+        shell: bash
       - run: flutter pub get
+      - name: Verify Firebase is replaced by Dart-only stubs
+        run: python scripts/verify_firebase_dependencies.py stub
+        shell: bash
       - name: Extract Version from pubspec.yaml
-        id: extract_version
         run: |
           $version = (Select-String -Path pubspec.yaml -Pattern '^version:' | ForEach-Object { $_.Line -replace 'version:\s*', '' }).Trim()
           echo "VERSION=$version" >> $env:GITHUB_ENV
         shell: pwsh
-      - name: Verify Firebase is replaced by Dart-only stubs
-        run: python scripts/verify_firebase_dependencies.py stub
-        shell: bash
-
-      # ============ 第一遍: 带 FFmpeg 版本 ============
-      - name: Switch to FFmpeg-enabled config
-        shell: bash
-        run: bash scripts/build.sh with
-
-      - run: flutter pub get
-      - name: Verify Firebase is replaced by Dart-only stubs
-        run: python scripts/verify_firebase_dependencies.py stub
-        shell: bash
-
-      - run: >-
+      - name: Build Windows application (${{ matrix.label }})
+        run: >-
           flutter build windows --dart-define=gitHash=${{ env.GITHASH }}
           --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress --yes
-      - name: Build Inno Setup installer (ffmpeg)
+      - name: Build Inno Setup installer (${{ matrix.label }})
         shell: pwsh
         env:
           APP_VERSION: ${{ env.VERSION }}
           BUILD_DIR: ${{ github.workspace }}
           INSTALLER_OUTPUT_DIR: ${{ github.workspace }}\release_artifacts
-          INSTALLER_NAME: listen1_xuan-ffmpeg-${{ env.GITHASH }}
+          INSTALLER_NAME: ${{ matrix.installer }}-${{ env.GITHASH }}
         run: |
           New-Item -ItemType Directory -Force -Path release_artifacts | Out-Null
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /O+ /DAPP_VERSION="$env:APP_VERSION" /DBUILD_DIR="$env:BUILD_DIR" /DINSTALLER_OUTPUT_DIR="$env:INSTALLER_OUTPUT_DIR" /DINSTALLER_NAME="$env:INSTALLER_NAME" inno_build.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload Installer Artifact (ffmpeg)
+      - name: Upload Installer Artifact (${{ matrix.label }})
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: windows-installer-artifact-ffmpeg
-          path: release_artifacts/listen1_xuan-ffmpeg-${{ env.GITHASH }}.exe
+          name: ${{ matrix.installer_artifact }}
+          path: release_artifacts/${{ matrix.installer }}-${{ env.GITHASH }}.exe
+          if-no-files-found: error
+      # Canary updater extracts the Actions archive directly (no nested ZIP).
+      - name: Upload portable application
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ matrix.build_artifact }}
+          path: build/windows/x64/runner/Release/**
+          if-no-files-found: error
 
-      - name: Compress Build Artifacts (ffmpeg)
-        run: |
-          mkdir -p release_artifacts
-          powershell Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath release_artifacts/windows-build-artifact-ffmpeg-${{ env.GITHASH }}.zip
 
-      # ============ 第二遍: 无 FFmpeg 精简版 ============
-      - name: Switch to FFmpeg-free config
-        shell: bash
-        run: bash scripts/build.sh without
-
-      - run: flutter pub get
-      - name: Verify Firebase is replaced by Dart-only stubs
-        run: python scripts/verify_firebase_dependencies.py stub
-        shell: bash
-      - run: >-
-          flutter build windows --dart-define=gitHash=${{ env.GITHASH }}
-          --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
-      - name: Build Inno Setup installer (lite)
+  publish:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_call') && github.ref_type == 'tag'
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: windows-build-artifact*
+          path: bundles
+      - name: Package portable release ZIPs
         shell: pwsh
-        env:
-          APP_VERSION: ${{ env.VERSION }}
-          BUILD_DIR: ${{ github.workspace }}
-          INSTALLER_OUTPUT_DIR: ${{ github.workspace }}\release_artifacts
-          INSTALLER_NAME: listen1_xuan-${{ env.GITHASH }}
         run: |
+          $hash = $env:GITHUB_SHA.Substring(0,7)
+          "GITHASH=$hash" >> $env:GITHUB_ENV
           New-Item -ItemType Directory -Force -Path release_artifacts | Out-Null
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /O+ /DAPP_VERSION="$env:APP_VERSION" /DBUILD_DIR="$env:BUILD_DIR" /DINSTALLER_OUTPUT_DIR="$env:INSTALLER_OUTPUT_DIR" /DINSTALLER_NAME="$env:INSTALLER_NAME" inno_build.iss
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload Installer Artifact (lite)
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: windows-installer-artifact
-          path: release_artifacts/listen1_xuan-${{ env.GITHASH }}.exe
-      - name: Upload Build Artifact (lite)
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-              name: windows-build-artifact
-              path: build/windows/x64/runner/Release/**
-         # 打包构建产物为 ZIP 文件（同样输出到 release_artifacts/）
-      - name: Compress Build Artifacts (lite)
-        run: |
-          powershell Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath release_artifacts/windows-build-artifact-${{ env.GITHASH }}.zip
-
+          foreach ($name in 'windows-build-artifact', 'windows-build-artifact-ffmpeg') {
+            Compress-Archive -Path "bundles/$name/*" -DestinationPath "release_artifacts/$name-$hash.zip" -Force
+          }
       - name: Extract Version from pubspec.yaml
         id: extract_version
         run: |
           $version = (Select-String -Path pubspec.yaml -Pattern '^version:' | ForEach-Object { $_.Line -replace 'version:\s*', '' }).Trim()
           echo "VERSION=$version" >> $env:GITHUB_ENV
         shell: pwsh
-      - name: Debug Version
-        run: echo "${{ env.VERSION }}"
-      
       # 删除该 Release 下所有旧的 Windows 构建文件
       - name: Delete Old Windows Assets from Release
         run: |
-          gh release view "${{ env.VERSION }}" --json assets --jq '.assets[].name' | Select-String -Pattern '^(windows-build-artifact|listen1_xuan)-.+\.(zip|exe)$' | ForEach-Object {
+          gh release view "${{ env.VERSION }}" --json assets --jq '.assets[].name' | Select-String -Pattern '^(windows-build-artifact(-ffmpeg)?-.+\.zip|listen1_xuan(-ffmpeg)?-[0-9a-f]{7}\.exe)$' | ForEach-Object {
             $asset = $_.Line.Trim()
             Write-Host "Deleting old asset: $asset"
             gh release delete-asset "${{ env.VERSION }}" "$asset" --yes 2>$null
@@ -158,16 +134,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
         shell: pwsh
-        
+
       # 上传新的资产到最新 Release（带 FFmpeg 版 + 精简版）
       - name: Upload New Asset to Release
         uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
         with:
-          tag_name: ${{ env.VERSION }}
+          tag_name: ${{ github.ref_name }}
           files: |
             release_artifacts/windows-build-artifact-ffmpeg-${{ env.GITHASH }}.zip
             release_artifacts/windows-build-artifact-${{ env.GITHASH }}.zip
           prerelease: ${{ !contains(github.event.head_commit.message, 'sta') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          

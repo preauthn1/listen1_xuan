@@ -254,115 +254,138 @@ Widget _buildSupabasePanel() {
   });
 }
 
-Widget _buildProviderLoginRow(BuildContext context, BaseProvider provider) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-    child: Row(
-      children: [
-        SizedBox(
-          width: 34,
-          child: Center(
-            child: ColorFiltered(
-              colorFilter: ColorFilter.mode(
-                Theme.of(context).colorScheme.onSurfaceVariant,
-                BlendMode.srcIn,
-              ),
-              child: provider.loginIcon,
-            ),
-          ),
+Widget _loginRow({
+  required Widget icon,
+  required Widget status,
+  required String label,
+  required VoidCallback onPressed,
+}) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final scaler = MediaQuery.textScalerOf(context);
+      final actionWidth = scaler.scale(112) + 24;
+      final identity = Row(
+        children: [
+          SizedBox.square(dimension: 24, child: Center(child: icon)),
+          const SizedBox(width: 10),
+          Expanded(child: status),
+        ],
+      );
+      final action = FilledButton.tonal(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Obx(() {
-            switch (provider.loginStatus.value) {
-              case LoginStatus.processing:
-                return const Align(alignment: Alignment.centerLeft, child: LinearProgressIndicator());
-              case LoginStatus.loggedIn:
-                return Text(provider.currentUser.value?.name ?? '已连接');
-              case LoginStatus.failed:
-                return Tooltip(message: provider.loginError.value, child: const Text('登录状态获取失败'));
-              case LoginStatus.noLogin:
-                return Text('未连接', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant));
-            }
-          }),
-        ),
-        const SizedBox(width: 16),
-        FilledButton.tonal(
-          onPressed: () => provider.login(context),
-          child: Text(provider.loginButtonText),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildGithubLoginRow(BuildContext context) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-    child: Row(
-      children: [
-        SizedBox(
-          width: 34,
-          child: Iconify(Mdi.github, color: Theme.of(context).colorScheme.onSurfaceVariant),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Obx(() => Text(Github.getStatusText(), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)))),
-        const SizedBox(width: 16),
-        FilledButton.tonal(
-          onPressed: () => Github.openAuthUrl(),
-          child: const Text('登录 GitHub'),
-        ),
-      ],
-    ),
+        child: Text(label, textAlign: TextAlign.center),
+      );
+      if (constraints.maxWidth < actionWidth + scaler.scale(80) + 46) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [identity, action],
+        );
+      }
+      return Row(
+        children: [
+          Expanded(child: identity),
+          const SizedBox(width: 12),
+          SizedBox(width: actionWidth, child: action),
+        ],
+      );
+    },
   );
 }
 
 Widget _buildThirdPartyLoginPanel(BuildContext context) {
-  return Column(
-    children: <Widget>[
-      Builder(
-        builder: (context) {
-          return Column(
-            children: [
-              for (final provider in music_providers.provider.getLoginProviders())
-                _buildProviderLoginRow(context, provider),
-              _buildGithubLoginRow(context),
-            ],
-          );
-        },
-      ),
+  final theme = Theme.of(context);
+  Widget gatedAction(String label, String reason, VoidCallback? callback) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FilledButton.tonal(
+          onPressed: callback,
+          style: FilledButton.styleFrom(
+            disabledBackgroundColor: theme.colorScheme.surfaceContainerHighest,
+            disabledForegroundColor: theme.colorScheme.onSurfaceVariant,
+          ),
+          child: Text(label),
+        ),
+        if (callback == null)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 12, bottom: 4),
+            child: Text(reason, style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface,
+            )),
+          ),
+      ],
+    );
+  }
 
-      Wrap(
-        spacing: 8.0,
-        runSpacing: 8.0,
-        alignment: WrapAlignment.center,
-        children: [
-          Obx(() {
-            WebSocketClientController wscc =
-                Get.find<WebSocketClientController>();
-            return ElevatedButton(
-              onPressed: !wscc.isConnected
-                  ? null
-                  : () {
-                      wscc.sendGetCookieMessage();
-                    },
-              child: Text('从WebSocket服务器获取登录信息'),
-            );
-          }),
-          Obx(() {
-            final authController = Get.find<SupabaseAuthController>();
-            return ElevatedButton(
-              onPressed: !authController.isLoggedIn.value
-                  ? null
-                  : () {
-                      _showSupabaseTokenManagementDialog();
-                    },
-              child: Text('Supabase登录信息管理'),
-            );
-          }),
-        ],
+  return Align(
+    alignment: AlignmentDirectional.centerStart,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 480),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final provider in music_providers.provider.getLoginProviders())
+              _loginRow(
+                icon: provider.loginIcon,
+                status: Obx(() {
+                  switch (provider.loginStatus.value) {
+                    case LoginStatus.processing:
+                      return const LinearProgressIndicator();
+                    case LoginStatus.loggedIn:
+                      return Text(provider.currentUser.value?.name ?? '已连接');
+                    case LoginStatus.failed:
+                      return Tooltip(
+                        message: provider.loginError.value,
+                        child: const Text('登录状态获取失败'),
+                      );
+                    case LoginStatus.noLogin:
+                      return const Text('未连接');
+                  }
+                }),
+                label: provider.loginButtonText,
+                onPressed: () => provider.login(context),
+              ),
+            _loginRow(
+              icon: Iconify(Mdi.github, size: 18, color: theme.colorScheme.onSurface),
+              status: Obx(() => Text(Github.getStatusText())),
+              label: '登录 GitHub',
+              onPressed: () => Github.openAuthUrl(),
+            ),
+            const Divider(),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                Obx(() {
+                  final wscc = Get.find<WebSocketClientController>();
+                  return gatedAction(
+                    '从WebSocket服务器获取登录信息',
+                    '请先连接 WebSocket 服务器',
+                    wscc.isConnected ? wscc.sendGetCookieMessage : null,
+                  );
+                }),
+                Obx(() {
+                  final authController = Get.find<SupabaseAuthController>();
+                  return gatedAction(
+                    'Supabase登录信息管理',
+                    '请先登录 Supabase 账号',
+                    authController.isLoggedIn.value
+                        ? _showSupabaseTokenManagementDialog
+                        : null,
+                  );
+                }),
+              ],
+            ),
+          ],
+        ),
       ),
-    ].map((e) => Padding(padding: EdgeInsets.all(8.0), child: e)).toList(),
+    ),
   );
 }
 

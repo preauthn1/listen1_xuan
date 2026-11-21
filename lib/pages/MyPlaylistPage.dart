@@ -476,8 +476,10 @@ class _MyPlaylistState extends State<MyPlaylist> {
           tooltip: '歌曲替换列表',
           child: Icon(Icons.find_replace_rounded),
         ),
-        floatingActionButtonLocation:
-            settingsController.songReplaceFabMiniRx.value
+        floatingActionButtonLocation: isWindows &&
+                !settingsController.settings.containsKey(SettingsController.songReplaceFabLocationKey)
+            ? FloatingActionButtonLocation.centerFloat
+            : settingsController.songReplaceFabMiniRx.value
             ? settingsController.songReplaceFabLocation.fabMiniLocation
             : settingsController.songReplaceFabLocation.fabLocation,
         body: LayoutBuilder(
