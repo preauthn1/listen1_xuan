@@ -28,7 +28,7 @@ jobs:
           Expand-Archive -Path artifact.zip -DestinationPath app -Force
           if (-not (Test-Path app/listen1_xuan.exe)) { throw 'Artifact executable missing' }
       - name: Launch app and capture default and wide settings screenshots
-        shell: pwsh
+        shell: powershell
         run: .github/scripts/capture_windows_settings.ps1
       - name: Upload cropped app screenshots
         uses: actions/upload-artifact@v4
