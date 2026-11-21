@@ -1,4 +1,4 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,System.Drawing
 Add-Type @'
 using System;
@@ -15,8 +15,8 @@ public class UI {
 }
 '@ -ReferencedAssemblies System.Drawing
 $p=Start-Process (Resolve-Path app/listen1_xuan.exe) -WorkingDirectory (Resolve-Path app) -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP/app.out" -RedirectStandardError "$env:RUNNER_TEMP/app.err"
-for($i=0;$i -lt 60;$i++){Start-Sleep 1;$p.Refresh();if($p.HasExited){throw "App exited: $($p.ExitCode)"};if($p.MainWindowHandle){break}}
-$w=$p.MainWindowHandle;if(!$w){throw 'No app window'}
+for($i=0;$i -lt 60;$i++){Start-Sleep 1;$p.Refresh();if($p.HasExited){throw "App exited: $($p.ExitCode)"};if($p.MainWindowHandle -ne [intptr]::Zero){break}}
+$w=$p.MainWindowHandle;if($w -eq [intptr]::Zero){throw 'No app window'}
 $root=[Windows.Automation.AutomationElement]::FromHandle($w)
 function Named($text){$items=$root.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition);foreach($e in $items){if($e.Current.Name -like "*$text*" -or $e.Current.HelpText -eq $text){$b=$e.Current.BoundingRectangle;if(!$b.IsEmpty -and $b.Width -gt 0){return $e}}}}
 function Activate($text){for($i=0;$i -lt 20;$i++){ $e=Named $text;if($e){break};Start-Sleep 1};if(!$e){throw "Control unavailable: $text"};$b=$e.Current.BoundingRectangle;$x=[int]($b.X+$b.Width/2);$y=[int]($b.Y+$b.Height/2);if([UI]::GetAncestor([UI]::WindowFromPoint([Drawing.Point]::new($x,$y)),2) -ne $w){throw 'Control obscured'};[UI]::SetCursorPos($x,$y)|Out-Null;[UI]::mouse_event(2,0,0,0,0);[UI]::mouse_event(4,0,0,0,0);Start-Sleep 2}
