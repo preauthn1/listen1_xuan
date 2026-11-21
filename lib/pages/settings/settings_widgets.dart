@@ -88,12 +88,12 @@ Widget _buildSupabasePanel() {
                       if (authController.userCreatedAt != null)
                         Text(
                           '注册时间: ${authController.userCreatedAt}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: Get.theme.colorScheme.onSurfaceVariant),
                         ),
                       if (authController.userLastLoginAt != null)
                         Text(
                           '上次登录: ${authController.userLastLoginAt}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: Get.theme.colorScheme.onSurfaceVariant),
                         ),
                     ],
                   ),
@@ -218,7 +218,7 @@ Widget _buildSupabasePanel() {
           children: [
             Text(
               '使用 Supabase 账号可以同步您的数据',
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(color: Get.theme.colorScheme.onSurfaceVariant),
             ),
             16.sbh,
             Row(
@@ -470,11 +470,11 @@ void _showPasswordManagementDialog(SupabaseAuthController authController) {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (authController.currentUser.value?.identities?.isNotEmpty ?? false)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16.0),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
               child: Text(
                 '您已通过邮箱验证码登录。建议设置密码以便后续直接使用邮箱密码登录。',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
+                style: TextStyle(fontSize: 13, color: Get.theme.colorScheme.onSurfaceVariant),
               ),
             ),
           8.sbh,
@@ -542,7 +542,7 @@ void _showOpacityDialog() {
               8.sbh,
               Text(
                 '提示: 255为完全不透明，0为完全透明',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: TextStyle(fontSize: 12, color: Get.theme.colorScheme.onSurfaceVariant),
               ),
             ],
           ),

@@ -175,9 +175,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: const Text('设置'),
                 centerTitle: false,
                 actions: [
-                  WebSocketHelper.buildReactiveButton(tooltip: "WebSocket服务器"),
+                  WebSocketHelper.buildReactiveButton(tooltip: "WebSocket 服务器"),
                   WebSocketClientHelper.buildReactiveButton(
-                    tooltip: "WebSocket客户端",
+                    tooltip: "WebSocket 客户端",
                   ),
                 ],
               ),

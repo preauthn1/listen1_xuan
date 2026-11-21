@@ -342,13 +342,97 @@ class ThemeController extends GetxController {
               ),
             ),
           );
+    // 统一设计系统（taste-skill + ui-ux-pro-max）：
+    // 单一按钮形状/高度、8px 间距基线、语义色、无文本装饰、可见焦点。
+    final cs = base.colorScheme;
+    const noDecoration = TextStyle(decoration: TextDecoration.none);
+    final textTheme = base.textTheme
+        .apply(
+          fontFamilyFallback: const [
+            'Segoe UI',
+            'Microsoft YaHei UI',
+            'Microsoft YaHei',
+            'Noto Sans CJK SC',
+          ],
+          decoration: TextDecoration.none,
+        );
+    final labelStyle = (textTheme.labelLarge ?? const TextStyle())
+        .copyWith(fontWeight: FontWeight.w500, letterSpacing: 0.1)
+        .merge(noDecoration);
+    const controlShape = StadiumBorder();
+    const controlMin = Size(64, 40);
+    const controlPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 10);
+    WidgetStateProperty<Color?> disabledAware(Color enabled, Color disabled) =>
+        WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled) ? disabled : enabled,
+        );
     return base.copyWith(
-      textTheme: base.textTheme.apply(fontFamilyFallback: const [
-        'Segoe UI',
-        'Microsoft YaHei UI',
-        'Microsoft YaHei',
-        'Noto Sans CJK SC',
-      ]),
+      textTheme: textTheme,
+      visualDensity: VisualDensity.standard,
+      filledButtonTheme: FilledButtonThemeData(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(controlMin),
+          padding: const WidgetStatePropertyAll(controlPadding),
+          shape: const WidgetStatePropertyAll(controlShape),
+          textStyle: WidgetStatePropertyAll(labelStyle),
+          // 禁用态保持可读（>=4.5:1 的 onSurfaceVariant），不靠低对比灰暗表达。
+          foregroundColor: disabledAware(cs.onPrimary, cs.onSurfaceVariant),
+          backgroundColor:
+              disabledAware(cs.primary, cs.surfaceContainerHighest),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          minimumSize: controlMin,
+          padding: controlPadding,
+          shape: controlShape,
+          textStyle: labelStyle,
+          disabledForegroundColor: cs.onSurfaceVariant,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: controlMin,
+          padding: controlPadding,
+          shape: controlShape,
+          textStyle: labelStyle,
+          side: BorderSide(color: cs.outline),
+          disabledForegroundColor: cs.onSurfaceVariant,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: controlMin,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          shape: controlShape,
+          textStyle: labelStyle,
+          disabledForegroundColor: cs.onSurfaceVariant,
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(minimumSize: const Size(40, 40)),
+      ),
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        minVerticalPadding: 8,
+        subtitleTextStyle: textTheme.bodySmall?.copyWith(
+          color: cs.onSurfaceVariant,
+        ),
+        iconColor: cs.onSurfaceVariant,
+      ),
+      dividerTheme: DividerThemeData(
+        color: cs.outlineVariant,
+        thickness: 1,
+        space: 24,
+      ),
+      tooltipTheme: TooltipThemeData(
+        waitDuration: const Duration(milliseconds: 400),
+        textStyle: textTheme.bodySmall?.copyWith(color: cs.onInverseSurface),
+        decoration: BoxDecoration(
+          color: cs.inverseSurface,
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: base.colorScheme.surfaceContainerHighest.withOpacity(0.42),

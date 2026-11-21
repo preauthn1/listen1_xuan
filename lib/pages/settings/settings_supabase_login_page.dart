@@ -166,7 +166,7 @@ class _SupabaseLoginPageState extends State<SupabaseLoginPage> {
                           () => _authController.countdown.value > 0
                               ? Text(
                                   '${_authController.countdown.value}秒后可重新发送',
-                                  style: const TextStyle(color: Colors.grey),
+                                  style: TextStyle(color: Get.theme.colorScheme.onSurfaceVariant),
                                 )
                               : TextButton(
                                   onPressed: () => _sendEmailOtp(),
