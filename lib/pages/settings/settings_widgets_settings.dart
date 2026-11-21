@@ -326,11 +326,11 @@ class _SupabasePlaylistContent extends StatelessWidget {
           children: [
             Icon(Icons.cloud_off, size: 64, color: Colors.grey),
             16.sbh,
-            Text('暂无歌单', style: TextStyle(fontSize: 16, color: Colors.grey)),
+            Text('暂无歌单', style: TextStyle(fontSize: 16, color: Get.theme.colorScheme.onSurfaceVariant)),
             8.sbh,
             Text(
               '点击下方按钮新建歌单',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(fontSize: 14, color: Get.theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),

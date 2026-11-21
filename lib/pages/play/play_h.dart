@@ -225,7 +225,7 @@ Widget playH() {
                 color: AdaptiveTheme.of(
                   Get.context!,
                 ).theme.colorScheme.onPrimaryContainer,
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
             ),
