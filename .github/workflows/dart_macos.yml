@@ -72,7 +72,7 @@ jobs:
           FLUTTER_XCODE_ONLY_ACTIVE_ARCH: 'NO'
         run: |
           dart pub global activate fastforge
-          fastforge release --name prod --build_args "--dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}"
+          fastforge release --name prod
 
       - name: Verify single-arch, extract version, rename asset
         id: rename
