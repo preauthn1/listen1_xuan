@@ -187,6 +187,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: <Widget>[
                   Obx(
                     () => ExpansionPanelList(
+                      elevation: 0,
+                      materialGapSize: 12,
+                      dividerColor: Theme.of(context).colorScheme.outlineVariant,
+                      expandedHeaderPadding: EdgeInsets.zero,
                       expansionCallback: (int index, bool isExpanded) {
                         if (isExpanded) {
                           settingsController.settingsPageExpansion.add(index);
@@ -199,6 +203,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         // Supabase 登录面板
                         ExpansionPanel(
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
                           headerBuilder:
                               (BuildContext context, bool isExpanded) {
                                 return ListTile(
@@ -219,6 +224,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           body: _buildSupabasePanel(),
                         ),
                         ExpansionPanel(
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
                           headerBuilder:
                               (BuildContext context, bool isExpanded) {
                                 return ListTile(
@@ -238,6 +244,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           body: _buildThirdPartyLoginPanel(context),
                         ),
                         ExpansionPanel(
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
                           headerBuilder:
                               (BuildContext context, bool isExpanded) {
                                 return ListTile(
@@ -251,6 +258,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           body: settingsWidget(context),
                         ),
                         ExpansionPanel(
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
                           headerBuilder:
                               (BuildContext context, bool isExpanded) {
                                 final theme = Theme.of(context);
@@ -278,6 +286,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                         ),
                         ExpansionPanel(
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
                           headerBuilder:
                               (BuildContext context, bool isExpanded) {
                                 return ListTile(
@@ -315,6 +324,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                         ),
                         ExpansionPanel(
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
                           headerBuilder: (BuildContext context, bool isExpanded) {
                             return ListTile(
                               leading: Icon(Icons.system_update),
@@ -354,6 +364,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           body: updSettingsTile(context),
                         ),
                         ExpansionPanel(
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
                           headerBuilder:
                               (BuildContext context, bool isExpanded) {
                                 final theme = Theme.of(context);
@@ -377,6 +388,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           body: themeSettingsTiles,
                         ),
                         ExpansionPanel(
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
                           headerBuilder:
                               (BuildContext context, bool isExpanded) {
                                 return ListTile(
@@ -511,6 +523,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                         ),
                         ExpansionPanel(
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
                           headerBuilder:
                               (BuildContext context, bool isExpanded) {
                                 return ListTile(
@@ -545,7 +558,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
                               Obx(
                                 () => SwitchListTile(
-                                  title: const Text('显示一些tip'),
+                                  secondary: const Icon(Icons.tips_and_updates_outlined),
+                                  title: const Text('显示使用提示'),
+                                  subtitle: const Text('在搜索框等位置显示操作提示'),
                                   value: settingsController.showSomeTips,
                                   onChanged: (value) {
                                     settingsController.showSomeTips = value;
@@ -555,12 +570,12 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                               ),
                               ListTile(
-                                leading: Icon(Icons.width_normal),
-                                title: const Text('当左边栏大于一定宽度时隐藏搜索页面的搜索框'),
+                                leading: const Icon(Icons.width_normal),
+                                title: const Text('侧栏较宽时隐藏搜索框'),
                                 subtitle: Obx(
                                   () => setSubTitleTextAniSwi(
                                     Text(
-                                      '当前宽度：${Get.find<XSearchController>().leftBarWidth.value.toStringAsFixed(2)}, 设置宽度：${Get.find<SettingsController>().showSearchAreaWidth.toStringAsFixed(2)}',
+                                      '侧栏超过 ${Get.find<SettingsController>().showSearchAreaWidth.round()} px 时隐藏，当前 ${Get.find<XSearchController>().leftBarWidth.value.round()} px',
                                       key: ValueKey<double>(
                                         Get.find<XSearchController>()
                                             .leftBarWidth
@@ -578,14 +593,15 @@ class _SettingsPageState extends State<SettingsPage> {
 
                               Obx(
                                 () => SwitchListTile(
-                                  title: const Text('搜索源选择方式'),
+                                  secondary: const Icon(Icons.manage_search),
+                                  title: const Text('记忆上次搜索源'),
                                   subtitle: Obx(
                                     () => setSubTitleTextAniSwi(
                                       Text(
                                         Get.find<SettingsController>()
                                                 .searchUseLastSource
-                                            ? '记忆上次搜索源'
-                                            : '默认搜索源',
+                                            ? '打开搜索时使用上次的平台'
+                                            : '打开搜索时使用默认平台',
                                         key: ValueKey<bool>(
                                           Get.find<SettingsController>()
                                               .searchUseLastSource,
@@ -604,7 +620,9 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                               Obx(
                                 () => SwitchListTile(
-                                  title: const Text('复制错误信息到剪贴板'),
+                                  secondary: const Icon(Icons.content_copy_outlined),
+                                  title: const Text('出错时复制错误信息'),
+                                  subtitle: const Text('便于反馈问题时粘贴'),
                                   value: Get.find<SettingsController>()
                                       .copyErrorMessage,
                                   onChanged: (bool value) {
@@ -662,16 +680,15 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                               ),
 
-                              Obx(
-                                () => SwitchListTile(
-                                  title: const Text('SSL 证书绕过已禁用'),
-                                  value: false,
-                                  onChanged: null,
-                                ),
+                              const ListTile(
+                                leading: Icon(Icons.verified_user_outlined),
+                                title: Text('始终校验 SSL 证书'),
+                                subtitle: Text('出于安全考虑，证书校验无法关闭'),
                               ),
                               Obx(
                                 () => SwitchListTile(
-                                  title: const Text('debugToast'),
+                                  secondary: const Icon(Icons.bug_report_outlined),
+                                  title: const Text('显示调试提示'),
                                   value: Get.find<SettingsController>()
                                       .useDebugMode,
                                   onChanged: (bool value) {
@@ -709,22 +726,22 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                   ListTile(
-                    leading: Icon(Icons.lightbulb_outline),
-                    title: Text('Tip'),
+                    leading: const Icon(Icons.lightbulb_outline),
+                    title: const Text('使用技巧'),
                     trailing: Icon(Icons.chevron_right),
                     onTap: () {
                       Get.toNamed(RouteName.settingsTipsPage, id: 1);
                     },
                   ),
                   ListTile(
-                    leading: Icon(Icons.book),
-                    title: Text('查看README'),
+                    leading: const Icon(Icons.menu_book_outlined),
+                    title: const Text('说明文档'),
                     trailing: Icon(Icons.chevron_right),
                     onTap: () {
                       Get.toNamed(RouteName.settingsReadmePage, id: 1);
                     },
                   ),
-                  0.3.sh.sbh,
+                  24.sbh,
                 ],
               ),
             ),

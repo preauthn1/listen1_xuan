@@ -38,7 +38,9 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
       final settingsRoute = top_routeWithName.isNotEmpty &&
           top_routeWithName.last.name == RouteName.settingsPage;
       final settings = Get.find<SettingsController>();
-      return SizedBox(
+      return Material(
+        color: Theme.of(context).colorScheme.surface,
+        child: SizedBox(
         height: 32,
         child: DragToMoveArea(
           child: Row(
@@ -50,7 +52,7 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
                   padding: EdgeInsets.zero,
                   iconSize: 15,
                   onPressed: routerPop,
-                  icon: const Icon(Icons.arrow_back_ios_new),
+                  icon: const Icon(LucideIcons.chevronLeft),
                 ),
               ),
               Expanded(
@@ -73,16 +75,10 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
                   padding: EdgeInsets.zero,
                 ),
               ],
-              if (settings.windowsCloseBtnCloseOrHideApp != false)
-                IconButton(
-                  tooltip: '隐藏到托盘',
-                  padding: EdgeInsets.zero,
-                  iconSize: 15,
-                  onPressed: () async {
-                    await windowManager.hide();
-                    await windowManager.setSkipTaskbar(true);
-                  },
-                  icon: const Icon(Icons.close_fullscreen_rounded),
+              if (settingsRoute)
+                const SizedBox(
+                  height: 16,
+                  child: VerticalDivider(width: 17, thickness: 1),
                 ),
               IconButton(
                 tooltip: _isPinned ? '取消置顶' : '窗口置顶',
@@ -90,7 +86,7 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
                 iconSize: 15,
                 color: _isPinned ? Theme.of(context).colorScheme.primary : null,
                 onPressed: _togglePinned,
-                icon: Icon(_isPinned ? Icons.push_pin : Icons.push_pin_outlined),
+                icon: Icon(_isPinned ? LucideIcons.pinOff : LucideIcons.pin),
               ),
               IconButton(
                 tooltip: '最小化',
@@ -100,7 +96,7 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
                   await windowManager.minimize();
                   await windowManager.setSkipTaskbar(false);
                 },
-                icon: const Icon(Icons.minimize),
+                icon: const Icon(LucideIcons.minus),
               ),
               FutureBuilder<bool>(
                 future: windowManager.isMaximized(),
@@ -118,7 +114,7 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
                       }
                       if (mounted) setState(() {});
                     },
-                    icon: Icon(maximized ? Icons.filter_none_rounded : Icons.crop_square_rounded),
+                    icon: Icon(maximized ? LucideIcons.copy : LucideIcons.square),
                   );
                 },
               ),
@@ -127,10 +123,11 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
                 padding: EdgeInsets.zero,
                 iconSize: 15,
                 onPressed: _clickCloseBtn,
-                icon: const Icon(Icons.close),
+                icon: const Icon(LucideIcons.x),
               ),
             ],
           ),
+        ),
         ),
       );
     });
@@ -324,6 +321,8 @@ Listener _mainContent() => Listener(
       children: [
         if (isWindows) const _WindowsTitleBar(),
         Expanded(
+          // 防止页面内容/转场绘制溢出到标题栏区域。
+          child: ClipRect(
           child: Navigator(
             key: innerKey,
             initialRoute: RouteName.defaultPage,
@@ -694,6 +693,7 @@ Listener _mainContent() => Listener(
                 ),
               );
             },
+          ),
           ),
         ),
       ],
