@@ -13,7 +13,7 @@ public class UI {
  [DllImport("user32")] public static extern IntPtr WindowFromPoint(System.Drawing.Point pt);
  [DllImport("user32")] public static extern IntPtr GetAncestor(IntPtr w,uint flag);
  [DllImport("user32")] public static extern bool SetCursorPos(int x,int y);
- [DllImport("user32")] public static extern void mouse_event(uint f,uint x,uint y,uint d,UIntPtr extra);
+ [DllImport("user32")] public static extern void mouse_event(uint f,uint x,uint y,uint d,ulong extra);
 }
 '@ -ReferencedAssemblies System.Drawing
 $p=Start-Process (Resolve-Path app/listen1_xuan.exe) -WorkingDirectory (Resolve-Path app) -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP/app.out" -RedirectStandardError "$env:RUNNER_TEMP/app.err"
