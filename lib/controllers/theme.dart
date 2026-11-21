@@ -12,6 +12,9 @@ import '../global_settings_animations.dart';
 import '../packages/circular_theme_reveal/src/circular_theme_reveal_overlay.dart';
 import 'settings_controller.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
+import 'package:flex_color_scheme/flex_color_scheme.dart'
+    show FlexThemeData, FlexSurfaceMode, FlexSubThemesData;
+import 'package:chinese_font_library/chinese_font_library.dart';
 
 class ThemeController extends GetxController {
   // ColorScheme? _light;
@@ -343,19 +346,37 @@ class ThemeController extends GetxController {
             ),
           );
     // 统一设计系统（taste-skill + ui-ux-pro-max）：
-    // 单一按钮形状/高度、8px 间距基线、语义色、无文本装饰、可见焦点。
-    final cs = base.colorScheme;
+    // 由 flex_color_scheme 生成一致的表面层级与组件子主题，
+    // chinese_font_library 统一中文字体回退；按钮/列表规格在下方覆盖。
+    final schemeSource = base.colorScheme;
+    final flexBuilder =
+        brightness == Brightness.light ? FlexThemeData.light : FlexThemeData.dark;
+    final flex = flexBuilder(
+      colorScheme: schemeSource,
+      useMaterial3: true,
+      surfaceMode: FlexSurfaceMode.highScaffoldLowSurface,
+      blendLevel: 2,
+      visualDensity: VisualDensity.standard,
+      subThemesData: const FlexSubThemesData(
+        defaultRadius: 12,
+        interactionEffects: true,
+        blendOnColors: false,
+        inputDecoratorIsFilled: true,
+        inputDecoratorRadius: 12,
+        tooltipRadius: 8,
+        cardRadius: 16,
+      ),
+      fontFamilyFallback: const [
+        'Segoe UI',
+        'Microsoft YaHei UI',
+        'Microsoft YaHei',
+        'PingFang SC',
+        'Noto Sans CJK SC',
+      ],
+    ).useSystemChineseFont(brightness).copyWith(appBarTheme: base.appBarTheme);
+    final cs = flex.colorScheme;
     const noDecoration = TextStyle(decoration: TextDecoration.none);
-    final textTheme = base.textTheme
-        .apply(
-          fontFamilyFallback: const [
-            'Segoe UI',
-            'Microsoft YaHei UI',
-            'Microsoft YaHei',
-            'Noto Sans CJK SC',
-          ],
-          decoration: TextDecoration.none,
-        );
+    final textTheme = flex.textTheme.apply(decoration: TextDecoration.none);
     final labelStyle = (textTheme.labelLarge ?? const TextStyle())
         .copyWith(fontWeight: FontWeight.w500, letterSpacing: 0.1)
         .merge(noDecoration);
@@ -366,7 +387,7 @@ class ThemeController extends GetxController {
         WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled) ? disabled : enabled,
         );
-    return base.copyWith(
+    return flex.copyWith(
       textTheme: textTheme,
       visualDensity: VisualDensity.standard,
       filledButtonTheme: FilledButtonThemeData(
@@ -435,22 +456,22 @@ class ThemeController extends GetxController {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: base.colorScheme.surfaceContainerHighest.withOpacity(0.42),
+        fillColor: cs.surfaceContainerHighest.withOpacity(0.42),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: base.colorScheme.outlineVariant),
+          borderSide: BorderSide(color: cs.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: base.colorScheme.outlineVariant),
+          borderSide: BorderSide(color: cs.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: base.colorScheme.primary, width: 1.5),
+          borderSide: BorderSide(color: cs.primary, width: 1.5),
         ),
       ),
-      sliderTheme: base.sliderTheme.copyWith(
+      sliderTheme: flex.sliderTheme.copyWith(
         trackHeight: 4,
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
         overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
