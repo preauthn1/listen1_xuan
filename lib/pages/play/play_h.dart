@@ -142,7 +142,9 @@ Widget playH() {
                   ],
                 ),
               ),
-              Padding(
+              Obx(() => _playController.nowPlayingTrackRx.value == null
+                  ? const SizedBox.shrink()
+                  : Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Obx(
                   () => _playController.loading
@@ -192,7 +194,7 @@ Widget playH() {
                           );
                         }),
                 ),
-              ),
+              )),
             ],
           ),
         ),

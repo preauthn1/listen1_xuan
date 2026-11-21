@@ -8,6 +8,135 @@ String _searchHintText(String? tip) => startupTipsService.searchHintText(
 Widget _leftBarTitleDragArea(Widget child) =>
     isWindows || isMacOS ? DragToMoveArea(child: child) : child;
 
+class _WindowsTitleBar extends StatefulWidget {
+  const _WindowsTitleBar();
+
+  @override
+  State<_WindowsTitleBar> createState() => _WindowsTitleBarState();
+}
+
+class _WindowsTitleBarState extends State<_WindowsTitleBar> {
+  bool _isPinned = false;
+
+  @override
+  void initState() {
+    super.initState();
+    windowManager.isAlwaysOnTop().then((value) {
+      if (mounted) setState(() => _isPinned = value);
+    });
+  }
+
+  Future<void> _togglePinned() async {
+    final next = !_isPinned;
+    await windowManager.setAlwaysOnTop(next);
+    if (mounted) setState(() => _isPinned = next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final settingsRoute = top_routeWithName.isNotEmpty &&
+          top_routeWithName.last.name == RouteName.settingsPage;
+      final settings = Get.find<SettingsController>();
+      return SizedBox(
+        height: 32,
+        child: DragToMoveArea(
+          child: Row(
+            children: [
+              SizedBox(
+                width: 40,
+                child: IconButton(
+                  tooltip: '返回',
+                  padding: EdgeInsets.zero,
+                  iconSize: 15,
+                  onPressed: routerPop,
+                  icon: const Icon(Icons.arrow_back_ios_new),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  settingsRoute ? '设置' : 'Listen1',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (settingsRoute) ...[
+                WebSocketHelper.buildReactiveButton(
+                  tooltip: 'WebSocket服务器',
+                  iconSize: 15,
+                  padding: EdgeInsets.zero,
+                ),
+                WebSocketClientHelper.buildReactiveButton(
+                  tooltip: 'WebSocket客户端',
+                  iconSize: 15,
+                  padding: EdgeInsets.zero,
+                ),
+              ],
+              if (settings.windowsCloseBtnCloseOrHideApp != false)
+                IconButton(
+                  tooltip: '隐藏到托盘',
+                  padding: EdgeInsets.zero,
+                  iconSize: 15,
+                  onPressed: () async {
+                    await windowManager.hide();
+                    await windowManager.setSkipTaskbar(true);
+                  },
+                  icon: const Icon(Icons.close_fullscreen_rounded),
+                ),
+              IconButton(
+                tooltip: _isPinned ? '取消置顶' : '窗口置顶',
+                padding: EdgeInsets.zero,
+                iconSize: 15,
+                color: _isPinned ? Theme.of(context).colorScheme.primary : null,
+                onPressed: _togglePinned,
+                icon: Icon(_isPinned ? Icons.push_pin : Icons.push_pin_outlined),
+              ),
+              IconButton(
+                tooltip: '最小化',
+                padding: EdgeInsets.zero,
+                iconSize: 15,
+                onPressed: () async {
+                  await windowManager.minimize();
+                  await windowManager.setSkipTaskbar(false);
+                },
+                icon: const Icon(Icons.minimize),
+              ),
+              FutureBuilder<bool>(
+                future: windowManager.isMaximized(),
+                builder: (context, snapshot) {
+                  final maximized = snapshot.data == true;
+                  return IconButton(
+                    tooltip: maximized ? '还原窗口' : '最大化',
+                    padding: EdgeInsets.zero,
+                    iconSize: 15,
+                    onPressed: () async {
+                      if (await windowManager.isMaximized()) {
+                        await windowManager.unmaximize();
+                      } else {
+                        await windowManager.maximize();
+                      }
+                      if (mounted) setState(() {});
+                    },
+                    icon: Icon(maximized ? Icons.filter_none_rounded : Icons.crop_square_rounded),
+                  );
+                },
+              ),
+              IconButton(
+                tooltip: settings.windowsCloseBtnCloseOrHideApp != false ? '关闭' : '隐藏到托盘',
+                padding: EdgeInsets.zero,
+                iconSize: 15,
+                onPressed: _clickCloseBtn,
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
 Widget get _leftBar => Scaffold(
   resizeToAvoidBottomInset: false,
   body: Column(
@@ -104,10 +233,12 @@ Widget get _leftBar => Scaffold(
       // SizedBox(),
       Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: PriorityResponsiveActionRow(
-          hidePriority: const [2, 1, 0, 3],
-          mainAxisAlignment: MainAxisAlignment.start,
-        children: [
+        child: Align(
+          alignment: Alignment.center,
+          child: PriorityResponsiveActionRow(
+            hidePriority: const [2, 1, 0, 3],
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
           ThemeToggleButton(iconSize: 24.0, padding: EdgeInsets.all(0)),
           WebSocketHelper.buildReactiveButton(
             tooltip: "WebSocket服务器",
@@ -125,6 +256,7 @@ Widget get _leftBar => Scaffold(
             },
           ),
         ],
+        ),
         ),
       ),
     ],
@@ -190,78 +322,7 @@ Listener _mainContent() => Listener(
     resizeToAvoidBottomInset: false,
     body: Column(
       children: [
-        if (isWindows)
-          DragToMoveArea(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  tooltip: "返回",
-                  onPressed: routerPop,
-                  icon: const Icon(Icons.arrow_back_ios_new, size: 13),
-                ),
-                Obx(
-                  () => Container(
-                    width:
-                        Get.find<SettingsController>()
-                                .windowsCloseBtnCloseOrHideApp ==
-                            false
-                        ? 80
-                        : 120,
-                    child: Row(
-                      children: [
-                        if (Get.find<SettingsController>()
-                                .windowsCloseBtnCloseOrHideApp !=
-                            false)
-                          IconButton(
-                            tooltip: "隐藏到托盘",
-                            icon: Icon(
-                              Icons.close_fullscreen_rounded,
-                              size: 13,
-                            ),
-                            onPressed: () {
-                              windowManager.hide();
-                              windowManager.setSkipTaskbar(true);
-                            },
-                          ),
-                        FutureBuilder<bool>(
-                          future: windowManager.isMaximized(),
-                          builder: (context, snapshot) => IconButton(
-                            tooltip: snapshot.data == true ? '还原窗口' : '最大化',
-                            icon: Icon(snapshot.data == true ? Icons.filter_none_rounded : Icons.crop_square_rounded, size: 13),
-                            onPressed: () async {
-                              if (await windowManager.isMaximized()) {
-                                await windowManager.unmaximize();
-                              } else {
-                                await windowManager.maximize();
-                              }
-                            },
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.minimize, size: 13),
-                          onPressed: () {
-                            windowManager.minimize();
-                            windowManager.setSkipTaskbar(false);
-                          },
-                        ),
-                        IconButton(
-                          tooltip:
-                              (Get.find<SettingsController>()
-                                      .windowsCloseBtnCloseOrHideApp !=
-                                  false)
-                              ? "关闭"
-                              : "隐藏到托盘",
-                          icon: Icon(Icons.close, size: 13),
-                          onPressed: _clickCloseBtn,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ).sbh(32),
+        if (isWindows) const _WindowsTitleBar(),
         Expanded(
           child: Navigator(
             key: innerKey,
