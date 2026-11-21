@@ -7,13 +7,15 @@ on:
       GOOGLE_SERVICES_JSON_B64:
         required: false
       KEYSTORE_BASE64:
-        required: true
+        # Forks do not receive the upstream release key.  Keep this optional so
+        # the caller can be evaluated and the Android job can be skipped safely.
+        required: false
       KEYSTORE_PASSWORD:
-        required: true
+        required: false
       KEY_ALIAS:
-        required: true
+        required: false
       KEY_PASSWORD:
-        required: true
+        required: false
       SUPABASE_PROXY_TOKEN:
         required: false
 
@@ -21,7 +23,35 @@ permissions:
   contents: read
 
 jobs:
+  signing_gate:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    env:
+      ALL_KEYS: ${{ secrets.KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != '' && secrets.KEY_PASSWORD != '' }}
+      ANY_KEY: ${{ secrets.KEYSTORE_BASE64 != '' || secrets.KEYSTORE_PASSWORD != '' || secrets.KEY_ALIAS != '' || secrets.KEY_PASSWORD != '' }}
+      FORK: ${{ github.event.repository.fork }}
+    steps:
+      - id: check
+        shell: bash
+        run: |
+          # An unsigned fork must not silently become a debug-signed release.
+          if [[ "$ALL_KEYS" == true ]]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          elif [[ "$ANY_KEY" == false && "$FORK" == true && "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == branch ]]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::Fork has no Android signing secrets; no APK will be built or published.'
+          else
+            echo '::error::Configure KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD for signed Android artifacts.'
+            exit 1
+          fi
+
   build:
+    needs: signing_gate
+    # Never substitute a debug/ephemeral key for a release build.  A fork with
+    # no signing secrets gets a clean skip instead of a workflow-evaluation
+    # failure with zero steps; a configured release build still runs normally.
+    if: ${{ needs.signing_gate.outputs.ready == 'true' }}
     env:
       GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
     runs-on: ubuntu-latest
@@ -97,9 +127,18 @@ jobs:
         run: python3 scripts/verify_firebase_dependencies.py real
 
       - name: 解码生成 jks
-        run: printf '%s' "$KEYSTORE_BASE64" | base64 --decode --ignore-garbage > android/app/xuan.jks
+        run: |
+          set -eu
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/xuan.jks
+          test -s android/app/xuan.jks
+          chmod 600 android/app/xuan.jks
+          keytool -exportcert -alias "$KEY_ALIAS" -keystore android/app/xuan.jks \
+            -storepass:env KEYSTORE_PASSWORD > "$RUNNER_TEMP/android-release.der"
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
       # 先编译 AOT，后续二次 build 复用 kernel_snapshot 产物。
       - name: flutter build apk --split-per-abi (${{ matrix.ffmpeg }}/${{ matrix.cronet }})
@@ -109,6 +148,7 @@ jobs:
           --dart-define=gitHash=${{ env.GITHASH }}
           --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
         env:
+          KEYSTORE: xuan.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -129,6 +169,7 @@ jobs:
           --dart-define=gitHash=${{ env.GITHASH }}
           --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
         env:
+          KEYSTORE: xuan.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -141,6 +182,18 @@ jobs:
 
       - name: List produced APKs
         run: ls -l out/
+
+      - name: Verify release APK signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          signer=$(ls -d "${ANDROID_HOME:-$ANDROID_SDK_ROOT}"/build-tools/*/apksigner | sort -V | tail -1)
+          test -x "$signer"
+          digest=$(sha256sum "$RUNNER_TEMP/android-release.der" | cut -d' ' -f1)
+          for apk in out/*.apk; do
+            verified=$("$signer" verify --print-certs "$apk")
+            grep -Ei "^(Signer #1|V[0-9.]+ Signer)(:)? certificate SHA-256 digest: ${digest}$" <<< "$verified"
+          done
 
       # 每个变体上传 4 个压缩 ZIP artifact（不带 hash）。
       - name: Upload arm64-v8a APK
