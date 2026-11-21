@@ -324,29 +324,31 @@ Widget _loginRow({
 Widget _buildThirdPartyLoginPanel(BuildContext context) {
   final theme = Theme.of(context);
   Widget gatedAction(String label, String reason, VoidCallback? callback) {
-    return SizedBox(
-      width: 232,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          FilledButton.tonal(
-            onPressed: callback,
-            style: _pillStyle(theme, minWidth: 232),
-            child: Text(label, maxLines: 1, softWrap: false, style: _noUnderline),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.tonal(
+          onPressed: callback,
+          style: _pillStyle(theme),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _noUnderline,
           ),
-          if (callback == null)
-            Padding(
-              padding: const EdgeInsetsDirectional.only(start: 12, top: 6),
-              child: Text(
-                reason,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurface)
-                    .merge(_noUnderline),
-              ),
+        ),
+        if (callback == null)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 16, top: 6),
+            child: Text(
+              reason,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)
+                  .merge(_noUnderline),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -395,13 +397,14 @@ Widget _buildThirdPartyLoginPanel(BuildContext context) {
                 label: '登录',
                 onPressed: () => Github.openAuthUrl(),
               ),
+              // 行自带 6px 垂直内边距，补到上下各 14px。
               const Padding(
-                padding: EdgeInsets.symmetric(vertical: 14),
+                padding: EdgeInsets.only(top: 8, bottom: 14),
                 child: Divider(height: 1),
               ),
-              Wrap(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 spacing: 12,
-                runSpacing: 12,
                 children: [
                   Obx(() {
                     final wscc = Get.find<WebSocketClientController>();
