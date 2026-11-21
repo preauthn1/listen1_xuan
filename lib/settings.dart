@@ -327,10 +327,12 @@ class _SettingsPageState extends State<SettingsPage> {
                           backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
                           headerBuilder: (BuildContext context, bool isExpanded) {
                             return ListTile(
-                              leading: Icon(Icons.system_update),
-                              title: Text('更新版本'),
-                              trailing: Text(
-                                '$_appVersion ${isFfmpegEnabled ? '有FFmpeg' : '无FFmpeg'}\n构建hash:${UpdController.buildGitHash}',
+                              leading: const Icon(Icons.system_update),
+                              title: const Text('更新版本'),
+                              subtitle: Text(
+                                '$_appVersion · ${isFfmpegEnabled ? '含 FFmpeg' : '不含 FFmpeg'} · ${UpdController.buildGitHash}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               onTap: () {
                                 if (settingsController.settingsPageExpansion
