@@ -4,6 +4,7 @@ import 'package:listen1_xuan/funcs.dart';
 import 'package:listen1_xuan/widgets/ext/ext_widget.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:get/get.dart';
+import 'package:listen1_xuan/utils/websocket_address.dart';
 
 /// 二维码扫描页面
 class QRScannerPage extends StatefulWidget {
@@ -217,11 +218,19 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   void _handleScanResult(String result) {
     if (isScanned) return;
-    isScanned = true;
-
-    // 验证扫描结果格式
-    _isValidServerAddress(result);
-    Get.back(result: result);
+    try {
+      final envelopeParts = result.split('|');
+      if (envelopeParts.length > 2 || envelopeParts.any((part) => part.isEmpty)) {
+        throw const FormatException('二维码内容无效');
+      }
+      final address = envelopeParts.first;
+      _isValidServerAddress(address);
+      isScanned = true;
+      Get.back(result: result);
+    } catch (error) {
+      isScanned = false;
+      showWarningSnackbar('服务器地址无效', error.toString());
+    }
   }
 
   void _showManualInputDialog() {
@@ -253,9 +262,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
           ElevatedButton(
             onPressed: () {
               final address = inputController.text.trim();
-              _isValidServerAddress(address);
-              Get.back();
-              Get.back(result: address);
+              try {
+                _isValidServerAddress(address);
+                Get.back();
+                Get.back(result: address);
+              } catch (error) {
+                showWarningSnackbar('服务器地址无效', error.toString());
+              }
             },
             child: const Text('确定'),
           ),
@@ -266,12 +279,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   /// 验证服务器地址格式
   bool _isValidServerAddress(String address) {
-    final RegExp addressRegex = RegExp(
-      r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$',
-    );
-    final res = addressRegex.hasMatch(address);
-    if (!res) showWarningSnackbar('当前地址未通过正则匹配,可能无效', null);
-    return res;
+    try {
+      WebSocketAddress.parse(address);
+      return true;
+    } on FormatException {
+      throw const FormatException('请输入主机:端口或 [IPv6]:端口');
+    }
   }
 
   @override

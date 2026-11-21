@@ -75,7 +75,8 @@ class SupabaseAuthController extends GetxController {
           subscribeToPlaylist();
         }
         if (data.event.jsName == 'INITIAL_SESSION') {
-          _tryReconnectWithSavedCredentials();
+          // Supabase SDK restores its persisted session; do not replay a password.
+          logger.i('初始会话事件已处理');
         } else if (data.event.jsName == 'SIGNED_OUT') {
           currentUser.value = null;
           isLoggedIn.value = false;
@@ -86,9 +87,7 @@ class SupabaseAuthController extends GetxController {
         }
       },
       onError: (error) {
-        logger.e('认证状态监听错误: $error');
-        // 尝试使用保存的账号密码进行自动重连
-        _tryReconnectWithSavedCredentials();
+        logger.e('认证状态监听错误: ${error.runtimeType}');
       },
     );
 
@@ -106,35 +105,8 @@ class SupabaseAuthController extends GetxController {
 
   /// 使用保存的凭证尝试自动重连
   Future<void> _tryReconnectWithSavedCredentials() async {
-    try {
-      final settingsController = Get.find<SettingsController>();
-      final savedEmail = settingsController.supabaseEmail;
-      final savedPassword = settingsController.supabasePassword;
-
-      // 如果没有保存的凭证，则跳过
-      if (savedEmail.isEmpty || savedPassword.isEmpty) {
-        logger.i('没有保存的账号密码，跳过自动重连');
-        return;
-      }
-
-      logger.i('尝试使用保存的凭证进行自动重连...');
-
-      final AuthResponse response = await _supabase.auth.signInWithPassword(
-        email: savedEmail,
-        password: savedPassword,
-      );
-
-      if (response.session != null) {
-        currentUser.value = response.session!.user;
-        isLoggedIn.value = true;
-        await _updateUserLoginTime();
-        logger.i('自动重连成功');
-      } else {
-        logger.w('自动重连失败：无法获取会话');
-      }
-    } catch (e) {
-      logger.e('自动重连异常: $e');
-    }
+    // Deprecated: passwords are never persisted or replayed.
+    return;
   }
 
   /// 检查当前会话
@@ -196,9 +168,9 @@ class SupabaseAuthController extends GetxController {
         isLoggedIn.value = true;
         await _updateUserLoginTime();
 
-        // 保存账号密码用于自动重连
-        Get.find<SettingsController>().supabaseEmail = email;
-        Get.find<SettingsController>().supabasePassword = password;
+        // 不再保存账号密码；Supabase SDK 会管理会话令牌。
+        Get.find<SettingsController>().supabaseEmail = '';
+        Get.find<SettingsController>().supabasePassword = '';
 
         isLoading.value = false;
         return true;

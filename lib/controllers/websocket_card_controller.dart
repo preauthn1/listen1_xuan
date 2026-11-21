@@ -39,13 +39,14 @@ class WebSocketCardController extends GetxController {
   final RxBool _isServerRunning = false.obs;
   final RxInt i_clientCount = 0.obs;
   final RxString _serverUrl = ''.obs;
+  final RxString _accessToken = ''.obs;
 
   /// WebSocket服务器是否自动启动的标志位
   final RxBool _wsServerAutoStart = false.obs;
   final RxBool _wsServerBtnShow = true.obs;
 
-  /// 服务器配置
-  final RxString _host = '::'.obs; // 优先使用 IPv6 双栈监听
+  /// Server defaults to loopback. LAN sharing must be explicitly enabled.
+  final RxString _host = '127.0.0.1'.obs;
   final RxInt _port = 25917.obs;
   final RxInt _pingInterval = 30.obs; // 秒
   final RxInt _pongTimeout = 5.obs; // 秒
@@ -81,6 +82,7 @@ class WebSocketCardController extends GetxController {
   bool get isServerRunning => _isServerRunning.value;
   int get clientCount => i_clientCount.value;
   String get serverUrl => _serverUrl.value;
+  String get accessToken => _accessToken.value;
   bool get wsServerAutoStart => _wsServerAutoStart.value;
   bool get wsServerBtnShow => _wsServerBtnShow.value;
 
@@ -97,9 +99,17 @@ class WebSocketCardController extends GetxController {
           : false;
       final serverPort = settings['wsServerPort'] as int?;
 
-      // 使用双栈监听，IPv4-only 系统由服务端回退到 IPv4
-      _host.value = '::';
-
+      // Loopback is the safe default; persisted legacy wildcard values are not trusted.
+      final configuredHost = settings['wsServerHost'] as String?;
+      final parsedHost = configuredHost == null
+          ? null
+          : InternetAddress.tryParse(configuredHost);
+      if (parsedHost != null && parsedHost.isLoopback) {
+        _host.value = configuredHost!;
+      } else {
+        _host.value = '127.0.0.1';
+      }
+      selectBestAvailableAddress.value = _host.value;
       if (serverPort != null && serverPort >= 1024 && serverPort <= 65535) {
         _port.value = serverPort;
       }
@@ -119,8 +129,8 @@ class WebSocketCardController extends GetxController {
       // 保存WebSocket服务器配置
       settings['wsServerAutoStart'] = _wsServerAutoStart.value;
       settings['wsServerBtnShow'] = _wsServerBtnShow.value;
-      // 不再保存地址配置，固定使用0.0.0.0
       settings['wsServerPort'] = _port.value;
+      settings['wsServerHost'] = _host.value;
 
       // 触发设置保存
       settingsController.setSettings(settings);
@@ -215,15 +225,20 @@ class WebSocketCardController extends GetxController {
       ipList.addAll(otherIps);
       ipList.addAll(loopbackIps);
 
-      availableIpAddresses.value = ipList;
-      _logger.i('$_tag 获取到IP地址: $ipList');
+      // 仅展示可绑定的回环地址；LAN 传输尚未提供 TLS，不能误导用户选择明文地址。
+      final bindableIps = ipList.where((ip) {
+        final parsed = InternetAddress.tryParse(ip);
+        return parsed?.isLoopback ?? false;
+      }).toList();
+      availableIpAddresses.value = bindableIps.isEmpty
+          ? <String>['127.0.0.1']
+          : bindableIps;
 
       // 检查当前选中的地址是否在列表中，如果不在则自动选择最优地址
-      if (!ipList.contains(selectBestAvailableAddress.value)) {
-        if (ipList.isNotEmpty) {
-          selectBestAvailableAddress.value = ipList.first;
-          _logger.i('$_tag 选择新的最佳IP地址: ${selectBestAvailableAddress.value}');
-        }
+      if (!bindableIps.contains(selectBestAvailableAddress.value)) {
+        selectBestAvailableAddress.value = bindableIps.isEmpty
+            ? '127.0.0.1'
+            : bindableIps.first;
       }
     } catch (e) {
       _logger.e('$_tag 获取IP地址失败', error: e);
@@ -248,6 +263,7 @@ class WebSocketCardController extends GetxController {
       wsServerController = WebSocketServerController(
         host: _host.value,
         port: _port.value,
+        accessToken: _accessToken.value.isEmpty ? null : _accessToken.value,
         pingInterval: Duration(seconds: _pingInterval.value),
         pongTimeout: Duration(seconds: _pongTimeout.value),
       );
@@ -258,6 +274,7 @@ class WebSocketCardController extends GetxController {
       if (success) {
         _isServerRunning.value = true;
         _serverUrl.value = wsServerController!.serverUrl;
+        _accessToken.value = wsServerController!.accessToken;
         _updateStatusMessage('运行中');
         _logger.i('$_tag WebSocket服务器启动成功: $serverUrl');
 
@@ -268,7 +285,7 @@ class WebSocketCardController extends GetxController {
         wsServerController = null;
         _isServerRunning.value = false;
         _serverUrl.value = '';
-        i_clientCount.value = 0;
+        _accessToken.value = '';
         _updateStatusMessage('启动失败');
         _showError('服务器启动失败，请检查端口 $_port 是否被占用或其他资源冲突');
         _logger.e('$_tag 启动服务器失败: 服务器返回 false');
@@ -278,6 +295,7 @@ class WebSocketCardController extends GetxController {
       wsServerController = null;
       _isServerRunning.value = false;
       _serverUrl.value = '';
+      _accessToken.value = '';
       i_clientCount.value = 0;
       _updateStatusMessage('启动失败');
       final errorMsg = '启动服务器异常: $e';
@@ -310,6 +328,22 @@ class WebSocketCardController extends GetxController {
     _isExpanded.value = !_isExpanded.value;
   }
 
+  /// LAN sharing is explicit; selecting a LAN address binds the server to it.
+  void updateBindAddress(String address) {
+    if (isServerRunning) {
+      _showError('服务器运行时不能更改监听地址');
+      return;
+    }
+    final value = address.trim();
+    final parsed = InternetAddress.tryParse(value);
+    if (parsed == null || !parsed.isLoopback) {
+      _showError('当前仅支持本机回环地址；局域网传输需要 WSS/TLS 后再开放');
+      return;
+    }
+    _host.value = value;
+    selectBestAvailableAddress.value = value;
+    saveWebSocketSettings();
+  }
   /// 更新端口
   void updatePort(int newPort) {
     if (isServerRunning) {
@@ -372,6 +406,7 @@ class WebSocketCardController extends GetxController {
 
       _isServerRunning.value = false;
       _serverUrl.value = '';
+      _accessToken.value = '';
       i_clientCount.value = 0;
       _updateStatusMessage('已停止');
       _showSuccess('WebSocket 服务器已停止');
@@ -433,6 +468,7 @@ class WebSocketCardController extends GetxController {
             ? '::1'
             : '127.0.0.1',
         port: _port.value,
+        token: wsServerController!.accessToken,
       );
       _showSuccess('测试连接已发起，请查看控制台日志');
     } catch (e) {
@@ -491,12 +527,18 @@ class WebSocketClientTester {
   static Future<void> testConnection({
     String host = 'localhost',
     int port = 8080,
+    String? token,
   }) async {
     try {
       final uri = WebSocketAddress(host, port).uri().toString();
       print('正在连接到: $uri');
 
-      final webSocket = await WebSocket.connect(uri);
+      final webSocket = await WebSocket.connect(
+        uri,
+        headers: token == null || token.isEmpty
+            ? null
+            : {'x-listen1-pairing-token': token},
+      );
       print('连接成功！');
 
       // 监听消息

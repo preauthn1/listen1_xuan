@@ -82,6 +82,7 @@ const String supabaseDefaultUrl = 'https://jtvxrwybwvgpqobyhaoy.supabase.co';
 /// 注意必须是 **一级** 子域，Cloudflare 免费版证书不覆盖多层子域。
 /// 在「设置 - Supabase 账号 - 使用备用地址」开关切换，重启应用生效。
 const String supabaseBackupUrl = 'https://sb.040905.xyz';
+const String supabaseProxyToken = String.fromEnvironment('SUPABASE_PROXY_TOKEN');
 
 /// 实际使用的地址，在 main() 中按设置决定
 String supabaseUrl = supabaseDefaultUrl;
@@ -201,12 +202,18 @@ Future<void> _initializeAppForHome(SettingsController settingsController) async 
   supabaseUrl = settingsController.supabaseUseBackupUrl
       ? supabaseBackupUrl
       : supabaseDefaultUrl;
+  if (settingsController.supabaseUseBackupUrl &&
+      supabaseProxyToken.isEmpty) {
+    throw StateError(
+      '备用 Supabase 地址需要使用 --dart-define=SUPABASE_PROXY_TOKEN 构建',
+    );
+  }
   await Supabase.initialize(
     url: supabaseUrl,
     anonKey: supabaseKey,
-    // 固定会话存储键。默认实现是用 host 首段拼出来的
-    // （sb-<host 首段>-auth-token），切换地址会因此换键、丢掉登录态。
-    // 两个地址指向同一个 Supabase 项目，token 通用，所以固定成默认地址的键。
+    headers: settingsController.supabaseUseBackupUrl
+        ? {'x-proxy-token': supabaseProxyToken}
+        : const {},
     authOptions: FlutterAuthClientOptions(
       localStorage: SharedPreferencesLocalStorage(
         persistSessionKey: 'sb-jtvxrwybwvgpqobyhaoy-auth-token',
@@ -261,17 +268,10 @@ Future<void> _initializeAppForHome(SettingsController settingsController) async 
   // 如果设置了自动连接，则连接WebSocket服务器
   wsClientController.autoConnectIfNeeded();
 
-  Map<String, dynamic> settings = lengcyGetSettings();
-  bool useHttpOverrides = false;
-  if (settings["useHttpOverrides"] == null) {
-    settings["useHttpOverrides"] = false;
-    Get.find<SettingsController>().setSettings(settings);
-  } else {
-    useHttpOverrides = settings["useHttpOverrides"];
-  }
-  // Always set global UA; certificate bypass remains controlled by settings.
+  final settings = lengcyGetSettings();
+  settings.remove('useHttpOverrides');
   HttpOverrides.global = MyHttpOverrides(
-    trustBadCertificates: useHttpOverrides,
+    trustBadCertificates: false,
     userAgent: kGlobalDefaultUserAgent,
   );
 

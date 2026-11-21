@@ -16,6 +16,7 @@ import 'package:dio/dio.dart';
 import 'package:listen1_xuan/models/bootStrapTrackRes.dart';
 import 'package:listen1_xuan/utils/cookie_utils.dart';
 import 'dart:convert';
+import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:html/parser.dart' show parse;
 import 'dart:typed_data';
@@ -44,6 +45,10 @@ enum NeTrackType {
 }
 
 class Netease extends BaseProvider {
+  static const int _maxPageCount = 100;
+  static const int _maxTrackCount = 10000;
+  static const int _maxResponseBytes = 32 * 1024 * 1024;
+
   @override
   String get id => "ne";
   @override
@@ -109,48 +114,42 @@ class Netease extends BaseProvider {
   }
 
   Future<dynamic> dioGetWithCookieAndCsrf(String url) async {
-    try {
-      final cookies = token;
-      final csrf = cookies
-          .split(';')
-          .firstWhere((element) => element.contains('__csrf'))
-          .split('=')
-          .last;
-      if (url.contains('?')) {
-        url = '$url&csrf_token=$csrf';
-      } else {
-        url = '$url?csrf_token=$csrf';
-      }
-      return await dioWithCookieManager.get(url);
-    } catch (e) {
-      return await dioWithCookieManager.get(url);
-    }
+    final csrf = await getCsrf();
+    final separator = url.contains('?') ? '&' : '?';
+    final targetUrl = csrf.isEmpty
+        ? url
+        : '$url$separator${Uri(queryParameters: {'csrf_token': csrf}).query}';
+    return dioWithCookieManager.get(
+      targetUrl,
+      onReceiveProgress: (received, total) {
+        if (received > _maxResponseBytes) {
+          throw const FormatException('网易云响应超过大小限制');
+        }
+      },
+    );
   }
 
   Future<dynamic> dioPostWithCookieAndCsrf(
     String url,
     dynamic data,
   ) async {
-    try {
-      final cookies = token;
-
-      final csrf = isEmpty(cookies)
-          ? '1234567890123456'
-          : cookies
-                .split(';')
-                .firstWhere((String element) => element.contains('__csrf'))
-                .split('=')
-                .last;
-      if (url.contains('?')) {
-        url = '$url&csrf_token=$csrf';
-      } else {
-        url = '$url?csrf_token=$csrf';
-      }
-      return await dioWithCookieManager.post(
-        url,
-        data: data,
-        options: Options(
-          headers: {
+    final csrf = await getCsrf();
+    if (csrf.isEmpty) {
+      throw const FormatException('网易云 Cookie 缺少 CSRF token');
+    }
+    final separator = url.contains('?') ? '&' : '?';
+    final targetUrl =
+        '$url$separator${Uri(queryParameters: {'csrf_token': csrf}).query}';
+    final response = await dioWithCookieManager.post(
+      targetUrl,
+      data: data,
+      onReceiveProgress: (received, total) {
+        if (received > _maxResponseBytes) {
+          throw const FormatException('网易云响应超过大小限制');
+        }
+      },
+      options: Options(
+        headers: {
             "user-agent":
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
             "referer": "https://music.163.com/",
@@ -163,13 +162,11 @@ class Netease extends BaseProvider {
             "accept-language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
             "accept": "*/*",
             "sec-ch-ua-platform": "\"Windows\"",
-          },
-          contentType: 'application/x-www-form-urlencoded',
-        ),
-      );
-    } catch (e) {
-      return await dioWithCookieManager.post(url, data: FormData.fromMap(data));
-    }
+        },
+        contentType: 'application/x-www-form-urlencoded',
+      ),
+    );
+    return response;
   }
 
   Uint8List _pad(Uint8List data, int blockSize) {
@@ -178,17 +175,9 @@ class Netease extends BaseProvider {
   }
 
   static String _createSecretKey(int size) {
-    // return '1234567890123456';
-    const choice = '012345679abcdef';
-    final result = List.generate(size, (index) {
-      final randomIndex =
-          (choice.length *
-                  (DateTime.now().millisecondsSinceEpoch % 1000) /
-                  1000)
-              .floor();
-      return choice[randomIndex];
-    });
-    return result.join('');
+    const choice = '0123456789abcdef';
+    final random = Random.secure();
+    return List.generate(size, (_) => choice[random.nextInt(choice.length)]).join();
   }
 
   Uint8List _aesEncrypt(String text, String secKey, String algo) {
@@ -435,8 +424,11 @@ class Netease extends BaseProvider {
       'source_url': 'https://music.163.com/#/playlist?id=$id',
     };
     final maxAllowSize = 1000;
+    final sourceIds = List<dynamic>.from(resData['playlist']['trackIds'] as List)
+        .take(_maxTrackCount)
+        .toList();
     final trackIdsArray = _splitArray(
-      resData['playlist']['trackIds'],
+      sourceIds,
       maxAllowSize,
     );
 
@@ -460,7 +452,9 @@ class Netease extends BaseProvider {
       'source_url': 'https://music.163.com/#/djradio?id=$id',
     };
 
-    while (hasMore) {
+    var pageCount = 0;
+    while (hasMore && pageCount++ < _maxPageCount &&
+        tracks.length < _maxTrackCount) {
       final targetUrl =
           'https://music.163.com/api/dj/program/byradio?asc=false&limit=$pageSize&radioId=$id&offset=$offset';
       final response = await dioGetWithCookieAndCsrf(targetUrl);
@@ -478,6 +472,7 @@ class Netease extends BaseProvider {
       }
 
       for (final program in programs) {
+        if (tracks.length >= _maxTrackCount) break;
         final mainSong = program['mainSong'];
         if (mainSong == null || mainSong['id'] == null) {
           continue;
@@ -532,17 +527,31 @@ class Netease extends BaseProvider {
   Future<List<Map<String, dynamic>>> ngParsePlaylistTracks(
     List<dynamic> trackIds,
   ) async {
-    const targetUrl = 'https://music.163.com/weapi/v3/song/detail';
-    final ids = trackIds.map((element) => element['id']).toList();
+    const targetEndpoint = 'https://music.163.com/weapi/v3/song/detail';
+    final ids = trackIds.take(_maxTrackCount).map((element) => element['id']).toList();
     final t = {
       'c': '[${ids.map((id) => '{"id":$id}').join(',')}]',
       'ids': '[${ids.join(',')}]',
     };
     final data = weapi(t);
+    final csrf = await getCsrf();
+    if (csrf.isEmpty) {
+      throw const FormatException('网易云 Cookie 缺少 CSRF token');
+    }
+    final targetUrl =
+        '$targetEndpoint?${Uri(queryParameters: {'csrf_token': csrf}).query}';
     final response = await dioWithCookieManager.post(
       targetUrl,
       data: data,
-      options: Options(contentType: 'application/x-www-form-urlencoded'),
+      onReceiveProgress: (received, total) {
+        if (received > _maxResponseBytes) {
+          throw const FormatException('网易云响应超过大小限制');
+        }
+      },
+      options: Options(
+        contentType: 'application/x-www-form-urlencoded',
+        receiveDataWhenStatusError: false,
+      ),
     );
     final tracks = ((decodeResponseData(response.data)['songs']) as List).map((
       trackJson,

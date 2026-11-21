@@ -5,6 +5,7 @@ import 'pages/feedback/feedback_route_args.dart';
 import 'widgets/feedback_unread_badge.dart';
 import 'controllers/feedback_push_controller.dart';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:ui';
 import 'package:animations/animations.dart';
 import 'package:flutter/foundation.dart';
@@ -47,6 +48,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
+import 'package:crypto/crypto.dart';
 import 'dart:async';
 import 'package:system_info3/system_info3.dart';
 import 'global_settings_animations.dart';
@@ -107,7 +109,6 @@ Future<void> init_apkfilepath() async {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  var useHttpOverrides = false.obs;
   final FocusNode _focusNode2 = FocusNode();
   final FocusNode _focusNode3 = FocusNode();
   late final TextEditingController _windowsProxyAddrController;
@@ -131,18 +132,6 @@ class _SettingsPageState extends State<SettingsPage> {
     super.dispose();
   }
 
-  void get_useHttpOverrides() async {
-    Map<String, dynamic> settings = lengcyGetSettings();
-    if (settings["useHttpOverrides"] != null) {
-      useHttpOverrides.value = settings["useHttpOverrides"];
-    }
-  }
-
-  void set_useHttpOverrides(bool value) async {
-    Get.find<SettingsController>().setSettings({'useHttpOverrides': value});
-    showWarningSnackbar('重启应用后生效', null);
-  }
-
   @override
   void initState() {
     super.initState();
@@ -150,7 +139,6 @@ class _SettingsPageState extends State<SettingsPage> {
     _windowsProxyAddrController = TextEditingController(
       text: Get.find<SettingsController>().windowsProxyAddr,
     );
-    get_useHttpOverrides();
     // 监听焦点变化
     _focusNode2.addListener(() {
       if (_focusNode2.hasFocus) {
@@ -673,12 +661,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
                               Obx(
                                 () => SwitchListTile(
-                                  title: const Text('禁用ssl证书验证'),
-                                  value: useHttpOverrides.value,
-                                  onChanged: (bool value) {
-                                    set_useHttpOverrides(value);
-                                    useHttpOverrides.value = value;
-                                  },
+                                  title: const Text('SSL 证书绕过已禁用'),
+                                  value: false,
+                                  onChanged: null,
                                 ),
                               ),
                               Obx(

@@ -10,6 +10,9 @@ import 'package:path/path.dart' as p;
 class PasteFileTransfer {
   static const stagingDirectoryName = '.listen1-paste-transfers';
   static final _active = <String>{};
+  static const int defaultMaxTotalBytes = 64 * 1024 * 1024;
+  static const int defaultMaxPartBytes = 32 * 1024 * 1024;
+  static const int defaultMaxFiles = 100;
 
   /// Recover staging directories left by an app/process crash. Never touch an
   /// active transfer, user source files, or successfully published downloads.
@@ -72,15 +75,22 @@ class PasteFileTransfer {
   static Future<int> _write(
     Stream<List<int>> stream,
     File file,
-    bool Function()? isCancelled,
-  ) async {
+    bool Function()? isCancelled, {
+    required int maxBytes,
+    required int maxTotalBytes,
+    required int currentTotal,
+  }) async {
     final output = await file.open(mode: FileMode.write);
     var length = 0;
     try {
       await for (final chunk in stream) {
         _checkCancelled(isCancelled);
+        final nextLength = length + chunk.length;
+        if (nextLength > maxBytes || currentTotal + nextLength > maxTotalBytes) {
+          throw const FormatException('Transfer exceeds size limit');
+        }
         await output.writeFrom(chunk);
-        length += chunk.length;
+        length = nextLength;
       }
       return length;
     } finally {
@@ -102,7 +112,13 @@ class PasteFileTransfer {
     String? fileName,
     int? expectedLength,
     bool Function()? isCancelled,
+    int maxTotalBytes = defaultMaxTotalBytes,
+    int maxPartBytes = defaultMaxPartBytes,
+    int maxFiles = defaultMaxFiles,
   }) async {
+    if (maxTotalBytes <= 0 || maxPartBytes <= 0 || maxFiles <= 0) {
+      throw ArgumentError('Transfer limits must be positive');
+    }
     await Directory(saveDir).create(recursive: true);
     await cleanStale(saveDir);
     final root = await Directory(
@@ -113,24 +129,42 @@ class PasteFileTransfer {
     final published = <String>[];
     try {
       final body = File(p.join(staging.path, 'body'));
-      final length = await _write(stream, body, isCancelled);
+      final length = await _write(
+        stream,
+        body,
+        isCancelled,
+        maxBytes: maxTotalBytes,
+        maxTotalBytes: maxTotalBytes,
+        currentTotal: 0,
+      );
       if (expectedLength != null &&
           expectedLength >= 0 &&
           expectedLength != length) {
         throw const FormatException('Incomplete transfer');
       }
       final files = <(File, String)>[];
+      final rawLength = length;
+      if (rawLength > maxTotalBytes) {
+        throw const FormatException('Transfer exceeds size limit');
+      }
       if (boundary == null) {
         if (length == 0) throw const FormatException('Empty image');
         files.add((body, _safeName(fileName!)));
+        if (length > maxPartBytes) {
+          throw const FormatException('Transfer exceeds per-file limit');
+        }
       } else {
         // Own the underlying subscription explicitly: MIME cancellation can
         // be deferred while a part is unconsumed (e.g. invalid headers/names).
         final source = StreamIterator<List<int>>(body.openRead());
+        var totalPartBytes = 0;
         try {
           await for (final part in _readIterator(
             source,
           ).transform(MimeMultipartTransformer(boundary))) {
+            if (files.length >= maxFiles) {
+              throw const FormatException('Too many files');
+            }
             final name = fileNameFromDisposition(
               part.headers['content-disposition'] ?? '',
             );
@@ -140,7 +174,18 @@ class PasteFileTransfer {
             }
             final safeName = _safeName(name);
             final file = File(p.join(staging.path, 'part-${files.length}'));
-            final partLength = await _write(part, file, isCancelled);
+            final partLength = await _write(
+              part,
+              file,
+              isCancelled,
+              maxBytes: maxPartBytes,
+              maxTotalBytes: maxTotalBytes,
+              currentTotal: totalPartBytes,
+            );
+            totalPartBytes += partLength;
+            if (totalPartBytes > maxTotalBytes) {
+              throw const FormatException('Transfer exceeds size limit');
+            }
             final declaredLength = part.headers['content-length'];
             if (declaredLength != null &&
                 int.parse(declaredLength) != partLength) {
