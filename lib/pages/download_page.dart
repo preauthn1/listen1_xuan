@@ -105,8 +105,10 @@ class DownloadPage extends StatelessWidget {
       );
 
       // 发送 GET 请求
-      final dio = Dio();
-      final response = await dio.get(uri.toString());
+      final client = Dio();
+      client.options.headers['x-listen1-pairing-token'] =
+          webSocketClientController.serverToken;
+      final response = await client.get(uri.toString());
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> serverCacheData =

@@ -1,6 +1,5 @@
 part of '../../settings.dart';
 
-// Future<void> outputAllSettingsToFile([bool toJsonString = false]) async {
 Future<Map<String, dynamic>> outputAllSettingsToFile([
   bool toJsonString = false,
 ]) async {
@@ -28,7 +27,12 @@ Future<Map<String, dynamic>> outputAllSettingsToFile([
       default:
         if (key.startsWith('flutter.') ||
             key.startsWith('supabase.') ||
-            key.contains('token'))
+            key.toLowerCase().contains('token') ||
+            key.toLowerCase().contains('password') ||
+            key.toLowerCase().contains('secret') ||
+            key == 'githubOauthAccessKey' ||
+            key == 'supabaseEmail' ||
+            key == 'supabasePassword')
           continue;
         try {
           settings[key] = jsonDecode(await s.getString(key) ?? '{}');
@@ -43,11 +47,16 @@ Future<Map<String, dynamic>> outputAllSettingsToFile([
   }
   settings[SettingsController.lyricHiveStoreKey] = await s
       .exportLyricBoxToString();
+  final credentialKeys = SettingsController.exportCredentialKeys;
+  settings.removeWhere(
+    (key, _) => credentialKeys.contains(key) ||
+        key.toLowerCase().contains('token') ||
+        key.toLowerCase().contains('password') ||
+        key.toLowerCase().contains('secret'),
+  );
   if (toJsonString) {
-    settings.remove('githubOauthAccessKey');
     return settings;
   }
-  // 申请所有文件访问权限
   if ((isAndroid &&
           await Permission.manageExternalStorage.request().isGranted) ||
       (isMobile && await Permission.storage.request().isGranted) ||
@@ -58,7 +67,10 @@ Future<Map<String, dynamic>> outputAllSettingsToFile([
       final file = File(outputPath);
       // 将设置写入 JSON 文件
       await file.writeAsString(jsonEncode(settings));
-      showSuccessSnackbar('设置已保存到', outputPath);
+      showSuccessSnackbar(
+        '设置已保存到',
+        '$outputPath\n设置导出为明文 JSON，请勿上传到不受信任的位置。',
+      );
     } catch (e) {
       showErrorSnackbar('保存设置时出错', '$e');
     }
@@ -77,8 +89,43 @@ Future<void> importSettingsFromFile(
 
     // logger.d('2');
 
+    final maxImportedKeys = 100;
+    if (settings.length > maxImportedKeys) {
+      throw const FormatException('配置项数量超过限制');
+    }
+    final activeKeys = <String>{
+      'playerlists',
+      'auto_choose_source_list',
+      'favoriteplayerlists',
+      'settings',
+      'player-settings',
+      'current-playing',
+      SettingsController.PlayController_play_replaceKey,
+      SettingsController.lyricHiveStoreKey,
+    };
+    final playlistKeys = <String>{
+      ...((settings['playerlists'] is List)
+          ? (settings['playerlists'] as List).whereType<String>()
+          : const <String>[]),
+      ...((settings['favoriteplayerlists'] is List)
+          ? (settings['favoriteplayerlists'] as List).whereType<String>()
+          : const <String>[]),
+      ...settings.keys.where(SettingsController.isPlaylistKey),
+    };
+    final sanitized = Map<String, dynamic>.from(settings)
+      ..removeWhere((key, _) =>
+          (!activeKeys.contains(key) && !playlistKeys.contains(key)) ||
+          SettingsController.exportCredentialKeys.contains(key) ||
+          key.toLowerCase().contains('token') ||
+          key.toLowerCase().contains('password') ||
+          key.toLowerCase().contains('secret'));
+    for (final entry in sanitized.entries) {
+      if (utf8.encode(jsonEncode(entry.value)).length > 1024 * 1024) {
+        throw FormatException('配置项过大: ${entry.key}');
+      }
+    }
     await Future.wait(
-      settings.keys.map((key) async {
+      sanitized.keys.map((key) async {
         switch (key) {
           case SettingsController.totpLocalKey:
             break;
@@ -114,19 +161,22 @@ Future<void> importSettingsFromFile(
             break;
           default:
             try {
-              if (settings[key] is String) throw "String! :${settings[key]}";
+              final value = sanitized[key];
+              if (value is String && !playlistKeys.contains(key)) {
+                throw const FormatException('String value');
+              }
               await s.setString(
                 key,
                 kDebugMode
-                    ? jsonEncode(settings[key])
+                    ? jsonEncode(value)
                     : await compute(
                         (dynamic value) => jsonEncode(value),
-                        settings[key],
+                        value,
                       ),
               );
             } catch (e) {
               try {
-                await s.setString(key, settings[key].toString());
+                await s.setString(key, sanitized[key].toString());
               } catch (e) {
                 logger.e('Error saving key $key: $e');
               }
@@ -164,8 +214,11 @@ Future<void> importSettingsFromFile(
       );
 
       if (result != null) {
-        final content = utf8.decode(await result.readAsBytes());
-        final settings = jsonDecode(content) as Map<String, dynamic>;
+      final content = await result.readAsBytes();
+      if (content.length > 4 * 1024 * 1024) {
+        throw const FormatException('配置文件超过大小限制');
+      }
+      final settings = jsonDecode(utf8.decode(content)) as Map<String, dynamic>;
 
         await _sets(settings);
       } else {

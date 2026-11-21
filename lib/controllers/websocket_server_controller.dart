@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:get/get.dart';
 import 'package:listen1_xuan/controllers/paste_controller.dart';
@@ -24,19 +25,24 @@ import '../services/paste_file_transfer.dart';
 /// WebSocket 服务器控制器
 /// 支持 IPv4/IPv6 配置，包含 ping/pong 心跳机制和资源释放
 class WebSocketServerController extends GetxController {
-  static const String _tag = 'WebSocketServerController';
-  final Logger _logger = createAppLogger();
+  /// 将本地粘贴图片限制为和网络传输相同的预算。
+  static const int maxPasteImageBytes = 32 * 1024 * 1024;
 
-  /// 服务器实例
+  static const String _tag = 'WebSocketServerController';
+  static const int _maxConnections = 8;
+  static const int _maxMessageBytes = 256 * 1024;
+  static const int _maxHttpBodyBytes = 64 * 1024 * 1024;
+  final Logger _logger = createAppLogger();
   HttpServer? _server;
 
+  final String accessToken;
   /// 所有活跃的 WebSocket 连接
   final List<WebSocketConnection> _connections = <WebSocketConnection>[];
+  int _pendingConnections = 0;
 
   /// 心跳定时器
   Timer? _pingTimer;
-
-  /// 服务器运行状态
+  DateTime? _serverStartedAt;
   final RxBool _isRunning = false.obs;
 
   /// 连接客户端数量
@@ -51,6 +57,9 @@ class WebSocketServerController extends GetxController {
 
   /// Persist a new clipboard snapshot and release the old one after its readers.
   Future<bool> setPasteImage(List<int> bytes, String fileName) async {
+    if (bytes.length > maxPasteImageBytes) {
+      throw const FormatException('粘贴图片超过大小限制');
+    }
     final generation = ++_pasteImageGeneration;
     final image = await PasteImageSnapshot.create(
       await getPasteFileDownloadDir(),
@@ -86,11 +95,16 @@ class WebSocketServerController extends GetxController {
   WebSocketServerController({
     required String host,
     required int port,
+    String? accessToken,
     InternetAddressType addressType = InternetAddressType.any,
     Duration pingInterval = const Duration(seconds: 30),
     Duration pongTimeout = const Duration(seconds: 5),
   }) : _host = host,
        _port = port,
+       accessToken = accessToken ??
+           base64UrlEncode(
+             List<int>.generate(32, (_) => Random.secure().nextInt(256)),
+           ),
        _pingInterval = pingInterval,
        _pongTimeout = pongTimeout;
 
@@ -115,30 +129,35 @@ class WebSocketServerController extends GetxController {
       }
 
       _isRunning.value = true;
-      _logger.i('$_tag WebSocket 服务器启动成功: $serverUrl');
+      _serverStartedAt = DateTime.now();
       Get.find<BroadcastWsController>().startBroadcast(_port);
       // 监听请求
       _server!.listen((HttpRequest request) async {
-        if (WebSocketTransformer.isUpgradeRequest(request)) {
-          // 升级为 WebSocket 连接
+        final authorized = _isAuthorizedRequest(request);
+        final connectionSlot = _connections.length + _pendingConnections;
+        if (WebSocketTransformer.isUpgradeRequest(request) &&
+            authorized &&
+            connectionSlot < _maxConnections) {
+          _pendingConnections++;
           try {
             final webSocket = await WebSocketTransformer.upgrade(request);
             _handleNewConnection(webSocket);
-          } catch (e) {
-            _logger.e('$_tag WebSocket 升级失败', error: e);
-            try {
-              if (!request.response.headers.chunkedTransferEncoding) {
-                request.response.statusCode = HttpStatus.badRequest;
-                await request.response.close();
-              }
-            } catch (closeError) {
-              _logger.e('$_tag 关闭响应失败', error: closeError);
-            }
+          } finally {
+            _pendingConnections--;
           }
-        } else {
-          // 处理普通 HTTP 请求
-          _handleHttpRequest(request);
+          return;
         }
+        if (WebSocketTransformer.isUpgradeRequest(request)) {
+          request.response
+            ..statusCode = authorized
+                ? HttpStatus.serviceUnavailable
+                : HttpStatus.unauthorized
+            ..write(authorized ? 'Connection limit reached' : 'Unauthorized');
+          await request.response.close();
+          return;
+        }
+        // 处理普通 HTTP 请求
+        _handleHttpRequest(request);
       });
 
       // 启动心跳检测
@@ -174,15 +193,12 @@ class WebSocketServerController extends GetxController {
 
       // 关闭所有连接
       await _closeAllConnections();
-
-      // 关闭服务器
       await _server?.close(force: true);
       _server = null;
 
       _isRunning.value = false;
       _clientCount.value = 0;
-
-      _logger.i('$_tag WebSocket 服务器已停止');
+      _serverStartedAt = null;
     } catch (e, stackTrace) {
       _logger.e('$_tag 停止服务器时出错', error: e, stackTrace: stackTrace);
     }
@@ -219,14 +235,20 @@ class WebSocketServerController extends GetxController {
     WebSocketConnection connection,
     dynamic data,
   ) async {
+    final raw = data is String ? data : data.toString();
+    final rawBytes = utf8.encode(raw);
+    if (rawBytes.length > _maxMessageBytes) {
+      await connection.webSocket.close(WebSocketStatus.messageTooBig, 'Message too large');
+      return;
+    }
     try {
       // 尝试解析为新的 WebSocketMessage 格式
       WebSocketMessage message;
       try {
-        message = WebSocketMessage.fromJsonString(data.toString());
+        message = WebSocketMessage.fromJsonString(raw);
       } catch (e) {
         // 如果解析失败，尝试解析为旧格式
-        final oldMessage = json.decode(data.toString());
+        final oldMessage = json.decode(raw);
         final messageType = oldMessage['type'] ?? 'unknown';
 
         // 转换为新格式
@@ -310,7 +332,7 @@ class WebSocketServerController extends GetxController {
       _logger.e('$_tag 处理消息失败', error: e);
       // 发送错误消息给客户端
       final errorMessage = WebSocketMessageBuilder.createErrorMessage(
-        '消息处理失败: $e',
+        _safeExternalError('消息处理失败'),
       );
       _sendMessage(connection, errorMessage);
     }
@@ -341,7 +363,7 @@ class WebSocketServerController extends GetxController {
 
       // 发送错误消息
       final errorMessage = WebSocketMessageBuilder.createErrorMessage(
-        '无法获取播放状态: $e',
+        _safeExternalError('无法获取播放状态'),
       );
       _sendMessage(connection, errorMessage);
     }
@@ -390,7 +412,7 @@ class WebSocketServerController extends GetxController {
             } catch (e) {
               _logger.e('$_tag 切换播放模式失败', error: e);
               final errorMessage = WebSocketMessageBuilder.createErrorMessage(
-                '切换播放模式失败: $e',
+                _safeExternalError('切换播放模式失败'),
               );
               _sendMessage(connection, errorMessage);
               return;
@@ -409,7 +431,7 @@ class WebSocketServerController extends GetxController {
               } catch (e) {
                 _logger.e('$_tag 进度控制失败', error: e);
                 final errorMessage = WebSocketMessageBuilder.createErrorMessage(
-                  '设置进度失败: $e',
+                  _safeExternalError('设置进度失败'),
                 );
                 _sendMessage(connection, errorMessage);
                 return;
@@ -436,7 +458,7 @@ class WebSocketServerController extends GetxController {
             } catch (e) {
               _logger.e('$_tag 设置音量失败', error: e);
               final errorMessage = WebSocketMessageBuilder.createErrorMessage(
-                '设置音量失败: $e',
+                _safeExternalError('设置音量失败'),
               );
               _sendMessage(connection, errorMessage);
               return;
@@ -459,7 +481,7 @@ class WebSocketServerController extends GetxController {
     } catch (e) {
       _logger.e('$_tag 处理播放控制消息失败', error: e);
       final errorMessage = WebSocketMessageBuilder.createErrorMessage(
-        '播放控制失败: $e',
+        _safeExternalError('播放控制失败'),
       );
       _sendMessage(connection, errorMessage);
     }
@@ -495,14 +517,14 @@ class WebSocketServerController extends GetxController {
       } catch (e) {
         _logger.e('$_tag 播放歌曲执行失败', error: e);
         final errorMessage = WebSocketMessageBuilder.createErrorMessage(
-          '播放歌曲失败: $e',
+          _safeExternalError('播放歌曲失败'),
         );
         _sendMessage(connection, errorMessage);
       }
     } catch (e) {
       _logger.e('$_tag 处理播放歌曲消息失败 (解析阶段)', error: e);
       final errorMessage = WebSocketMessageBuilder.createErrorMessage(
-        '解析歌曲数据失败: $e',
+        _safeExternalError('解析歌曲数据失败'),
       );
       _sendMessage(connection, errorMessage);
     }
@@ -535,14 +557,14 @@ class WebSocketServerController extends GetxController {
       } catch (e) {
         _logger.e('$_tag 设置下一首歌曲失败', error: e);
         final errorMessage = WebSocketMessageBuilder.createErrorMessage(
-          '设置下一首歌曲失败: $e',
+          _safeExternalError('设置下一首歌曲失败'),
         );
         _sendMessage(connection, errorMessage);
       }
     } catch (e) {
       _logger.e('$_tag 处理播放下一首消息失败 (解析阶段)', error: e);
       final errorMessage = WebSocketMessageBuilder.createErrorMessage(
-        '解析歌曲数据失败: $e',
+        _safeExternalError('解析歌曲数据失败'),
       );
       _sendMessage(connection, errorMessage);
     }
@@ -665,7 +687,10 @@ class WebSocketServerController extends GetxController {
       } else {
         messageJson = message.toString();
       }
-
+      if (utf8.encode(messageJson).length > _maxMessageBytes) {
+        _logger.w('$_tag 拒绝发送超大消息');
+        return;
+      }
       connection.webSocket.add(messageJson);
     } catch (e) {
       _logger.e('$_tag 发送消息失败 to ${connection.id}', error: e);
@@ -685,6 +710,11 @@ class WebSocketServerController extends GetxController {
       messageJson = message;
     } else {
       messageJson = message.toString();
+    }
+
+    if (utf8.encode(messageJson).length > _maxMessageBytes) {
+      _logger.w('$_tag 拒绝广播超大消息');
+      return;
     }
 
     final connectionsToRemove = <WebSocketConnection>[];
@@ -738,13 +768,67 @@ class WebSocketServerController extends GetxController {
     _connections.clear();
   }
 
+  bool _isAuthorizedRequest(HttpRequest request) {
+    final candidate = request.headers.value('x-listen1-pairing-token');
+    return candidate != null &&
+        candidate.isNotEmpty &&
+        _constantTimeEquals(candidate, accessToken);
+  }
+
+  bool _constantTimeEquals(String left, String right) {
+    final a = utf8.encode(left);
+    final b = utf8.encode(right);
+    var result = a.length ^ b.length;
+    final length = a.length < b.length ? a.length : b.length;
+    for (var i = 0; i < length; i++) {
+      result |= a[i] ^ b[i];
+    }
+    return result == 0;
+  }
+
+  void _rejectUnauthorized(HttpRequest request) {
+    request.response
+      ..statusCode = HttpStatus.unauthorized
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode({'error': 'Unauthorized'}));
+    unawaited(request.response.close());
+  }
+
+  static String _safeExternalError(String fallback) => fallback;
+
   /// 处理 HTTP 请求（根路径）
   void _handleHttpRequest(HttpRequest request) async {
+    if (!_isAuthorizedRequest(request)) {
+      _rejectUnauthorized(request);
+      return;
+    }
+    final body = request.contentLength;
+    if (body > _maxHttpBodyBytes) {
+      request.response
+        ..statusCode = HttpStatus.requestEntityTooLarge
+        ..write('Request too large');
+      await request.response.close();
+      return;
+    }
     final uri = request.uri.path;
 
     // 检查是否为 /downloadById/{id} 路由
     if (uri.startsWith('/downloadById/')) {
+      if (request.method != 'GET') {
+        request.response
+          ..statusCode = HttpStatus.methodNotAllowed
+          ..write('Method Not Allowed');
+        await request.response.close();
+        return;
+      }
       final id = uri.substring('/downloadById/'.length);
+      if (id.isEmpty || id.contains('/') || id.contains('\\')) {
+        request.response
+          ..statusCode = HttpStatus.badRequest
+          ..write('Invalid cache ID');
+        await request.response.close();
+        return;
+      }
       await _handleDownloadById(request, id);
       return;
     }
@@ -760,7 +844,9 @@ class WebSocketServerController extends GetxController {
         final status = {
           'running': _isRunning.value,
           'clientCount': _clientCount.value,
-          'uptime': DateTime.now().millisecondsSinceEpoch,
+          'uptime': _serverStartedAt == null
+              ? Duration.zero.inSeconds
+              : DateTime.now().difference(_serverStartedAt!).inSeconds,
         };
         request.response
           ..statusCode = HttpStatus.ok
@@ -789,7 +875,7 @@ class WebSocketServerController extends GetxController {
             ..write(
               json.encode({
                 'error': 'Internal server error',
-                'message': 'Failed to get cache list: $e',
+                'message': _safeExternalError('Failed to get cache list'),
               }),
             );
         }
@@ -823,10 +909,17 @@ class WebSocketServerController extends GetxController {
         request.response
           ..statusCode = HttpStatus.methodNotAllowed
           ..write('Method Not Allowed');
-        request.response.close();
+        await request.response.close();
         return;
       }
-
+      final body = request.contentLength;
+      if (body < 0 || body > _maxHttpBodyBytes) {
+        request.response
+          ..statusCode = HttpStatus.requestEntityTooLarge
+          ..write('Request too large');
+        await request.response.close();
+        return;
+      }
       final contentType = request.headers.contentType;
       if (contentType == null ||
           contentType.mimeType != 'multipart/form-data') {
@@ -854,7 +947,7 @@ class WebSocketServerController extends GetxController {
         isCancelled: () => generation != _transferGeneration,
         saveDir: downloadDir,
         boundary: boundary,
-        expectedLength: request.contentLength,
+        expectedLength: body,
       );
 
       request.response
@@ -873,7 +966,7 @@ class WebSocketServerController extends GetxController {
       try {
         request.response
           ..statusCode = HttpStatus.internalServerError
-          ..write('Internal Server Error: $e');
+          ..write('Internal Server Error');
         request.response.close();
       } catch (_) {}
     }
@@ -881,8 +974,42 @@ class WebSocketServerController extends GetxController {
 
   /// 处理 /getPasteFile GET 请求 - 将 nowPasteFiles 中的文件以 multipart/mixed 方式返回
   Future<void> _handleGetPasteFile(HttpRequest request) async {
+    const maxFiles = 100;
+    if (request.method != 'GET') {
+      request.response
+        ..statusCode = HttpStatus.methodNotAllowed
+        ..write('Method Not Allowed');
+      await request.response.close();
+      return;
+    }
+    var responseStarted = false;
     try {
-      if (nowPasteFiles.isEmpty) {
+      final prevalidated = <(String, List<int>)>[];
+      var totalBytes = 0;
+      for (final filePath in List<String>.of(nowPasteFiles)) {
+        if (prevalidated.length >= maxFiles) {
+          throw const FormatException('粘贴文件数量超过限制');
+        }
+        final file = File(filePath);
+        if (!await file.exists()) continue;
+        final bytes = await file.readAsBytes();
+        if (bytes.length > PasteFileTransfer.defaultMaxPartBytes ||
+            totalBytes + bytes.length > PasteFileTransfer.defaultMaxTotalBytes) {
+          throw const FormatException('粘贴文件总大小超过限制');
+        }
+        totalBytes += bytes.length;
+        prevalidated.add((p.basename(filePath), bytes));
+      }
+      if (prevalidated.isEmpty) {
+        request.response
+          ..statusCode = HttpStatus.notFound
+          ..headers.contentType = ContentType.json
+          ..write(json.encode({'error': 'No paste files available'}));
+        await request.response.close();
+        return;
+      }
+      final files = prevalidated;
+      if (files.isEmpty) {
         request.response
           ..statusCode = HttpStatus.notFound
           ..headers.contentType = ContentType.json
@@ -893,30 +1020,30 @@ class WebSocketServerController extends GetxController {
 
       final boundary = '----Listen1Paste${const Uuid().v4()}';
       request.response.statusCode = HttpStatus.ok;
+      responseStarted = true;
       request.response.headers.set(
         HttpHeaders.contentTypeHeader,
         'multipart/mixed; boundary=$boundary',
       );
 
-      for (final filePath in List<String>.of(nowPasteFiles)) {
-        final file = File(filePath);
-        if (!await file.exists()) continue;
-
-        final fileName = p.basename(filePath);
+      var sentBytes = 0;
+      for (final file in files) {
+        final fileName = file.$1;
         final encodedFileName = Uri.encodeComponent(fileName);
-
-        // 写 boundary 和 headers
+        final fileSize = file.$2.length;
+        if (sentBytes + fileSize > PasteFileTransfer.defaultMaxTotalBytes) {
+          throw const FormatException('粘贴文件总大小超过限制');
+        }
+        sentBytes += fileSize;
         request.response.write('--$boundary\r\n');
         request.response.write(
           'Content-Disposition: attachment; filename*=UTF-8\'\'$encodedFileName\r\n',
         );
         request.response.write('Content-Type: application/octet-stream\r\n');
-        final fileSize = await file.length();
         request.response.write('Content-Length: $fileSize\r\n');
         request.response.write('\r\n');
 
-        // 写文件内容
-        await request.response.addStream(file.openRead());
+        await request.response.addStream(Stream<List<int>>.value(file.$2));
         request.response.write('\r\n');
       }
 
@@ -927,12 +1054,18 @@ class WebSocketServerController extends GetxController {
       _logger.i('$_tag 返回 ${nowPasteFiles.length} 个粘贴文件');
     } catch (e) {
       _logger.e('$_tag 处理 /getPasteFile 请求失败', error: e);
-      try {
-        request.response
-          ..statusCode = HttpStatus.internalServerError
-          ..write('Internal Server Error: $e');
-        request.response.close();
-      } catch (_) {}
+      if (responseStarted) {
+        try {
+          await request.response.close();
+        } catch (_) {}
+      } else {
+        try {
+          request.response
+            ..statusCode = HttpStatus.internalServerError
+            ..write('Internal Server Error');
+          await request.response.close();
+        } catch (_) {}
+      }
     }
   }
 
@@ -944,7 +1077,15 @@ class WebSocketServerController extends GetxController {
         request.response
           ..statusCode = HttpStatus.methodNotAllowed
           ..write('Method Not Allowed');
-        request.response.close();
+        await request.response.close();
+        return;
+      }
+      final body = request.contentLength;
+      if (body < 0 || body > _maxHttpBodyBytes) {
+        request.response
+          ..statusCode = HttpStatus.requestEntityTooLarge
+          ..write('Request too large');
+        await request.response.close();
         return;
       }
 
@@ -959,14 +1100,14 @@ class WebSocketServerController extends GetxController {
         isCancelled: () => generation != _transferGeneration,
         saveDir: await getPasteFileDownloadDir(),
         fileName: decodedFileName,
-        expectedLength: request.contentLength,
+        expectedLength: body,
       );
       final savePath = savedFiles.single;
 
       request.response
         ..statusCode = HttpStatus.ok
         ..headers.contentType = ContentType.json
-        ..write(json.encode({'saved': 1, 'path': savePath}));
+        ..write(json.encode({'saved': 1, 'fileName': p.basename(savePath)}));
       request.response.close();
 
       showSuccessSnackbar('收到粘贴图片', '已保存到 ${p.basename(savePath)}');
@@ -976,7 +1117,7 @@ class WebSocketServerController extends GetxController {
       try {
         request.response
           ..statusCode = HttpStatus.internalServerError
-          ..write('Internal Server Error: $e');
+          ..write('Internal Server Error');
         request.response.close();
       } catch (_) {}
     }
@@ -984,6 +1125,13 @@ class WebSocketServerController extends GetxController {
 
   /// 处理 /getPasteImage GET 请求 - 流式返回磁盘中的图片快照
   Future<void> _handleGetPasteImage(HttpRequest request) async {
+    if (request.method != 'GET') {
+      request.response
+        ..statusCode = HttpStatus.methodNotAllowed
+        ..write('Method Not Allowed');
+      await request.response.close();
+      return;
+    }
     try {
       final image = _pasteImage;
       if (image == null) {
@@ -1017,10 +1165,18 @@ class WebSocketServerController extends GetxController {
       try {
         request.response
           ..statusCode = HttpStatus.internalServerError
-          ..write('Internal Server Error: $e');
+          ..write('Internal Server Error');
         request.response.close();
       } catch (_) {}
     }
+  }
+
+  Future<void> _sendNotFound(HttpRequest request) async {
+    request.response
+      ..statusCode = HttpStatus.notFound
+      ..headers.contentType = ContentType.json
+      ..write(json.encode({'error': 'File not found'}));
+    await request.response.close();
   }
 
   /// 处理根据 ID 下载文件的请求
@@ -1033,33 +1189,13 @@ class WebSocketServerController extends GetxController {
       final filePath = await cacheController.getLocalCache(id);
 
       if (filePath.isEmpty) {
-        // 文件不存在
-        request.response
-          ..statusCode = HttpStatus.notFound
-          ..headers.contentType = ContentType.json
-          ..write(
-            json.encode({
-              'error': 'File not found',
-              'message': 'No cached file found for ID: $id',
-            }),
-          );
-        request.response.close();
+        await _sendNotFound(request);
         return;
       }
 
       final file = File(filePath);
       if (!await file.exists()) {
-        // 文件路径存在但文件实际不存在
-        request.response
-          ..statusCode = HttpStatus.notFound
-          ..headers.contentType = ContentType.json
-          ..write(
-            json.encode({
-              'error': 'File not found',
-              'message': 'Cached file does not exist: $filePath',
-            }),
-          );
-        request.response.close();
+        await _sendNotFound(request);
         return;
       }
 
@@ -1087,9 +1223,9 @@ class WebSocketServerController extends GetxController {
       final fileStream = file.openRead();
       await fileStream.pipe(request.response);
 
-      _logger.i('$_tag 成功处理文件下载请求: ID=$id, 文件=$fileName');
+      _logger.i('$_tag 成功处理文件下载请求: 文件=$fileName');
     } catch (e, stackTrace) {
-      _logger.e('$_tag 处理文件下载请求失败: ID=$id', error: e, stackTrace: stackTrace);
+      _logger.e('$_tag 处理文件下载请求失败', error: e, stackTrace: stackTrace);
 
       try {
         request.response
@@ -1098,7 +1234,7 @@ class WebSocketServerController extends GetxController {
           ..write(
             json.encode({
               'error': 'Internal server error',
-              'message': 'Failed to process download request: $e',
+              'message': _safeExternalError('Failed to process download request'),
             }),
           );
         request.response.close();

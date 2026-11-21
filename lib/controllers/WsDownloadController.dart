@@ -64,11 +64,15 @@ class WsDownloadController extends GetxController {
       if (await partialFile.exists()) await partialFile.delete();
       String serverAddress =
           Get.find<WebSocketClientController>().serverAddress;
-      final uri = WebSocketAddress.parse(
-        serverAddress,
-      ).uri(scheme: 'http', path: '/downloadById/${entry.key}');
+      final uri = WebSocketAddress.parse(serverAddress).uri(
+        scheme: 'http',
+        path: '/downloadById/${Uri.encodeComponent(entry.key)}',
+      );
+      final client = Dio();
+      client.options.headers['x-listen1-pairing-token'] =
+          Get.find<WebSocketClientController>().serverToken;
 
-      await Dio().download(
+      await client.download(
         uri.toString(),
         partialFile.path,
         onReceiveProgress: (received, total) {

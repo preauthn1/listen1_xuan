@@ -188,7 +188,9 @@ class PasteController extends GetxController {
         }
       }
 
-      final dio = dioWithCookieManager;
+      final dio = dio_pkg.Dio();
+      dio.options.headers['x-listen1-pairing-token'] =
+          Get.find<WebSocketClientController>().serverToken;
       final response = await dio.post(uri, data: formData, cancelToken: token);
 
       if (response.statusCode == 200) {
@@ -200,7 +202,7 @@ class PasteController extends GetxController {
     } catch (e) {
       if (token.isCancelled) return;
       debugPrint('[PasteController] POST文件到服务器失败: $e');
-      showErrorSnackbar('发送文件失败', e.toString());
+      showErrorSnackbar('发送文件失败', '传输失败，请检查连接和令牌');
     } finally {
       _transfers.remove(token);
     }
@@ -217,8 +219,9 @@ class PasteController extends GetxController {
         serverAddress,
       ).uri(scheme: 'http', path: '/getPasteFile').toString();
 
-      final dio = dioWithCookieManager;
-      final response = await dio.get<dio_pkg.ResponseBody>(
+      final client = dio_pkg.Dio();
+      client.options.headers['x-listen1-pairing-token'] = wsc.serverToken;
+      final response = await client.get<dio_pkg.ResponseBody>(
         uri,
         cancelToken: token,
         options: dio_pkg.Options(responseType: dio_pkg.ResponseType.stream),
@@ -260,7 +263,7 @@ class PasteController extends GetxController {
     } catch (e) {
       if (token.isCancelled) return;
       debugPrint('[PasteController] 下载粘贴文件失败: $e');
-      showErrorSnackbar('下载粘贴文件失败', e.toString());
+      showErrorSnackbar('下载粘贴文件失败', '传输失败，请检查连接和令牌');
     } finally {
       _transfers.remove(token);
     }
@@ -347,7 +350,9 @@ class PasteController extends GetxController {
       final uri = WebSocketAddress.parse(
         serverAddress,
       ).uri(scheme: 'http', path: '/onPasteImage').toString();
-      final dio = dioWithCookieManager;
+      final dio = dio_pkg.Dio();
+      dio.options.headers['x-listen1-pairing-token'] =
+          Get.find<WebSocketClientController>().serverToken;
       final response = await dio.post(
         uri,
         cancelToken: token,
@@ -386,8 +391,9 @@ class PasteController extends GetxController {
         serverAddress,
       ).uri(scheme: 'http', path: '/getPasteImage').toString();
 
-      final dio = dioWithCookieManager;
-      final response = await dio.get<dio_pkg.ResponseBody>(
+      final client = dio_pkg.Dio();
+      client.options.headers['x-listen1-pairing-token'] = wsc.serverToken;
+      final response = await client.get<dio_pkg.ResponseBody>(
         uri,
         cancelToken: token,
         options: dio_pkg.Options(responseType: dio_pkg.ResponseType.stream),

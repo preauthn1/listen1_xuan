@@ -12,6 +12,9 @@ import 'statistics_callback.dart';
 class FFmpegKit {
   FFmpegKit._();
 
+  /// Cancels a running session in the real plugin; a no-op in the stub.
+  static Future<void> cancel([int? sessionId]) async {}
+
   /// Creates a session that immediately fails, then invokes
   /// [completeCallback] with it (matching the real plugin's async contract).
   static Future<FFmpegSession> executeWithArgumentsAsync(

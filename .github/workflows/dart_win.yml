@@ -12,6 +12,8 @@ on:
       - 'scripts/build.sh'
       - 'scripts/configure_build.py'
       - 'scripts/verify_firebase_dependencies.py'
+      - 'inno_build.iss'
+      - 'assets/images/app_icon.ico'
       - '**/dart_win.yml'
 
 jobs:
@@ -31,15 +33,16 @@ jobs:
           echo "提交作者: $env:COMMIT_AUTHOR"
           $GITHASH = "$env:COMMIT_SHA".Substring(0,7)
           echo "GITHASH=$GITHASH" >> $env:GITHUB_ENV
+          echo "SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}" >> $env:GITHUB_ENV
           echo "GITHASH (前7位): $GITHASH"
         shell: pwsh
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: "3.13"
       - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-      - uses: subosito/flutter-action@v2
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           channel: 'stable'
           flutter-version: '3.41.9'
@@ -48,6 +51,12 @@ jobs:
         run: python scripts/configure_build.py firebase stub
         shell: bash
       - run: flutter pub get
+      - name: Extract Version from pubspec.yaml
+        id: extract_version
+        run: |
+          $version = (Select-String -Path pubspec.yaml -Pattern '^version:' | ForEach-Object { $_.Line -replace 'version:\s*', '' }).Trim()
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+        shell: pwsh
       - name: Verify Firebase is replaced by Dart-only stubs
         run: python scripts/verify_firebase_dependencies.py stub
         shell: bash
@@ -62,14 +71,29 @@ jobs:
         run: python scripts/verify_firebase_dependencies.py stub
         shell: bash
 
-      - run: flutter build windows --dart-define=gitHash=${{ env.GITHASH }}
-      - name: Upload Build Artifact (ffmpeg)
-        uses: actions/upload-artifact@v4
+      - run: >-
+          flutter build windows --dart-define=gitHash=${{ env.GITHASH }}
+          --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+      - name: Build Inno Setup installer (ffmpeg)
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ env.VERSION }}
+          BUILD_DIR: ${{ github.workspace }}
+          INSTALLER_OUTPUT_DIR: ${{ github.workspace }}\release_artifacts
+          INSTALLER_NAME: listen1_xuan-ffmpeg-${{ env.GITHASH }}
+        run: |
+          New-Item -ItemType Directory -Force -Path release_artifacts | Out-Null
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /O+ /DAPP_VERSION="$env:APP_VERSION" /DBUILD_DIR="$env:BUILD_DIR" /DINSTALLER_OUTPUT_DIR="$env:INSTALLER_OUTPUT_DIR" /DINSTALLER_NAME="$env:INSTALLER_NAME" inno_build.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload Installer Artifact (ffmpeg)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-              name: windows-build-artifact-ffmpeg
-              path: build/windows/x64/runner/Release/**
-         # 打包构建产物为 ZIP 文件（输出到 release_artifacts/，避免被
-         # 第二遍的 flutter clean 清理 build/ 时删除）
+          name: windows-installer-artifact-ffmpeg
+          path: release_artifacts/listen1_xuan-ffmpeg-${{ env.GITHASH }}.exe
+
       - name: Compress Build Artifacts (ffmpeg)
         run: |
           mkdir -p release_artifacts
@@ -80,15 +104,31 @@ jobs:
         shell: bash
         run: bash scripts/build.sh without
 
-      - run: flutter clean
       - run: flutter pub get
       - name: Verify Firebase is replaced by Dart-only stubs
         run: python scripts/verify_firebase_dependencies.py stub
         shell: bash
-
-      - run: flutter build windows --dart-define=gitHash=${{ env.GITHASH }}
+      - run: >-
+          flutter build windows --dart-define=gitHash=${{ env.GITHASH }}
+          --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
+      - name: Build Inno Setup installer (lite)
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ env.VERSION }}
+          BUILD_DIR: ${{ github.workspace }}
+          INSTALLER_OUTPUT_DIR: ${{ github.workspace }}\release_artifacts
+          INSTALLER_NAME: listen1_xuan-${{ env.GITHASH }}
+        run: |
+          New-Item -ItemType Directory -Force -Path release_artifacts | Out-Null
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /O+ /DAPP_VERSION="$env:APP_VERSION" /DBUILD_DIR="$env:BUILD_DIR" /DINSTALLER_OUTPUT_DIR="$env:INSTALLER_OUTPUT_DIR" /DINSTALLER_NAME="$env:INSTALLER_NAME" inno_build.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload Installer Artifact (lite)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-installer-artifact
+          path: release_artifacts/listen1_xuan-${{ env.GITHASH }}.exe
       - name: Upload Build Artifact (lite)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
               name: windows-build-artifact
               path: build/windows/x64/runner/Release/**
@@ -97,7 +137,6 @@ jobs:
         run: |
           powershell Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath release_artifacts/windows-build-artifact-${{ env.GITHASH }}.zip
 
-      # 从 pubspec.yaml 提取版本号
       - name: Extract Version from pubspec.yaml
         id: extract_version
         run: |
@@ -110,7 +149,7 @@ jobs:
       # 删除该 Release 下所有旧的 Windows 构建文件
       - name: Delete Old Windows Assets from Release
         run: |
-          gh release view "${{ env.VERSION }}" --json assets --jq '.assets[].name' | Select-String -Pattern 'windows-build-artifact-.+\.zip$' | ForEach-Object {
+          gh release view "${{ env.VERSION }}" --json assets --jq '.assets[].name' | Select-String -Pattern '^(windows-build-artifact|listen1_xuan)-.+\.(zip|exe)$' | ForEach-Object {
             $asset = $_.Line.Trim()
             Write-Host "Deleting old asset: $asset"
             gh release delete-asset "${{ env.VERSION }}" "$asset" --yes 2>$null
@@ -122,7 +161,7 @@ jobs:
         
       # 上传新的资产到最新 Release（带 FFmpeg 版 + 精简版）
       - name: Upload New Asset to Release
-        uses: softprops/action-gh-release@v2.3.2
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
         with:
           tag_name: ${{ env.VERSION }}
           files: |
