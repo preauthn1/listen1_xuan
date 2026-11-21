@@ -62,7 +62,7 @@ class PlayButtonsSettingsPage extends StatelessWidget {
         16.sbh,
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: Get.theme.colorScheme.outlineVariant),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Obx(() {
@@ -124,7 +124,7 @@ class PlayButtonsSettingsPage extends StatelessWidget {
           children: [
             Text(
               '选择要替换的按钮',
-              style: Get.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+              style: Get.textTheme.bodyMedium?.copyWith(color: Get.theme.colorScheme.onSurfaceVariant),
             ),
             16.sbh,
             Container(
@@ -196,7 +196,7 @@ class PlayButtonsSettingsPage extends StatelessWidget {
         16.sbh,
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: Get.theme.colorScheme.outlineVariant),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Obx(

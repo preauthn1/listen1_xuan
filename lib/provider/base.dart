@@ -130,6 +130,8 @@ abstract class BaseProvider extends GetxService {
   String get credentialKey => id;
   String get loginDisplayName => shortDisplayName;
   String get loginButtonText => '登录$loginDisplayName';
+  /// 设置页右侧紧凑按钮文案；平台名已在左侧展示。
+  String get loginActionText => '登录';
   Widget get loginIcon => const Icon(Icons.account_circle, size: 18);
   List<String> get cookieUrls => const [];
   String get token => settingsController.settings[credentialKey] as String? ?? '';

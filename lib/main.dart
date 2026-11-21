@@ -5,9 +5,11 @@ import 'widgets/feedback_unread_badge.dart';
 import 'pages/feedback/feedback_push_navigation.dart';
 import 'controllers/feedback_push_navigation_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:toastification/toastification.dart';
 import 'package:heroine/heroine.dart';
 import 'package:iconify_flutter_plus/icons/ic.dart';
 import 'package:listen1_xuan/controllers/controllers.dart';
@@ -366,7 +368,8 @@ class MyApp extends StatelessWidget {
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (context, child) {
-        return AdaptiveTheme(
+        return ToastificationWrapper(
+          child: AdaptiveTheme(
           light: themeController.lightTheme,
           dark: themeController.darkTheme,
           initial: themeController.themeMode.value,
@@ -429,6 +432,7 @@ class MyApp extends StatelessWidget {
             ],
             locale: const Locale('zh', 'CN'), // 设置默认语言为中文
             home: MyHomePage(),
+          ),
           ),
         );
       },
