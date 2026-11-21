@@ -5,6 +5,8 @@ using System;
 using System.Runtime.InteropServices;
 public class UI {
  [StructLayout(LayoutKind.Sequential)] public struct Rect {public int l,t,r,b;}
+ [StructLayout(LayoutKind.Sequential)] public struct Pt {public int x,y;}
+ [DllImport("user32")] public static extern bool ClientToScreen(IntPtr w,ref Pt pt);
  [DllImport("user32")] public static extern bool GetClientRect(IntPtr w,out Rect r);
  [DllImport("user32")] public static extern bool PrintWindow(IntPtr w,IntPtr dc,uint mode);
  [DllImport("user32")] public static extern bool SetWindowPos(IntPtr w,IntPtr after,int x,int y,int width,int height,uint flags);
@@ -19,7 +21,8 @@ for($i=0;$i -lt 60;$i++){Start-Sleep 1;$p.Refresh();if($p.HasExited){throw "App 
 $w=$p.MainWindowHandle;if($w -eq [intptr]::Zero){throw 'No app window'}
 $root=[Windows.Automation.AutomationElement]::FromHandle($w)
 function Named($text){$items=$root.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition);foreach($e in $items){if($e.Current.Name -like "*$text*" -or $e.Current.HelpText -eq $text){$b=$e.Current.BoundingRectangle;if(!$b.IsEmpty -and $b.Width -gt 0){return $e}}}}
+function ClickClient($x,$y){$pt=New-Object UI+Pt;$pt.x=$x;$pt.y=$y;[UI]::ClientToScreen($w,[ref]$pt)|Out-Null;[UI]::SetCursorPos($pt.x,$pt.y)|Out-Null;[UI]::mouse_event(2,0,0,0,0);[UI]::mouse_event(4,0,0,0,0);Start-Sleep 2}
 function Activate($text){for($i=0;$i -lt 20;$i++){ $e=Named $text;if($e){break};Start-Sleep 1};if(!$e){throw "Control unavailable: $text"};$b=$e.Current.BoundingRectangle;$x=[int]($b.X+$b.Width/2);$y=[int]($b.Y+$b.Height/2);if([UI]::GetAncestor([UI]::WindowFromPoint([Drawing.Point]::new($x,$y)),2) -ne $w){throw 'Control obscured'};[UI]::SetCursorPos($x,$y)|Out-Null;[UI]::mouse_event(2,0,0,0,0);[UI]::mouse_event(4,0,0,0,0);Start-Sleep 2}
 function Snap($name){$r=New-Object UI+Rect;[UI]::GetClientRect($w,[ref]$r)|Out-Null;$bmp=[Drawing.Bitmap]::new($r.r,$r.b);$g=[Drawing.Graphics]::FromImage($bmp);$dc=$g.GetHdc();try{if(![UI]::PrintWindow($w,$dc,3)){throw 'Window capture failed'}}finally{$g.ReleaseHdc($dc);$g.Dispose()};$bmp.Save("$PWD/visual_output/$name.png",[Drawing.Imaging.ImageFormat]::Png);$bmp.Dispose();Write-Host "$name $($r.r)x$($r.b)"}
 New-Item -Type Directory visual_output|Out-Null
-Start-Sleep 12;Snap 'startup';try { Activate '设置'; Activate '第三方平台登录'; Snap 'default-expanded'; [UI]::SetWindowPos($w,0,0,0,1500,850,0x40)|Out-Null; Start-Sleep 3; Snap 'wide-expanded' } catch { Write-Warning $_.Exception.Message }; $p.CloseMainWindow() | Out-Null
+Start-Sleep 12; ClickClient 118 599; Snap 'settings'; ClickClient 450 115; Snap 'default-expanded'; [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1500,850,0x40)|Out-Null; Start-Sleep 3; Snap 'wide-expanded'
