@@ -254,135 +254,177 @@ Widget _buildSupabasePanel() {
   });
 }
 
+const _noUnderline = TextStyle(decoration: TextDecoration.none);
+
+ButtonStyle _pillStyle(ThemeData theme, {double minWidth = 96}) {
+  return FilledButton.styleFrom(
+    minimumSize: Size(minWidth, 40),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    textStyle: theme.textTheme.labelLarge?.merge(_noUnderline) ?? _noUnderline,
+    disabledBackgroundColor: theme.colorScheme.surfaceContainerHighest,
+    disabledForegroundColor: theme.colorScheme.onSurfaceVariant,
+  );
+}
+
 Widget _loginRow({
+  required BuildContext context,
   required Widget icon,
+  required String name,
   required Widget status,
   required String label,
   required VoidCallback onPressed,
 }) {
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      final scaler = MediaQuery.textScalerOf(context);
-      final actionWidth = scaler.scale(112) + 24;
-      final identity = Row(
-        children: [
-          SizedBox.square(dimension: 24, child: Center(child: icon)),
-          const SizedBox(width: 10),
-          Expanded(child: status),
-        ],
-      );
-      final action = FilledButton.tonal(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-        ),
-        child: Text(label, textAlign: TextAlign.center),
-      );
-      if (constraints.maxWidth < actionWidth + scaler.scale(80) + 46) {
-        return Column(
+  final theme = Theme.of(context);
+  final identity = Row(
+    children: [
+      SizedBox.square(dimension: 24, child: Center(child: icon)),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [identity, action],
-        );
-      }
-      return Row(
-        children: [
-          Expanded(child: identity),
-          const SizedBox(width: 12),
-          SizedBox(width: actionWidth, child: action),
-        ],
-      );
-    },
+          children: [
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyLarge?.merge(_noUnderline),
+            ),
+            const SizedBox(height: 2),
+            DefaultTextStyle.merge(
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)
+                  .merge(_noUnderline),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              child: status,
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+  final action = FilledButton.tonal(
+    onPressed: onPressed,
+    style: _pillStyle(theme),
+    child: Text(label, maxLines: 1, softWrap: false, style: _noUnderline),
+  );
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      children: [
+        Expanded(child: identity),
+        const SizedBox(width: 16),
+        action,
+      ],
+    ),
   );
 }
 
 Widget _buildThirdPartyLoginPanel(BuildContext context) {
   final theme = Theme.of(context);
   Widget gatedAction(String label, String reason, VoidCallback? callback) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        FilledButton.tonal(
-          onPressed: callback,
-          style: FilledButton.styleFrom(
-            disabledBackgroundColor: theme.colorScheme.surfaceContainerHighest,
-            disabledForegroundColor: theme.colorScheme.onSurfaceVariant,
+    return SizedBox(
+      width: 232,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton.tonal(
+            onPressed: callback,
+            style: _pillStyle(theme, minWidth: 232),
+            child: Text(label, maxLines: 1, softWrap: false, style: _noUnderline),
           ),
-          child: Text(label),
-        ),
-        if (callback == null)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(start: 12, bottom: 4),
-            child: Text(reason, style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface,
-            )),
-          ),
-      ],
+          if (callback == null)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 12, top: 6),
+              child: Text(
+                reason,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurface)
+                    .merge(_noUnderline),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  return Align(
-    alignment: AlignmentDirectional.centerStart,
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 480),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final provider in music_providers.provider.getLoginProviders())
+  return Material(
+    type: MaterialType.transparency,
+    child: Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final provider in music_providers.provider.getLoginProviders())
+                _loginRow(
+                  context: context,
+                  icon: provider.loginIcon,
+                  name: provider.loginDisplayName,
+                  status: Obx(() {
+                    switch (provider.loginStatus.value) {
+                      case LoginStatus.processing:
+                        return const SizedBox(
+                          width: 80,
+                          child: LinearProgressIndicator(),
+                        );
+                      case LoginStatus.loggedIn:
+                        return Text(provider.currentUser.value?.name ?? '已连接');
+                      case LoginStatus.failed:
+                        return Tooltip(
+                          message: provider.loginError.value,
+                          child: const Text('登录状态获取失败'),
+                        );
+                      case LoginStatus.noLogin:
+                        return const Text('未连接');
+                    }
+                  }),
+                  label: provider.loginActionText,
+                  onPressed: () => provider.login(context),
+                ),
               _loginRow(
-                icon: provider.loginIcon,
-                status: Obx(() {
-                  switch (provider.loginStatus.value) {
-                    case LoginStatus.processing:
-                      return const LinearProgressIndicator();
-                    case LoginStatus.loggedIn:
-                      return Text(provider.currentUser.value?.name ?? '已连接');
-                    case LoginStatus.failed:
-                      return Tooltip(
-                        message: provider.loginError.value,
-                        child: const Text('登录状态获取失败'),
-                      );
-                    case LoginStatus.noLogin:
-                      return const Text('未连接');
-                  }
-                }),
-                label: provider.loginButtonText,
-                onPressed: () => provider.login(context),
+                context: context,
+                icon: Iconify(Mdi.github, size: 20, color: theme.colorScheme.onSurface),
+                name: 'GitHub',
+                status: Obx(() => Text(Github.getStatusText())),
+                label: '登录',
+                onPressed: () => Github.openAuthUrl(),
               ),
-            _loginRow(
-              icon: Iconify(Mdi.github, size: 18, color: theme.colorScheme.onSurface),
-              status: Obx(() => Text(Github.getStatusText())),
-              label: '登录 GitHub',
-              onPressed: () => Github.openAuthUrl(),
-            ),
-            const Divider(),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                Obx(() {
-                  final wscc = Get.find<WebSocketClientController>();
-                  return gatedAction(
-                    '从WebSocket服务器获取登录信息',
-                    '请先连接 WebSocket 服务器',
-                    wscc.isConnected ? wscc.sendGetCookieMessage : null,
-                  );
-                }),
-                Obx(() {
-                  final authController = Get.find<SupabaseAuthController>();
-                  return gatedAction(
-                    'Supabase登录信息管理',
-                    '请先登录 Supabase 账号',
-                    authController.isLoggedIn.value
-                        ? _showSupabaseTokenManagementDialog
-                        : null,
-                  );
-                }),
-              ],
-            ),
-          ],
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14),
+                child: Divider(height: 1),
+              ),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  Obx(() {
+                    final wscc = Get.find<WebSocketClientController>();
+                    return gatedAction(
+                      '从 WebSocket 服务器获取登录信息',
+                      '请先连接 WebSocket 服务器',
+                      wscc.isConnected ? wscc.sendGetCookieMessage : null,
+                    );
+                  }),
+                  Obx(() {
+                    final authController = Get.find<SupabaseAuthController>();
+                    return gatedAction(
+                      'Supabase 登录信息管理',
+                      '请先登录 Supabase 账号',
+                      authController.isLoggedIn.value
+                          ? _showSupabaseTokenManagementDialog
+                          : null,
+                    );
+                  }),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -522,7 +564,7 @@ List<Widget> get cacheSettingsTiles {
             : () {
                 Get.toNamed(RouteName.downloadPage, id: 1);
               },
-        child: Text('从WebSocket服务器获取缓存文件'),
+        child: Text('从 WebSocket 服务器获取缓存文件'),
       );
     }),
     ElevatedButton(

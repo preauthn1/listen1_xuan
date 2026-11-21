@@ -278,7 +278,10 @@ class Bilibili extends BaseProvider {
   // #region 登录 / 用户
 
   @override
-  String get loginButtonText => '登录哔哩哔哩 / 设置Cookie';
+  String get loginButtonText => '登录哔哩哔哩 / 设置 Cookie';
+
+  @override
+  String get loginActionText => '登录 / Cookie';
 
   @override
   Future<void> login(BuildContext context) async {
