@@ -1,25 +1,17 @@
-name: macos
+name: Build macos artifacts
 
 on:
-  push:
-    branches: [ "main" , "feat/dual-build-ffmpeg"]
-    paths:
-      - '**/*.dart'
-      - 'pubspec.yaml'
-      - 'packages/firebase_core_stub/**'
-      - 'packages/firebase_messaging_stub/**'
-      - 'scripts/build.sh'
-      - 'scripts/configure_build.py'
-      - 'scripts/verify_firebase_dependencies.py'
-      - '**/dart_macos.yml'
-      - 'macos/**'
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      SUPABASE_PROXY_TOKEN:
+        required: false
+
+permissions:
+  contents: read
 
 jobs:
-  # 每个矩阵任务只编一种架构（ARCHS 经 FLUTTER_XCODE_ 前缀注入 xcodebuild），
-  # 产物命名带芯片标记（apple-silicon / intel）。注意不能用 arm64 / x86_64 命名：
-  # Android 端 artifact 选择按这些子串过滤架构，会把 macOS 包也列出来。
   build:
-    if: "contains(github.event.head_commit.message, 'macos')"
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -144,8 +136,9 @@ jobs:
           path: ${{ steps.rename.outputs.asset_path }}
           if-no-files-found: error
 
-  # 单一上传点：避免多个矩阵任务互相删除/覆盖同一 Release 资产。
+
   publish:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_call') && github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -192,7 +185,7 @@ jobs:
       - name: Upload New Assets to Release
         uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
         with:
-          tag_name: ${{ env.VERSION }}
+          tag_name: ${{ github.ref_name }}
           files: dist-assets/*.zip
           fail_on_unmatched_files: true
           prerelease: ${{ !contains(github.event.head_commit.message, 'sta') }}

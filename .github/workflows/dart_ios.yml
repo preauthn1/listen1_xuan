@@ -1,21 +1,17 @@
-name: ios
+name: Build ios artifacts
 
 on:
-  push:
-    branches: [ "main" , "feat/dual-build-ffmpeg"]
-    paths:
-      - '**/*.dart'
-      - 'pubspec.yaml'
-      - 'packages/firebase_core_stub/**'
-      - 'packages/firebase_messaging_stub/**'
-      - 'scripts/build.sh'
-      - 'scripts/configure_build.py'
-      - 'scripts/verify_firebase_dependencies.py'
-      - '**/dart_ios.yml'
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      SUPABASE_PROXY_TOKEN:
+        required: false
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    if: "contains(github.event.head_commit.message, 'ios')"
     runs-on: macos-latest
     steps:
       - name: Output Commit Information
@@ -32,32 +28,32 @@ jobs:
           echo "SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}" >> $GITHUB_ENV
           echo "GITHASH (前7位): $GITHASH"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      
+
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90
         with:
           xcode-version: '26.3.0'
-      
+
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           channel: 'stable'
           flutter-version: '3.41.9'
-          
+
       - run: flutter --version
       - name: Exclude Firebase SDKs from this platform
         run: python3 scripts/configure_build.py firebase stub
       - run: flutter pub get
       - name: Verify Firebase is replaced by Dart-only stubs
         run: python3 scripts/verify_firebase_dependencies.py stub
-      
+
       # ============ 第一遍: 带 FFmpeg 版本 ============
       # 切换为带 FFmpeg 配置（默认，幂等）
       - name: Switch to FFmpeg-enabled config
         run: bash scripts/build.sh with
-        
+
       - run: flutter pub get
       - name: Verify Firebase is replaced by Dart-only stubs
         run: python3 scripts/verify_firebase_dependencies.py stub
-      
+
       # 安装 CocoaPods 依赖
       - name: Install CocoaPods dependencies (ffmpeg)
         run: |
@@ -65,11 +61,11 @@ jobs:
           pod install
       - name: Verify CocoaPods excludes Firebase
         run: python3 scripts/verify_firebase_dependencies.py stub --native ios
-        
+
       # 构建 iOS app (无签名版本，用于测试)
       - name: Build iOS app (no codesign, ffmpeg)
         run: flutter build ios --release --no-codesign --dart-define=gitHash=${{ env.GITHASH }} --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
-        
+
       # 打包为 .app 文件
       - name: Create .app archive (ffmpeg)
         run: |
@@ -79,7 +75,7 @@ jobs:
           zip -r Runner.app.zip Payload
           mv Runner.app.zip ../../../listen1_xuan-ios-ffmpeg-${GITHASH}.app.zip
           cd ../../..
-          
+
       # 上传 .app 文件
       - name: Upload .app artifact (ffmpeg)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -90,12 +86,12 @@ jobs:
       # ============ 第二遍: 无 FFmpeg 精简版 ============
       - name: Switch to FFmpeg-free config
         run: bash scripts/build.sh without
-        
+
       - run: flutter clean
       - run: flutter pub get
       - name: Verify Firebase is replaced by Dart-only stubs
         run: python3 scripts/verify_firebase_dependencies.py stub
-        
+
       # 安装 CocoaPods 依赖（无 ffmpeg 原生库）
       - name: Install CocoaPods dependencies (lite)
         run: |
@@ -103,11 +99,11 @@ jobs:
           pod install
       - name: Verify CocoaPods excludes Firebase
         run: python3 scripts/verify_firebase_dependencies.py stub --native ios
-        
+
       # 构建 iOS app (无签名版本，用于测试)
       - name: Build iOS app (no codesign, lite)
         run: flutter build ios --release --no-codesign --dart-define=gitHash=${{ env.GITHASH }} --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
-        
+
       # 打包为 .app 文件
       - name: Create .app archive (lite)
         run: |
@@ -117,14 +113,28 @@ jobs:
           zip -r Runner.app.zip Payload
           mv Runner.app.zip ../../../listen1_xuan-ios-${GITHASH}.app.zip
           cd ../../..
-          
+
       # 上传 .app 文件
       - name: Upload .app artifact (lite)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ios-app-artifact
           path: listen1_xuan-ios-${{ env.GITHASH }}.app.zip
-          
+
+
+  publish:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_call') && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: ios-app-artifact*
+          merge-multiple: true
+      - run: echo "GITHASH=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
       # 从 pubspec.yaml 提取版本号
       - name: Extract Version from pubspec.yaml
         id: extract_version
@@ -132,10 +142,10 @@ jobs:
           version=$(grep '^version:' pubspec.yaml | sed 's/version: *//')
           echo "VERSION=$version" >> $GITHUB_ENV
         shell: bash
-        
+
       - name: Debug Version
         run: echo "${{ env.VERSION }}"
-      
+
       # 删除该 Release 下所有旧的 iOS 构建文件
       - name: Delete Old iOS Assets from Release
         run: |
@@ -146,12 +156,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
-        
+
       # 上传到 Release（带 FFmpeg 版 + 精简版）
       - name: Upload New Asset to Release
         uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
         with:
-          tag_name: ${{ env.VERSION }}
+          tag_name: ${{ github.ref_name }}
           files: |
             listen1_xuan-ios-ffmpeg-${{ env.GITHASH }}.app.zip
             listen1_xuan-ios-${{ env.GITHASH }}.app.zip

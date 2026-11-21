@@ -1,0 +1,61 @@
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Platform build to run
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - android
+          - windows
+          - ios
+          - macos
+  push:
+    branches: [main, feat/dual-build-ffmpeg]
+    tags: ['v*', '[0-9]*']
+    paths:
+      - '**/*.dart'
+      - 'pubspec.yaml'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'android/**'
+      - 'ios/**'
+      - 'macos/**'
+      - 'windows/**'
+      - 'inno_build.iss'
+      - 'assets/images/app_icon.ico'
+      - '.github/workflows/**'
+
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'android'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/dart.yml
+    secrets: inherit
+  windows:
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'windows'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/dart_win.yml
+    secrets: inherit
+  ios:
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'ios'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/dart_ios.yml
+    secrets: inherit
+  macos:
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'macos'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/dart_macos.yml
+    secrets: inherit
