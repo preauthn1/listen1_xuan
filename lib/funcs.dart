@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' hide CircularProgressIndicator;
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:toastification/toastification.dart';
 import 'package:get/get.dart';
 import 'package:listen1_xuan/settings.dart';
 import 'package:listen1_xuan/widgets/ext/ext_widget.dart';
@@ -81,36 +82,47 @@ void _showCustomToast({
   VoidCallback? onTap,
 }) {
   try {
-    fToast.removeCustomToast();
-    if (Get.context != null) {
-      Widget toast = _buildCustomToast(
-        icon: icon,
-        iconColor: iconColor,
-        title: title,
-        message: message,
-        backgroundColor: backgroundColor,
-        textColor: textColor,
-        onTap: onTap,
-      );
-
-      fToast.showToast(
-        child: toast,
-        gravity: ToastGravity.TOP,
-        toastDuration: const Duration(seconds: 3),
-      );
-    } else {
-      // 降级到基础 Toast
+    final hasTitle = title != null && title.isNotEmpty;
+    final hasMessage = message != null && message.isNotEmpty;
+    toastification.dismissAll(delayForAnimation: false);
+    toastification.show(
+      alignment: Alignment.topCenter,
+      autoCloseDuration: const Duration(seconds: 3),
+      animationDuration: const Duration(milliseconds: 180),
+      style: ToastificationStyle.flat,
+      icon: Icon(icon, color: iconColor, size: 22),
+      title: hasTitle
+          ? Text(title, maxLines: 2, overflow: TextOverflow.ellipsis)
+          : (hasMessage ? Text(message, maxLines: 3) : null),
+      description: hasTitle && hasMessage
+          ? Text(message, maxLines: 4, overflow: TextOverflow.ellipsis)
+          : null,
+      primaryColor: iconColor,
+      backgroundColor: backgroundColor,
+      foregroundColor: textColor,
+      borderSide: BorderSide.none,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: const [],
+      showProgressBar: false,
+      closeButton: const ToastCloseButton(showType: CloseButtonShowType.onHover),
+      dragToClose: true,
+      pauseOnHover: true,
+      sizeConstraints: const BoxConstraints(maxWidth: 420),
+      callbacks: ToastificationCallbacks(
+        onTap: onTap == null ? null : (_) => onTap(),
+      ),
+    );
+  } catch (e) {
+    debugPrint("Error showing toast: $e");
+    try {
       Fluttertoast.showToast(
-        msg: "$title: $message",
+        msg: "${title ?? ''}${message == null ? '' : ': $message'}",
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.TOP,
         backgroundColor: backgroundColor,
         textColor: textColor,
-        fontSize: 16.0,
       );
-    }
-  } catch (e) {
-    debugPrint("Error showing toast: $e");
+    } catch (_) {}
   }
 }
 

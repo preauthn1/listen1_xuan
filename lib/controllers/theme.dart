@@ -12,6 +12,9 @@ import '../global_settings_animations.dart';
 import '../packages/circular_theme_reveal/src/circular_theme_reveal_overlay.dart';
 import 'settings_controller.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
+import 'package:flex_color_scheme/flex_color_scheme.dart'
+    show FlexThemeData, FlexSurfaceMode, FlexSubThemesData;
+import 'package:chinese_font_library/chinese_font_library.dart';
 
 class ThemeController extends GetxController {
   // ColorScheme? _light;
@@ -342,31 +345,133 @@ class ThemeController extends GetxController {
               ),
             ),
           );
-    return base.copyWith(
-      textTheme: base.textTheme.apply(fontFamilyFallback: const [
+    // 统一设计系统（taste-skill + ui-ux-pro-max）：
+    // 由 flex_color_scheme 生成一致的表面层级与组件子主题，
+    // chinese_font_library 统一中文字体回退；按钮/列表规格在下方覆盖。
+    final schemeSource = base.colorScheme;
+    final flexBuilder =
+        brightness == Brightness.light ? FlexThemeData.light : FlexThemeData.dark;
+    final flex = flexBuilder(
+      colorScheme: schemeSource,
+      useMaterial3: true,
+      surfaceMode: FlexSurfaceMode.highScaffoldLowSurface,
+      blendLevel: 2,
+      visualDensity: VisualDensity.standard,
+      subThemesData: const FlexSubThemesData(
+        defaultRadius: 12,
+        interactionEffects: true,
+        blendOnColors: false,
+        inputDecoratorIsFilled: true,
+        inputDecoratorRadius: 12,
+        tooltipRadius: 8,
+        cardRadius: 16,
+      ),
+      fontFamilyFallback: const [
         'Segoe UI',
         'Microsoft YaHei UI',
         'Microsoft YaHei',
+        'PingFang SC',
         'Noto Sans CJK SC',
-      ]),
+      ],
+    ).useSystemChineseFont(brightness).copyWith(appBarTheme: base.appBarTheme);
+    final cs = flex.colorScheme;
+    const noDecoration = TextStyle(decoration: TextDecoration.none);
+    final textTheme = flex.textTheme.apply(decoration: TextDecoration.none);
+    final labelStyle = (textTheme.labelLarge ?? const TextStyle())
+        .copyWith(fontWeight: FontWeight.w500, letterSpacing: 0.1)
+        .merge(noDecoration);
+    const controlShape = StadiumBorder();
+    const controlMin = Size(64, 40);
+    const controlPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 10);
+    WidgetStateProperty<Color?> disabledAware(Color enabled, Color disabled) =>
+        WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled) ? disabled : enabled,
+        );
+    return flex.copyWith(
+      textTheme: textTheme,
+      visualDensity: VisualDensity.standard,
+      filledButtonTheme: FilledButtonThemeData(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(controlMin),
+          padding: const WidgetStatePropertyAll(controlPadding),
+          shape: const WidgetStatePropertyAll(controlShape),
+          textStyle: WidgetStatePropertyAll(labelStyle),
+          // 禁用态保持可读（>=4.5:1 的 onSurfaceVariant），不靠低对比灰暗表达。
+          foregroundColor: disabledAware(cs.onPrimary, cs.onSurfaceVariant),
+          backgroundColor:
+              disabledAware(cs.primary, cs.surfaceContainerHighest),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          minimumSize: controlMin,
+          padding: controlPadding,
+          shape: controlShape,
+          textStyle: labelStyle,
+          disabledForegroundColor: cs.onSurfaceVariant,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: controlMin,
+          padding: controlPadding,
+          shape: controlShape,
+          textStyle: labelStyle,
+          side: BorderSide(color: cs.outline),
+          disabledForegroundColor: cs.onSurfaceVariant,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: controlMin,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          shape: controlShape,
+          textStyle: labelStyle,
+          disabledForegroundColor: cs.onSurfaceVariant,
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(minimumSize: const Size(40, 40)),
+      ),
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        minVerticalPadding: 8,
+        subtitleTextStyle: textTheme.bodySmall?.copyWith(
+          color: cs.onSurfaceVariant,
+        ),
+        iconColor: cs.onSurfaceVariant,
+      ),
+      dividerTheme: DividerThemeData(
+        color: cs.outlineVariant,
+        thickness: 1,
+        space: 24,
+      ),
+      tooltipTheme: TooltipThemeData(
+        waitDuration: const Duration(milliseconds: 400),
+        textStyle: textTheme.bodySmall?.copyWith(color: cs.onInverseSurface),
+        decoration: BoxDecoration(
+          color: cs.inverseSurface,
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: base.colorScheme.surfaceContainerHighest.withOpacity(0.42),
+        fillColor: cs.surfaceContainerHighest.withOpacity(0.42),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: base.colorScheme.outlineVariant),
+          borderSide: BorderSide(color: cs.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: base.colorScheme.outlineVariant),
+          borderSide: BorderSide(color: cs.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: base.colorScheme.primary, width: 1.5),
+          borderSide: BorderSide(color: cs.primary, width: 1.5),
         ),
       ),
-      sliderTheme: base.sliderTheme.copyWith(
+      sliderTheme: flex.sliderTheme.copyWith(
         trackHeight: 4,
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
         overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),

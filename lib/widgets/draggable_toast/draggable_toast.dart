@@ -437,8 +437,8 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
           _needsInitialCentering = false;
           final centeredX =
               (areaSize.width - widget.config.expandedWidth) / 2;
-          final centeredY =
-              (areaSize.height - _effectiveExpandedHeight) / 3;
+          // 起始放在可用区域底部（FAB 位置），避免压住列表中部的展开箭头。
+          final centeredY = areaSize.height - _effectiveExpandedHeight;
           _currentPosition = Offset(
             centeredX.clamp(0.0, areaSize.width - widget.config.expandedWidth),
             centeredY.clamp(0.0, areaSize.height - _effectiveExpandedHeight),
