@@ -96,8 +96,8 @@ jobs:
 
       - name: Compress Build Artifacts (ffmpeg)
         run: |
-          mkdir -p release_artifacts
-          powershell Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath release_artifacts/windows-build-artifact-ffmpeg-${{ env.GITHASH }}.zip
+          New-Item -ItemType Directory -Force -Path release_artifacts | Out-Null
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath release_artifacts/windows-build-artifact-ffmpeg-${{ env.GITHASH }}.zip -Force
 
       # ============ 第二遍: 无 FFmpeg 精简版 ============
       - name: Switch to FFmpeg-free config
@@ -135,7 +135,8 @@ jobs:
          # 打包构建产物为 ZIP 文件（同样输出到 release_artifacts/）
       - name: Compress Build Artifacts (lite)
         run: |
-          powershell Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath release_artifacts/windows-build-artifact-${{ env.GITHASH }}.zip
+          New-Item -ItemType Directory -Force -Path release_artifacts | Out-Null
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath release_artifacts/windows-build-artifact-${{ env.GITHASH }}.zip -Force
 
       - name: Debug Version
         run: echo "${{ env.VERSION }}"
