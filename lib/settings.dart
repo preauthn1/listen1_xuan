@@ -47,6 +47,7 @@ import 'models/websocket_message.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:async';
