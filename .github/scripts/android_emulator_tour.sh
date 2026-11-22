@@ -186,6 +186,10 @@ for i in 1 2 3 4 5 6 7 8; do
 done
 sleep 10
 snap 18-download-done
+grep -o 'content-desc="已下载"' "$OUT/18-download-done.xml" | head -1 | sed 's/^/badge: /' | tee -a "$OUT/tour.log"
+tap_text '更多' && sleep 3
+snap 18a-menu-after-download
+adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell cmd statusbar expand-notifications; sleep 3
 snap 18b-notification
 adb shell cmd statusbar collapse; sleep 2
@@ -197,9 +201,13 @@ adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input keyevent KEYCODE_BACK; sleep 2
 tap_text '我的' && sleep 2
 tap_text '设置' && sleep 4
-tap_text '缓存' && sleep 3
-adb shell input swipe 540 1500 540 1000 300; sleep 2
-tap_text '下载管理.*' && sleep 4
+# 展开状态会被记住：点一次没出现入口就再点一次
+for attempt in 1 2; do
+  tap_text '缓存' && sleep 3
+  adb shell input swipe 540 1500 540 1000 300; sleep 2
+  tap_text '下载管理.*' && break
+done
+sleep 4
 snap 19-downloads-page
 # 第二次点同一首：菜单应显示「重新下载」
 adb shell input keyevent KEYCODE_BACK; sleep 2
