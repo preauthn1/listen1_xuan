@@ -755,7 +755,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                   // 预留右下角浮动提示的位置，最后一行不会被遮住。
-                  80.sbh,
+                  88.sbh,
                 ],
               ),
             ),

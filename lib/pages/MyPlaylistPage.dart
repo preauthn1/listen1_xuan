@@ -277,7 +277,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
     try {
       final user = await provider.getUser();
       if (user == null) {
-        throw const _SectionLoadError('尚未登录，请在 设置 › 第三方平台登录 中登录');
+        throw const _SectionLoadError('未登录，可在设置中登录');
       }
       final playlists = await _fetchUserPlaylists(provider, type, user.userId);
 
@@ -328,18 +328,12 @@ class _MyPlaylistState extends State<MyPlaylist> {
           Expanded(
             child: Text(
               error,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          ),
-          IconButton(
-            tooltip: '重试',
-            visualDensity: VisualDensity.compact,
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh, size: 18),
           ),
         ],
       ),
@@ -478,7 +472,10 @@ class _MyPlaylistState extends State<MyPlaylist> {
       () => Scaffold(
         floatingActionButton: FloatingActionButton(
           heroTag: HeroTags.songReplaceFab,
-          mini: settingsController.songReplaceFabMiniRx.value,
+          mini: (isWindows &&
+                  !settingsController.settings
+                      .containsKey(SettingsController.songReplaceFabLocationKey)) ||
+              settingsController.songReplaceFabMiniRx.value,
           onPressed: () {
             if (routeController.inSongReplacePage.value) {
               Get.back(id: 1);
@@ -489,9 +486,10 @@ class _MyPlaylistState extends State<MyPlaylist> {
           tooltip: '歌曲替换列表',
           child: Icon(Icons.find_replace_rounded),
         ),
+        // Windows 默认放在侧栏右下角并缩小，列表底部留白保证不压住最后一行。
         floatingActionButtonLocation: isWindows &&
                 !settingsController.settings.containsKey(SettingsController.songReplaceFabLocationKey)
-            ? FloatingActionButtonLocation.centerFloat
+            ? FloatingActionButtonLocation.miniEndFloat
             : settingsController.songReplaceFabMiniRx.value
             ? settingsController.songReplaceFabLocation.fabMiniLocation
             : settingsController.songReplaceFabLocation.fabLocation,

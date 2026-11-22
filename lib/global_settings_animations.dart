@@ -336,7 +336,7 @@ List<Widget> create_hotkey_btns(context) {
             },
           );
         },
-        child: Text('${_hotkey['name']} 快捷键'),
+        child: Text('设置“${_hotkey['name']}”快捷键'),
       );
     }).toList(),
   ];

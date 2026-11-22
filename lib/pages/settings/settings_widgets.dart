@@ -765,11 +765,14 @@ Widget desktopSettingsTiles(
         [
               Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
-                alignment: WrapAlignment.spaceAround,
+                alignment: WrapAlignment.start,
+                spacing: 4,
 
                 children: create_hotkey_btns(context),
               ),
-              TextField(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: TextField(
                 focusNode: _focusNode2,
                 controller: windowsProxyAddrController,
                 decoration: InputDecoration(
@@ -783,10 +786,11 @@ Widget desktopSettingsTiles(
                   showInfoSnackbar('设置成功$value', '立即生效');
                 },
               ),
+              ),
               if (isDesktop)
                 Obx(
                   () => SwitchListTile(
-                    title: const Text('在右侧页面中键时隐藏/最小化主页面'),
+                    title: const Text('在内容区按鼠标中键隐藏/最小化窗口'),
                     value: Get.find<SettingsController>().hideOrMinimize,
                     onChanged: (bool value) {
                       Get.find<SettingsController>().hideOrMinimize = value;
