@@ -58,7 +58,7 @@ class QQ extends BaseProvider {
   @override
   String get credentialKey => 'qq';
   @override
-  String get loginDisplayName => 'QQ音乐';
+  String get loginDisplayName => 'QQ 音乐';
   @override
   Widget get loginIcon => _qqSectionIcon;
   @override
