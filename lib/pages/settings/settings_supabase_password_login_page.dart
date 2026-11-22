@@ -168,6 +168,13 @@ class _SupabasePasswordLoginPageState extends State<SupabasePasswordLoginPage> {
                   }
                   return null;
                 },
+                onFieldSubmitted: (_) {
+                  if (_isSignUpMode.value) {
+                    _confirmPasswordFocusNode.requestFocus();
+                  } else {
+                    _signIn();
+                  }
+                },
               ),
               20.sbh,
               // 确认密码输入框（仅注册模式显示）
