@@ -377,9 +377,11 @@ Listener _mainContent() => Listener(
                                       ),
 
                                       Positioned(
-                                        top: isWindows || isMacOS ? 5 : -5,
+                                        top: 0,
+                                        bottom: 0,
                                         right: 20,
-                                        child: Obx(
+                                        child: Center(
+                                          child: Obx(
                                           // filterButton 隐藏时仍会保留内容，
                                           // 这样淡出才有东西可以淡（见 filterButton 注释）。
                                           () => AnimatedOpacity(
@@ -391,6 +393,7 @@ Listener _mainContent() => Listener(
                                             ),
                                             child: filterButton,
                                           ),
+                                        ),
                                         ),
                                       ),
                                     ],

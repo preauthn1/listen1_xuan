@@ -516,7 +516,7 @@ Stream<bool> get _mediaBufferingStream =>
 
 IconButton _button(
   IconData iconData,
-  VoidCallback onPressed, {
+  VoidCallback? onPressed, {
   bool h = false,
 }) => IconButton(
   icon: Icon(iconData),

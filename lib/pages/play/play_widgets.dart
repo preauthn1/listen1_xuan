@@ -615,13 +615,15 @@ class _PlayPauseBtnState extends State<PlayPauseBtn>
         icon: AnimatedIcons.play_pause,
         progress: _animationController,
       ),
-      onPressed: () {
-        if (widget.isPlaying.value) {
-          widget.onPausePressed?.call();
-        } else {
-          widget.onPlayPressed?.call();
-        }
-      },
+      onPressed: widget.onPlayPressed == null && widget.onPausePressed == null
+          ? null
+          : () {
+              if (widget.isPlaying.value) {
+                widget.onPausePressed?.call();
+              } else {
+                widget.onPlayPressed?.call();
+              }
+            },
     );
   }
 }
