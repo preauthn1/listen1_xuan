@@ -930,6 +930,15 @@ class UpdController extends GetxController {
     }
   }
 
+  /// 更新提示收起后的停靠区域。桌面端底部还有侧栏操作栏（约 56px），
+  /// 底边留得更高，避免收起的圆形按钮贴着操作栏图标。
+  EdgeInsets get _updateToastArea => EdgeInsets.fromLTRB(
+    16,
+    100,
+    16,
+    (isWindows || isMacOS) ? 150 : 80,
+  );
+
   /// 显示 Release 更新对话框
   void _showReleaseUpdateDialog(
     GitHubRelease release,
@@ -979,7 +988,7 @@ class UpdController extends GetxController {
       inLockMode: true,
       icon: _buildProgressIcon(isPeekIcon: true),
       config: DraggableToastConfig(
-        areaPadding: EdgeInsets.fromLTRB(16, 100, 16, 80),
+        areaPadding: _updateToastArea,
         snapThreshold: 60,
         expandedWidth: 300,
         collapsedSize: 46,
@@ -1499,7 +1508,7 @@ class UpdController extends GetxController {
         color: Get.theme.colorScheme.onPrimary,
       ),
       config: DraggableToastConfig(
-        areaPadding: EdgeInsets.fromLTRB(16, 100, 16, 80),
+        areaPadding: _updateToastArea,
         snapThreshold: 60,
         expandedWidth: 300,
         collapsedSize: 46,
