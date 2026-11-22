@@ -64,6 +64,8 @@ class Netease extends BaseProvider {
   Widget get loginIcon => _neteaseSectionIcon;
   @override
   List<String> get cookieUrls => const ['https://music.163.com', 'https://interface3.music.163.com'];
+  @override
+  List<String> get requiredCookieNames => const ['MUSIC_U', '__csrf'];
 
   @override
   Future<void> login(BuildContext context) => openWebLogin(

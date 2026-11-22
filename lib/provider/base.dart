@@ -10,6 +10,7 @@ import 'package:listen1_xuan/controllers/DioController.dart';
 import 'package:listen1_xuan/funcs.dart';
 import 'package:listen1_xuan/global_settings_animations.dart';
 import 'package:listen1_xuan/utils/platform_credentials.dart';
+import 'package:listen1_xuan/utils/cookie_import.dart';
 import 'package:listen1_xuan/widgets/ext/ext_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -134,6 +135,29 @@ abstract class BaseProvider extends GetxService {
   String get loginActionText => '登录';
   Widget get loginIcon => const Icon(Icons.account_circle, size: 18);
   List<String> get cookieUrls => const [];
+
+  /// 支持「直接导入 Cookie」：有 Cookie 作用域的可登录平台默认支持。
+  bool get supportCookieImport => supportLogin && cookieUrls.isNotEmpty;
+
+  /// 判定 Cookie 有效所必需的名称（缺少时导入前给出明确提示）。
+  List<String> get requiredCookieNames => const [];
+
+  /// 解析粘贴或文件中的 Cookie，过滤到本平台的域名后保存并刷新登录状态。
+  /// 返回实际保存的 Cookie 数量；没有有效 Cookie 或缺少必需项时抛出 [FormatException]。
+  Future<int> importCookies(String input) async {
+    final cookies = CookieImport.parse(input, domains: cookieUrls)
+        .where((c) => c.value.isNotEmpty)
+        .toList();
+    if (cookies.isEmpty) {
+      throw FormatException('没有找到 $loginDisplayName 的 Cookie');
+    }
+    final missing = CookieImport.missing(cookies, requiredCookieNames);
+    if (missing.isNotEmpty) {
+      throw FormatException('缺少 ${missing.join('、')}，请确认已在浏览器登录后再复制');
+    }
+    await saveToken(cookies);
+    return cookies.length;
+  }
   String get token => settingsController.settings[credentialKey] as String? ?? '';
 
   final Rx<LoginStatus> loginStatus = LoginStatus.noLogin.obs;
