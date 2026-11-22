@@ -186,6 +186,8 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
 
   void _startAutoPeekTimer() {
     _autoPeekTimer?.cancel();
+    // 收起即关闭的 Toast 不自动收起，否则用户还没看清就消失了。
+    if (widget.config.dismissOnPeek?.call() ?? false) return;
     _autoPeekTimer = Timer(widget.initialDisplayDuration, () {
       if (_state == ToastState.expanded && !_isDragging) {
         _performPeek();
