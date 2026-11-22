@@ -413,7 +413,7 @@ Future<void> showLyricBackgroundBlurRadiusInputDialog({
 }) async {
   await showInputDialog(
     title: '歌词背景高斯模糊距离',
-    message: '数值越大,模糊效果越明显',
+    message: '数值越大，模糊效果越明显',
     initialValue: Get.find<SettingsController>().lyricBackgroundBlurRadius
         .toString(),
     onConfirm: (value) async {
@@ -436,10 +436,11 @@ Future<void> showShowSearchAreaWidthInputDialog({
   bool disableBackgroundShadow = false,
 }) async {
   await showInputDialog(
-    title: '当左边栏大于一定宽度时隐藏搜索页面的搜索框',
-    message: '数值越大,模糊效果越明显',
+    title: '侧栏宽度阈值',
+    message: '侧栏宽于该值（像素）时，搜索页不再重复显示搜索框',
     initialValue: Get.find<SettingsController>().showSearchAreaWidth
-        .toStringAsFixed(2),
+        .round()
+        .toString(),
     onConfirm: (value) async {
       if (isEmpty(value)) return false;
       double? intValue = double.tryParse(value);
