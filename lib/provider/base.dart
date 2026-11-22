@@ -145,11 +145,14 @@ abstract class BaseProvider extends GetxService {
   /// 解析粘贴或文件中的 Cookie，过滤到本平台的域名后保存并刷新登录状态。
   /// 返回实际保存的 Cookie 数量；没有有效 Cookie 或缺少必需项时抛出 [FormatException]。
   Future<int> importCookies(String input) async {
+    if (input.trim().isEmpty) {
+      throw const FormatException('请先粘贴 Cookie，或从文件导入');
+    }
     final cookies = CookieImport.parse(input, domains: cookieUrls)
         .where((c) => c.value.isNotEmpty)
         .toList();
     if (cookies.isEmpty) {
-      throw FormatException('没有找到 $loginDisplayName 的 Cookie');
+      throw const FormatException('没有识别到属于该平台的 Cookie，请检查复制的内容');
     }
     final missing = CookieImport.missing(cookies, requiredCookieNames);
     if (missing.isNotEmpty) {
