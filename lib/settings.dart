@@ -575,11 +575,11 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                               ListTile(
                                 leading: const Icon(Icons.width_normal),
-                                title: const Text('侧栏较宽时隐藏搜索框'),
+                                title: const Text('侧栏较宽时隐藏搜索页的搜索框'),
                                 subtitle: Obx(
                                   () => setSubTitleTextAniSwi(
                                     Text(
-                                      '侧栏超过 ${Get.find<SettingsController>().showSearchAreaWidth.round()} px 时隐藏，当前 ${Get.find<XSearchController>().leftBarWidth.value.round()} px',
+                                      '侧栏宽于 ${Get.find<SettingsController>().showSearchAreaWidth.round()} px 时，搜索页不再重复显示搜索框（当前 ${Get.find<XSearchController>().leftBarWidth.value.round()} px）',
                                       key: ValueKey<double>(
                                         Get.find<XSearchController>()
                                             .leftBarWidth

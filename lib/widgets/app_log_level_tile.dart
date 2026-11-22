@@ -16,7 +16,7 @@ class AppLogLevelTile extends StatelessWidget {
   Widget build(BuildContext context) => ListTile(
     leading: const Icon(Icons.bug_report_outlined),
     title: const Text('日志级别'),
-    subtitle: Text('${value.label}\n立即生效并保存，可通过 flutter logs 查看'),
+    subtitle: Text('${value.label} · 立即生效'),
     trailing: const Icon(Icons.chevron_right),
     onTap: () async {
       final selected = await showDialog<AppLogLevel>(
