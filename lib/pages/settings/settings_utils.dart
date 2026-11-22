@@ -57,25 +57,24 @@ Future<Map<String, dynamic>> outputAllSettingsToFile([
   if (toJsonString) {
     return settings;
   }
-  if ((isAndroid &&
-          await Permission.manageExternalStorage.request().isGranted) ||
-      (isMobile && await Permission.storage.request().isGranted) ||
-      isDesktop) {
-    try {
-      // 确保路径存在
-      final outputPath = await xuanGetdownloadDirectory(path: 'settings.json');
-      final file = File(outputPath);
-      // 将设置写入 JSON 文件
-      await file.writeAsString(jsonEncode(settings));
-      showSuccessSnackbar(
-        '设置已保存到',
-        '$outputPath\n设置导出为明文 JSON，请勿上传到不受信任的位置。',
+  try {
+    // 默认写在应用专属目录，Android 上无需存储权限。
+    final outputPath = await xuanGetdownloadDirectory(path: 'settings.json');
+    final file = File(outputPath);
+    await file.writeAsString(jsonEncode(settings));
+    showSuccessSnackbar(
+      '设置已保存到',
+      '$outputPath\n设置导出为明文 JSON，请勿上传到不受信任的位置。',
+    );
+    // Android 11+ 的文件管理器通常看不到应用专属目录，导出后直接调起分享，
+    // 让用户自己选择保存到哪里。
+    if (isMobile) {
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(outputPath)], subject: 'Listen1 设置备份'),
       );
-    } catch (e) {
-      showErrorSnackbar('保存设置时出错', '$e');
     }
-  } else {
-    showErrorSnackbar('存储权限未授予', null);
+  } catch (e) {
+    showErrorSnackbar('保存设置时出错', '$e');
   }
   return {};
 }
@@ -201,34 +200,25 @@ Future<void> importSettingsFromFile(
     await _sets(settings);
     return;
   }
-  // 申请所有文件访问权限
-  if ((isAndroid &&
-          await Permission.manageExternalStorage.request().isGranted) ||
-      (isMobile && await Permission.storage.request().isGranted) ||
-      isDesktop) {
-    try {
-      // 弹出系统文件选择器选择文件
-      final result = await FilePicker.pickFile(
-        type: FileType.custom,
-        allowedExtensions: ["json"],
-      );
+  // 系统文件选择器（SAF）本身授予读取权限，不需要「所有文件访问」。
+  try {
+    final result = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ["json"],
+    );
 
-      if (result != null) {
+    if (result != null) {
       final content = await result.readAsBytes();
       if (content.length > 4 * 1024 * 1024) {
         throw const FormatException('配置文件超过大小限制');
       }
       final settings = jsonDecode(utf8.decode(content)) as Map<String, dynamic>;
-
-        await _sets(settings);
-      } else {
-        showErrorSnackbar('未选择文件', null);
-      }
-    } catch (e) {
-      showErrorSnackbar('导入设置时出错', '$e');
+      await _sets(settings);
+    } else {
+      showErrorSnackbar('未选择文件', null);
     }
-  } else {
-    showErrorSnackbar('存储权限未授予', null);
+  } catch (e) {
+    showErrorSnackbar('导入设置时出错', '$e');
   }
 }
 

@@ -1,5 +1,7 @@
 package com.xiebian.listen1_xuan
 
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.content.Intent
 import android.view.WindowManager
@@ -34,9 +36,13 @@ class MainActivity: AudioServiceActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 设置沉浸式状态栏和导航栏
-        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-        window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)       // 设置沉浸式状态栏，在MIUI系统中，状态栏背景透明。原生系统中，状态栏背景半透明。
-        window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)   // 设置沉浸式虚拟键，在MIUI系统中，虚拟键背景透明。原生系统中，虚拟键背景半透明。
+        // 真正的边到边：内容画到状态栏和手势条下方，系统栏透明且不加灰色遮罩。
+        // 旧的 FLAG_TRANSLUCENT_* 会在原生 Android 上叠一层半透明灰，已弃用。
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
     }
 }
