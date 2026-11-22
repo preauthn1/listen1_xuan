@@ -930,8 +930,13 @@ class UpdController extends GetxController {
     }
   }
 
-  /// 更新提示的停靠区域：底边让出播放栏。
-  static const EdgeInsets _updateToastArea = EdgeInsets.fromLTRB(16, 100, 16, 80);
+  /// 更新提示的停靠区域：底边让出播放栏（桌面端播放栏约 60px，再留 16px 间距）。
+  static EdgeInsets get _updateToastArea => EdgeInsets.fromLTRB(
+    16,
+    100,
+    16,
+    (isWindows || isMacOS) ? 92 : 80,
+  );
 
   /// 桌面端：卡片从内容区右下角弹出；收起时不留悬浮圆点（无论停在哪里
   /// 都会压住歌单行或内容），改由侧栏操作栏里的「发现新版本」按钮重新打开。

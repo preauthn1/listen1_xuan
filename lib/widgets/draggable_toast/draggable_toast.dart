@@ -219,6 +219,25 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
         _measuredHeight = renderBox.size.height;
         _isMeasuring = false;
       });
+      // 首次定位时还不知道卡片高度（按收起尺寸算），贴底出现的卡片会
+      // 超出可用区域、按钮被窗口底边裁掉。量出高度后把位置收回区域内。
+      final area = _cachedAreaSize;
+      if (area != null) {
+        final fixed = Offset(
+          _currentPosition.dx.clamp(
+            0.0,
+            (area.width - widget.config.expandedWidth).clamp(0.0, double.infinity),
+          ),
+          _currentPosition.dy.clamp(
+            0.0,
+            (area.height - _effectiveExpandedHeight).clamp(0.0, double.infinity),
+          ),
+        );
+        if (fixed != _currentPosition) {
+          _currentPosition = fixed;
+          _positionController.value = fixed;
+        }
+      }
       // Now trigger the expand animation
       _expandController.animateTo(1.0);
       _startAutoPeekTimer();
