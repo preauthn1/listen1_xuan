@@ -35,9 +35,9 @@ Step bili {Click 90 225 5; Snap '04-bili'}
 Step playlistinfo {Home; Click 90 135 3; Click 150 190 5; Snap '05-playlist-info'; Esc}
 Step queue {Click 743 661 2; Snap '06-queue'; Esc}
 Step settings {Settings; Snap '10-settings'}
+Step supabase { Settings; Click 610 61 3; Snap '11-supabase'; Click 610 61 2 }
 $rows=@(@('12-thirdparty',117),@('13-playlist-config',174),@('14-cache',231),@('15-desktop',289),@('16-update',353),@('17-appearance',418),@('18-playback',475),@('19-misc',532))
 foreach($r in $rows){ Step $r[0] { Settings; Wheel 600 300 -60; Click 500 $r[1] 2; Snap ($r[0]+'-a'); Wheel 600 300 4; Snap ($r[0]+'-b'); Wheel 600 300 -60; Click 500 $r[1] 2 } }
-Step supabase { Settings; Wheel 600 300 -60; Click 500 60 2; Snap '11-supabase'; Click 500 60 2 }
 Step bottom { Settings; Wheel 600 400 60; Snap '20-settings-bottom' }
 Stop-Process $p -Force -ErrorAction SilentlyContinue
 Start-Sleep 2
@@ -54,5 +54,5 @@ Step darkhome { Snap '32-dark-home' }
 Step darkqueue { Home; Click 743 661 3; Snap '33-dark-queue'; Esc; Esc }
 Step darkset { Settings; Snap '30-dark-settings'; Click 500 117 2; Snap '31-dark-thirdparty'; Click 500 117 2 }
 Step wide { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1500,850,0x40)|Out-Null; Start-Sleep 3; Snap '40-wide-dark-home' }
-Step wideinfo { Esc; Esc; Click 90 135 3; Click 150 190 5; Snap '41-wide-dark-playlist-info' }
+Step wideinfo { Click 20 20 2; Esc; Click 90 135 3; Click 150 190 5; Snap '41-wide-dark-playlist-info' }
 Stop-Process $p -Force -ErrorAction SilentlyContinue
