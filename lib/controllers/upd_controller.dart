@@ -930,14 +930,12 @@ class UpdController extends GetxController {
     }
   }
 
-  /// 更新提示收起后的停靠区域。桌面端底部还有侧栏操作栏（约 56px），
-  /// 底边留得更高，避免收起的圆形按钮贴着操作栏图标。
-  EdgeInsets get _updateToastArea => EdgeInsets.fromLTRB(
-    16,
-    100,
-    16,
-    (isWindows || isMacOS) ? 150 : 80,
-  );
+  /// 更新提示的停靠区域：底边让出播放栏。
+  static const EdgeInsets _updateToastArea = EdgeInsets.fromLTRB(16, 100, 16, 80);
+
+  /// 桌面端左下角是侧栏的歌单行和操作栏，收起后的圆形按钮会压住它们；
+  /// 改停在内容区右下角，与常见的桌面浮动按钮位置一致。
+  static bool get _updateToastAtEnd => isWindows || isMacOS;
 
   /// 显示 Release 更新对话框
   void _showReleaseUpdateDialog(
@@ -989,6 +987,7 @@ class UpdController extends GetxController {
       icon: _buildProgressIcon(isPeekIcon: true),
       config: DraggableToastConfig(
         areaPadding: _updateToastArea,
+        startAtEnd: _updateToastAtEnd,
         snapThreshold: 60,
         expandedWidth: 300,
         collapsedSize: 46,
@@ -1509,6 +1508,7 @@ class UpdController extends GetxController {
       ),
       config: DraggableToastConfig(
         areaPadding: _updateToastArea,
+        startAtEnd: _updateToastAtEnd,
         snapThreshold: 60,
         expandedWidth: 300,
         collapsedSize: 46,
