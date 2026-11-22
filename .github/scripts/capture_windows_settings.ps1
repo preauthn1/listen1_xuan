@@ -37,6 +37,19 @@ Step settings {Settings; Snap '10-settings'}
 $rows=@(@('12-thirdparty',117),@('13-playlist-config',174),@('14-cache',231),@('15-desktop',289),@('16-update',353),@('17-appearance',418),@('18-playback',475),@('19-misc',532))
 foreach($r in $rows){ Step $r[0] { Settings; Wheel 600 300 -60; Click 500 $r[1] 2; Snap ($r[0]+'-a'); Wheel 600 300 4; Snap ($r[0]+'-b'); Wheel 600 300 -60; Click 500 $r[1] 2 } }
 Step bottom { Settings; Wheel 600 400 60; Snap '20-settings-bottom' }
-Step dark { Home; Click 98 599 4; Snap '32-dark-home'; Settings; Snap '30-dark-settings' }
-Step wide { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1500,850,0x40)|Out-Null; Start-Sleep 3; Snap '40-wide-home' }
+Stop-Process $p -Force -ErrorAction SilentlyContinue
+Start-Sleep 2
+# 第二轮：系统切到深色，应用以「跟随系统」启动
+$k='HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+New-Item -Path $k -Force | Out-Null
+Set-ItemProperty -Path $k -Name AppsUseLightTheme -Value 0 -Type DWord
+Set-ItemProperty -Path $k -Name SystemUsesLightTheme -Value 0 -Type DWord
+$p=Start-Process (Resolve-Path app/listen1_xuan.exe) -WorkingDirectory (Resolve-Path app) -PassThru
+for($i=0;$i -lt 60;$i++){Start-Sleep 1;$p.Refresh();if($p.MainWindowHandle -ne [intptr]::Zero){break}}
+$w=$p.MainWindowHandle
+Start-Sleep 14
+Step darkhome { Snap '32-dark-home' }
+Step darkset { Settings; Snap '30-dark-settings'; Click 500 117 2; Snap '31-dark-thirdparty' }
+Step darkqueue { Home; Click 704 661 2; Snap '33-dark-queue'; Esc }
+Step wide { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1500,850,0x40)|Out-Null; Start-Sleep 3; Snap '40-wide-dark-home' }
 Stop-Process $p -Force -ErrorAction SilentlyContinue
