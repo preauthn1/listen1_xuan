@@ -31,6 +31,10 @@ class DraggableToastConfig {
   /// 首次出现时贴在可用区域的右下角（默认左下角）。
   final bool startAtEnd;
 
+  /// 返回 true 时，「收起」直接关闭 Toast，而不是缩成悬浮圆点。
+  /// 桌面端用它把入口交还给固定的按钮，避免圆点压住内容。
+  final bool Function()? dismissOnPeek;
+
   const DraggableToastConfig({
     this.areaPadding = const EdgeInsets.all(16),
     this.snapThreshold = 60.0,
@@ -46,6 +50,7 @@ class DraggableToastConfig {
     this.borderRadius = 16,
     this.collapsedBorderRadius = 24,
     this.startAtEnd = false,
+    this.dismissOnPeek,
   });
 }
 
@@ -240,6 +245,10 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
 
   void _performPeek() {
     _cancelAutoDismissTimer();
+    if (widget.config.dismissOnPeek?.call() ?? false) {
+      _controllerHide();
+      return;
+    }
     final areaSize = _cachedAreaSize;
     if (areaSize == null) return;
 

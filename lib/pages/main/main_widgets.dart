@@ -239,8 +239,8 @@ Widget get _leftBar => Scaffold(
         child: Align(
           alignment: Alignment.center,
           child: PriorityResponsiveActionRow(
-            // 窄时依次隐藏：WS 客户端、WS 服务器、主题、歌曲替换；设置最后保留。
-            hidePriority: const [2, 1, 0, 3, 4],
+            // 窄时依次隐藏：WS 客户端、WS 服务器、主题、歌曲替换、更新提示；设置最后保留。
+            hidePriority: const [2, 1, 0, 3, 4, 5],
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
           ThemeToggleButton(iconSize: 24.0, padding: EdgeInsets.all(0)),
@@ -264,6 +264,19 @@ Widget get _leftBar => Scaffold(
                 Get.toNamed(RouteName.songReplacePage, id: 1);
               },
             ),
+          Obx(() {
+            final pending = Get.find<UpdController>().pendingUpdate.value;
+            if (pending == null) return const SizedBox.shrink();
+            return IconButton(
+              tooltip: '发现新版本 ${pending.$1.tagName}',
+              color: Get.theme.colorScheme.primary,
+              icon: const Badge(
+                smallSize: 8,
+                child: Icon(Icons.system_update_rounded),
+              ),
+              onPressed: Get.find<UpdController>().reopenPendingUpdate,
+            );
+          }),
           IconButton(
             tooltip: "设置",
             icon: const FeedbackUnreadBadge(child: Icon(Icons.settings)),
