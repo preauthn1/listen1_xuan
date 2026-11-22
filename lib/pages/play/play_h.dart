@@ -12,21 +12,14 @@ Widget playH() {
           height: 50,
           child: Center(
             // 上一首
-            child: _button(Icons.skip_previous, () {
-              globalSkipToPrevious();
-            }, h: true),
-          ),
-        ),
-        Container(
-          width: 50,
-          height: 50,
-          child: Center(
-            // 上一首
-            child: PlayPauseBtn(
-              isPlaying: _playController.isplaying,
-              size: 50,
-              onPlayPressed: globalPlay,
-              onPausePressed: globalPause,
+            child: Obx(
+              () => _button(
+                Icons.skip_previous,
+                _playController.nowPlayingTrackRx.value == null
+                    ? null
+                    : globalSkipToPrevious,
+                h: true,
+              ),
             ),
           ),
         ),
@@ -35,9 +28,31 @@ Widget playH() {
           height: 50,
           child: Center(
             // 上一首
-            child: _button(Icons.skip_next, () {
-              globalSkipToNext();
-            }, h: true),
+            child: Obx(() {
+              final hasTrack = _playController.nowPlayingTrackRx.value != null;
+              return PlayPauseBtn(
+                isPlaying: _playController.isplaying,
+                size: 50,
+                onPlayPressed: hasTrack ? globalPlay : null,
+                onPausePressed: hasTrack ? globalPause : null,
+              );
+            }),
+          ),
+        ),
+        Container(
+          width: 50,
+          height: 50,
+          child: Center(
+            // 上一首
+            child: Obx(
+              () => _button(
+                Icons.skip_next,
+                _playController.nowPlayingTrackRx.value == null
+                    ? null
+                    : globalSkipToNext,
+                h: true,
+              ),
+            ),
           ),
         ),
         Obx(() {

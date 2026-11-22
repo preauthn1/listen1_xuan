@@ -90,13 +90,13 @@ class Netease extends BaseProvider {
   bool get supportGetUserFavoritePlaylist => true;
 
   @override
-  String get userCreatedPlaylistSectionTitle => '我创建的网易云歌单';
+  String get userCreatedPlaylistSectionTitle => '网易云 · 我创建的';
 
   @override
   Widget get userCreatedPlaylistSectionLeading => _neteaseSectionIcon;
 
   @override
-  String get userFavoritePlaylistSectionTitle => '我收藏的网易云歌单';
+  String get userFavoritePlaylistSectionTitle => '网易云 · 我收藏的';
 
   @override
   Widget get userFavoritePlaylistSectionLeading => _neteaseSectionIcon;

@@ -2,13 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
 enum AppLogLevel {
-  trace(Level.trace, 'Trace · 全部'),
-  debug(Level.debug, 'Debug · 调试'),
-  info(Level.info, 'Info · 信息'),
-  warning(Level.warning, 'Warning · 警告'),
-  error(Level.error, 'Error · 错误'),
-  fatal(Level.fatal, 'Fatal · 严重错误'),
-  off(Level.off, 'Off · 关闭');
+  trace(Level.trace, '全部'),
+  debug(Level.debug, '调试'),
+  info(Level.info, '信息'),
+  warning(Level.warning, '警告'),
+  error(Level.error, '错误'),
+  fatal(Level.fatal, '严重错误'),
+  off(Level.off, '关闭');
 
   const AppLogLevel(this.level, this.label);
 

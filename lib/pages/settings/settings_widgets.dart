@@ -261,8 +261,8 @@ ButtonStyle _pillStyle(ThemeData theme, {double minWidth = 96}) {
     minimumSize: Size(minWidth, 40),
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
     textStyle: theme.textTheme.labelLarge?.merge(_noUnderline) ?? _noUnderline,
-    disabledBackgroundColor: theme.colorScheme.surfaceContainerHighest,
-    disabledForegroundColor: theme.colorScheme.onSurfaceVariant,
+    disabledBackgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+    disabledForegroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.38),
   );
 }
 
@@ -304,9 +304,10 @@ Widget _loginRow({
       ),
     ],
   );
+  // 统一宽度，让「登录 / Cookie」与「登录」左右边缘对齐。
   final action = FilledButton.tonal(
     onPressed: onPressed,
-    style: _pillStyle(theme),
+    style: _pillStyle(theme, minWidth: 128),
     child: Text(label, maxLines: 1, softWrap: false, style: _noUnderline),
   );
   return Padding(
@@ -584,12 +585,15 @@ List<Widget> get cacheSettingsTiles {
         if (!result) return;
         clean_local_cache(true);
       },
+      style: ElevatedButton.styleFrom(
+        foregroundColor: Get.theme.colorScheme.error,
+      ),
       child: const Text('清除所有歌曲缓存'),
     ),
     Obx(
       () => SwitchListTile(
-        title: const Text('禁用歌曲缓存下载'),
-        subtitle: Text('开启后将不再下载歌曲缓存，已下载的缓存仍可使用'),
+        title: const Text('不再下载歌曲缓存'),
+        subtitle: const Text('已下载的缓存仍可使用'),
         value: Get.find<SettingsController>().disableSongDownload,
         onChanged: (bool value) {
           Get.find<SettingsController>().disableSongDownload = value;
@@ -598,8 +602,8 @@ List<Widget> get cacheSettingsTiles {
     ),
     Obx(
       () => SwitchListTile(
-        title: const Text('禁用歌词缓存下载'),
-        subtitle: Text('开启后将不再下载歌词缓存，已下载的缓存仍可使用'),
+        title: const Text('不再下载歌词缓存'),
+        subtitle: const Text('已下载的缓存仍可使用'),
         value: Get.find<SettingsController>().disableLyricDownload,
         onChanged: (bool value) {
           Get.find<SettingsController>().disableLyricDownload = value;
@@ -760,17 +764,27 @@ Widget desktopSettingsTiles(
     mainAxisSize: MainAxisSize.min,
     children:
         [
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                alignment: WrapAlignment.spaceAround,
-
-                children: create_hotkey_btns(context),
+              // 第一个是「启用热键」开关（ListTile 自带内边距），其余为快捷键按钮。
+              ...create_hotkey_btns(context).take(1),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  alignment: WrapAlignment.start,
+                  spacing: 8,
+                  runSpacing: 0,
+                  children: create_hotkey_btns(context).skip(1).toList(),
+                ),
               ),
-              TextField(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: TextField(
                 focusNode: _focusNode2,
                 controller: windowsProxyAddrController,
                 decoration: InputDecoration(
-                  labelText: '代理地址,仅适用于Github,例如：localhost:7890,留空表示不使用,回车以保存',
+                  labelText: 'GitHub 代理地址',
+                  hintText: '例如 localhost:7890，留空表示不使用',
+                  helperText: '仅用于访问 GitHub，按回车保存',
                 ),
                 onSubmitted: (value) async {
                   Get.find<SettingsController>().windowsProxyAddr = value;
@@ -778,10 +792,11 @@ Widget desktopSettingsTiles(
                   showInfoSnackbar('设置成功$value', '立即生效');
                 },
               ),
+              ),
               if (isDesktop)
                 Obx(
                   () => SwitchListTile(
-                    title: const Text('在右侧页面中键时隐藏/最小化主页面'),
+                    title: const Text('在内容区按鼠标中键隐藏/最小化窗口'),
                     value: Get.find<SettingsController>().hideOrMinimize,
                     onChanged: (bool value) {
                       Get.find<SettingsController>().hideOrMinimize = value;
@@ -853,7 +868,7 @@ List<Widget> get notificationSettingsTiles => [
     ),
   Obx(
     () => SwitchListTile(
-      title: const Text('使用Title字段显示歌词'),
+      title: const Text('在通知标题中显示歌词'),
       value: Get.find<SettingsController>().tryShowLyricInNotificationInTitle,
       onChanged:
           isAndroid &&
@@ -867,12 +882,12 @@ List<Widget> get notificationSettingsTiles => [
   ),
   Obx(
     () => SwitchListTile(
-      title: const Text('使用Album字段显示当前播放时长'),
+      title: const Text('在通知专辑栏显示播放时长'),
       subtitle: GestureDetector(
         onLongPress: () => g_launchURL(
           Uri.parse('https://github.com/HBWuChang/listen1_xuan/issues/36'),
         ),
-        child: Text('@Gitkila'),
+        child: const Text('建议来自 @Gitkila'),
       ),
       value: Get.find<SettingsController>().showTimeInNotify,
       onChanged: (bool value) =>

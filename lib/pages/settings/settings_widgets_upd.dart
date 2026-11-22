@@ -3,7 +3,7 @@ part of '../../settings.dart';
 UpdController updController = Get.find<UpdController>();
 Widget updSettingsTile(BuildContext context) {
   return Wrap(
-    alignment: WrapAlignment.center,
+    alignment: WrapAlignment.start,
     children: [
       ...[
         ElevatedButton(
@@ -16,7 +16,7 @@ Widget updSettingsTile(BuildContext context) {
               Uri.parse('https://github.com/HBWuChang/listen1_xuan/releases'),
             );
           },
-          child: Text('打开GitHub Release页面'),
+          child: const Text('打开 GitHub 发布页'),
         ),
         if (!kDebugMode && (isAndroid || isWindows || isMacOS))
           ElevatedButton(
@@ -25,7 +25,7 @@ Widget updSettingsTile(BuildContext context) {
           ),
         ElevatedButton(
           onPressed: () => Get.toNamed(RouteName.settingsChangelogPage, id: 1),
-          child: const Text('查看 Changelog'),
+          child: const Text('查看更新日志'),
         ),
         if (isAndroid)
           ElevatedButton(
@@ -79,14 +79,17 @@ Widget updSettingsTile(BuildContext context) {
           ),
         Obx(
           () => SwitchListTile(
-            title: const Text('获取PreRelease更新'),
+            title: const Text('接收预发布版本'),
+            subtitle: const Text('提前体验新功能，可能不够稳定'),
             value: Get.find<SettingsController>().getPreRelease,
             onChanged: (value) {
               Get.find<SettingsController>().getPreRelease = value;
             },
           ),
         ),
-      ].map((e) => Padding(padding: EdgeInsets.all(8.0), child: e)),
+      ].map((e) => e is Obx
+          ? SizedBox(width: double.infinity, child: e)
+          : Padding(padding: const EdgeInsets.fromLTRB(16, 8, 0, 8), child: e)),
     ],
   );
 }
