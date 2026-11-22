@@ -31,7 +31,7 @@ Widget settingsWidget(BuildContext context) {
               child: ElevatedButtonIcon(
                 onPressed: outputPlaylistToGithubGist,
                 icon: Icon(Icons.playlist_play),
-                label: Text('导出歌单到Github Gist'),
+                label: Text('导出歌单到 GitHub Gist'),
               ),
             ),
             10.sbw,
@@ -41,7 +41,7 @@ Widget settingsWidget(BuildContext context) {
                   if (Github.status != 2) {
                     await Github.updateStatus();
                     if (Github.status != 2) {
-                      showInfoSnackbar('请先登录Github', '');
+                      showInfoSnackbar('请先登录 GitHub', '');
                       return;
                     }
                   }
@@ -53,7 +53,7 @@ Widget settingsWidget(BuildContext context) {
                       context: context,
                       builder: (BuildContext context) {
                         return AlertDialog(
-                          title: Text('从Github Gist导入歌单'),
+                          title: Text('从 GitHub Gist 导入歌单'),
                           content: Container(
                             width: double.maxFinite,
                             child: ListView.builder(
@@ -68,7 +68,7 @@ Widget settingsWidget(BuildContext context) {
                                     try {
                                       // showInfoSnackbar('正在导入', null);
                                       final msg =
-                                          '正在导入歌单 ${playlist['id']}\n正在从Github Gist获取配置文件'
+                                          '正在导入歌单 ${playlist['id']}\n正在从 GitHub Gist 获取配置文件'
                                               .obs;
                                       showLoadingDialog(msg);
                                       final jsfile =
@@ -114,7 +114,7 @@ Widget settingsWidget(BuildContext context) {
                 },
 
                 icon: Icon(Icons.playlist_add),
-                label: Text('从Github Gist导入歌单'),
+                label: Text('从 GitHub Gist 导入歌单'),
               ),
             ),
           ],

@@ -584,12 +584,15 @@ List<Widget> get cacheSettingsTiles {
         if (!result) return;
         clean_local_cache(true);
       },
+      style: ElevatedButton.styleFrom(
+        foregroundColor: Get.theme.colorScheme.error,
+      ),
       child: const Text('清除所有歌曲缓存'),
     ),
     Obx(
       () => SwitchListTile(
-        title: const Text('禁用歌曲缓存下载'),
-        subtitle: Text('开启后将不再下载歌曲缓存，已下载的缓存仍可使用'),
+        title: const Text('不再下载歌曲缓存'),
+        subtitle: const Text('已下载的缓存仍可使用'),
         value: Get.find<SettingsController>().disableSongDownload,
         onChanged: (bool value) {
           Get.find<SettingsController>().disableSongDownload = value;
@@ -598,8 +601,8 @@ List<Widget> get cacheSettingsTiles {
     ),
     Obx(
       () => SwitchListTile(
-        title: const Text('禁用歌词缓存下载'),
-        subtitle: Text('开启后将不再下载歌词缓存，已下载的缓存仍可使用'),
+        title: const Text('不再下载歌词缓存'),
+        subtitle: const Text('已下载的缓存仍可使用'),
         value: Get.find<SettingsController>().disableLyricDownload,
         onChanged: (bool value) {
           Get.find<SettingsController>().disableLyricDownload = value;
@@ -770,7 +773,9 @@ Widget desktopSettingsTiles(
                 focusNode: _focusNode2,
                 controller: windowsProxyAddrController,
                 decoration: InputDecoration(
-                  labelText: '代理地址,仅适用于Github,例如：localhost:7890,留空表示不使用,回车以保存',
+                  labelText: 'GitHub 代理地址',
+                  hintText: '例如 localhost:7890，留空表示不使用',
+                  helperText: '仅用于访问 GitHub，按回车保存',
                 ),
                 onSubmitted: (value) async {
                   Get.find<SettingsController>().windowsProxyAddr = value;
@@ -853,7 +858,7 @@ List<Widget> get notificationSettingsTiles => [
     ),
   Obx(
     () => SwitchListTile(
-      title: const Text('使用Title字段显示歌词'),
+      title: const Text('在通知标题中显示歌词'),
       value: Get.find<SettingsController>().tryShowLyricInNotificationInTitle,
       onChanged:
           isAndroid &&
@@ -867,12 +872,12 @@ List<Widget> get notificationSettingsTiles => [
   ),
   Obx(
     () => SwitchListTile(
-      title: const Text('使用Album字段显示当前播放时长'),
+      title: const Text('在通知专辑栏显示播放时长'),
       subtitle: GestureDetector(
         onLongPress: () => g_launchURL(
           Uri.parse('https://github.com/HBWuChang/listen1_xuan/issues/36'),
         ),
-        child: Text('@Gitkila'),
+        child: const Text('建议来自 @Gitkila'),
       ),
       value: Get.find<SettingsController>().showTimeInNotify,
       onChanged: (bool value) =>

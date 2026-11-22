@@ -281,7 +281,9 @@ class _SettingsPageState extends State<SettingsPage> {
                           isExpanded: settingsController.settingsPageExpansion
                               .contains(3),
                           body: Wrap(
-                            alignment: WrapAlignment.center,
+                            alignment: WrapAlignment.start,
+                            spacing: 12,
+                            runSpacing: 8,
                             children: [...cacheSettingsTiles],
                           ),
                         ),
@@ -299,7 +301,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                   ),
                                   title: Text(
                                     isDesktop
-                                        ? '热键、代理及其它Desktop设置'
+                                        ? '桌面端：热键、代理与窗口'
                                         : isAndroid
                                         ? "安卓通知设置"
                                         : "未知平台设置",
@@ -707,43 +709,53 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
 
-                  ListTile(
-                    leading: const FeedbackUnreadBadge(child: Icon(Icons.forum_outlined)),
-                    title: const Text('在线反馈'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () =>
-                        Get.toNamed(RouteName.onlineFeedbackPage, id: 1),
-                  ),
-                  if (Get.isRegistered<FeedbackPushController>() && Get.find<FeedbackPushController>().supported)
-                    GetBuilder<FeedbackPushController>(
-                      autoRemove: false,
-                      builder: (push) => SwitchListTile(
-                        secondary: const Icon(Icons.notifications_outlined),
-                        title: const Text('反馈消息推送'),
-                        subtitle: Text(push.error ?? (push.enabled
-                            ? '按问题的未读红点设置接收系统通知'
-                            : '开启后可接收关注问题的新消息通知')),
-                        value: push.enabled,
-                        onChanged: push.busy ? null : push.setEnabled,
+                  // 导航类条目与上方分组卡片使用同一表面色，保持一个节奏。
+                  12.sbh,
+                  Material(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    child: Column(
+                      children: [
+                      ListTile(
+                        leading: const FeedbackUnreadBadge(child: Icon(Icons.forum_outlined)),
+                        title: const Text('在线反馈'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () =>
+                            Get.toNamed(RouteName.onlineFeedbackPage, id: 1),
                       ),
+                      if (Get.isRegistered<FeedbackPushController>() && Get.find<FeedbackPushController>().supported)
+                        GetBuilder<FeedbackPushController>(
+                          autoRemove: false,
+                          builder: (push) => SwitchListTile(
+                            secondary: const Icon(Icons.notifications_outlined),
+                            title: const Text('反馈消息推送'),
+                            subtitle: Text(push.error ?? (push.enabled
+                                ? '按问题的未读红点设置接收系统通知'
+                                : '开启后可接收关注问题的新消息通知')),
+                            value: push.enabled,
+                            onChanged: push.busy ? null : push.setEnabled,
+                          ),
+                        ),
+                      ListTile(
+                        leading: const Icon(Icons.lightbulb_outline),
+                        title: const Text('使用技巧'),
+                        trailing: Icon(Icons.chevron_right),
+                        onTap: () {
+                          Get.toNamed(RouteName.settingsTipsPage, id: 1);
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.menu_book_outlined),
+                        title: const Text('说明文档'),
+                        trailing: Icon(Icons.chevron_right),
+                        onTap: () {
+                          Get.toNamed(RouteName.settingsReadmePage, id: 1);
+                        },
+                      ),
+                      ],
                     ),
-                  ListTile(
-                    leading: const Icon(Icons.lightbulb_outline),
-                    title: const Text('使用技巧'),
-                    trailing: Icon(Icons.chevron_right),
-                    onTap: () {
-                      Get.toNamed(RouteName.settingsTipsPage, id: 1);
-                    },
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.menu_book_outlined),
-                    title: const Text('说明文档'),
-                    trailing: Icon(Icons.chevron_right),
-                    onTap: () {
-                      Get.toNamed(RouteName.settingsReadmePage, id: 1);
-                    },
-                  ),
-                  24.sbh,
+                  // 预留右下角浮动提示的位置，最后一行不会被遮住。
+                  80.sbh,
                 ],
               ),
             ),

@@ -1223,7 +1223,7 @@ class SettingsController extends GetxController {
     if (settings[horPartPercentagesKey] == null ||
         (settings[horPartPercentagesKey] is! List) ||
         (settings[horPartPercentagesKey] as List).length != 2) {
-      return [0.2, 0.8];
+      return [0.24, 0.76];
     }
     return settings[horPartPercentagesKey]
         .map<double>((e) => e as double)

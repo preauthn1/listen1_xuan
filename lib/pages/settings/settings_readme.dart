@@ -12,7 +12,7 @@ class SettingsReadmePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => RepositoryDocumentPage(
-    title: 'README',
+    title: '说明文档',
     document: Get.find<SettingsController>().readmeDocument,
   );
 }
@@ -22,7 +22,7 @@ class SettingsChangelogPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => RepositoryDocumentPage(
-    title: 'Changelog',
+    title: '更新日志',
     document: Get.find<SettingsController>().changelogDocument,
   );
 }

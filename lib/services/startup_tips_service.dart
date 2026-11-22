@@ -9,7 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StartupTipsService {
-  static const defaultSearchHint = '请输入歌曲名，歌手或专辑';
+  static const defaultSearchHint = '搜索歌曲、歌手、专辑';
   static const assetPath = 'assets/help/startup_tips.md';
   static const remoteUrl =
       'https://raw.githubusercontent.com/HBWuChang/listen1_xuan/main/assets/help/startup_tips.md';
