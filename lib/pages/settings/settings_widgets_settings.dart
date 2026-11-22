@@ -31,7 +31,7 @@ Widget settingsWidget(BuildContext context) {
               child: ElevatedButtonIcon(
                 onPressed: outputPlaylistToGithubGist,
                 icon: Icon(Icons.playlist_play),
-                label: Text('导出歌单到 GitHub Gist'),
+                label: Text('导出到 Gist', maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
             ),
             10.sbw,
@@ -114,7 +114,7 @@ Widget settingsWidget(BuildContext context) {
                 },
 
                 icon: Icon(Icons.playlist_add),
-                label: Text('从 GitHub Gist 导入歌单'),
+                label: Text('从 Gist 导入', maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
             ),
           ],
