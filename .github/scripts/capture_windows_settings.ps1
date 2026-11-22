@@ -32,6 +32,7 @@ function Settings(){ Home; Click 138 599 3 }
 Step home {Snap '01-home'}
 Step created {Click 90 135 4; Snap '02-my-created'}
 Step bili {Click 90 225 5; Snap '04-bili'}
+Step playlistinfo {Home; Click 90 135 3; Click 150 190 5; Snap '05-playlist-info'; Esc}
 Step queue {Click 743 661 2; Snap '06-queue'; Esc}
 Step settings {Settings; Snap '10-settings'}
 $rows=@(@('12-thirdparty',117),@('13-playlist-config',174),@('14-cache',231),@('15-desktop',289),@('16-update',353),@('17-appearance',418),@('18-playback',475),@('19-misc',532))
@@ -52,4 +53,5 @@ Step darkhome { Snap '32-dark-home' }
 Step darkqueue { Home; Click 743 661 3; Snap '33-dark-queue'; Esc; Esc }
 Step darkset { Settings; Snap '30-dark-settings'; Click 500 117 2; Snap '31-dark-thirdparty'; Click 500 117 2 }
 Step wide { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1500,850,0x40)|Out-Null; Start-Sleep 3; Snap '40-wide-dark-home' }
+Step wideinfo { Home; Click 90 135 3; Click 150 190 5; Snap '41-wide-dark-playlist-info' }
 Stop-Process $p -Force -ErrorAction SilentlyContinue
