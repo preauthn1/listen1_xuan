@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:listen1_xuan/bodys.dart';
 import 'package:listen1_xuan/controllers/routeController.dart';
 import 'package:listen1_xuan/controllers/track_download_controller.dart';
+import 'package:listen1_xuan/pages/track_downloads_page.dart';
 import 'package:listen1_xuan/funcs.dart';
 import 'package:listen1_xuan/global_settings_animations.dart';
 import 'package:listen1_xuan/models/Track.dart';
@@ -454,7 +455,18 @@ class PlaylistInfoPage extends StatelessWidget {
         final key = ValueKey(track.id);
         return ListTile(
           key: key,
-          title: Text(track.title ?? '未知标题'),
+          title: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  track.title ?? '未知标题',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              TrackDownloadBadge(trackId: track.id),
+            ],
+          ),
           subtitle: Text(
             '${track.artist ?? '未知艺术家'} - ${track.album ?? '未知专辑'}',
           ),
@@ -485,7 +497,18 @@ class PlaylistInfoPage extends StatelessWidget {
         final key = ValueKey(track.id);
         return ListTile(
           key: key,
-          title: Text(track.title ?? '未知标题'),
+          title: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  track.title ?? '未知标题',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              TrackDownloadBadge(trackId: track.id),
+            ],
+          ),
           subtitle: Text(
             '${track.artist} - ${track.album}${track.totalDurMsg != null ? ' | ${track.totalDurMsg}' : ''}',
           ),
