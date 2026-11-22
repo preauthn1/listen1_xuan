@@ -157,6 +157,7 @@ void init_hotkeys() async {
     Get.find<SettingsController>().setSettings(settings);
   }
   enable_hotkey = hotskeys["enable"];
+  hotkeyEnabledNotifier.value = enable_hotkey == true;
   if (hotskeys['copy_totp'] != null) {
     set_hotkey(null, HotKey.fromJson(hotskeys['copy_totp']), 'copy_totp');
   }
@@ -263,6 +264,9 @@ Future<void> set_hotkey(s_hotkey, hotkey, name) async {
 
 var enable_hotkey_setstate;
 var enable_hotkey;
+/// 热键总开关的可监听副本，用于在关闭时禁用各快捷键按钮。
+final ValueNotifier<bool> hotkeyEnabledNotifier = ValueNotifier<bool>(false);
+
 List<Widget> create_hotkey_btns(context) {
   if (!(isWindows || isMacOS)) return [];
   var s_hotkeys = [
@@ -281,6 +285,7 @@ List<Widget> create_hotkey_btns(context) {
           value: enable_hotkey,
           onChanged: (bool value) async {
             enable_hotkey = value;
+            hotkeyEnabledNotifier.value = value == true;
             var settings = lengcyGetSettings();
             var hotkeys = settings['hotkeys'];
             hotkeys['enable'] = value;
@@ -296,8 +301,12 @@ List<Widget> create_hotkey_btns(context) {
       },
     ),
     ...s_hotkeys.map((_hotkey) {
-      return TextButton(
-        onPressed: () async {
+      return ValueListenableBuilder<bool>(
+        valueListenable: hotkeyEnabledNotifier,
+        builder: (context, enabled, _) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: OutlinedButton(
+        onPressed: !enabled ? null : () async {
           var settings = lengcyGetSettings();
           var hotkeys = settings['hotkeys'];
           var hotkeyData = hotkeys[_hotkey['hotkey']];
@@ -307,7 +316,7 @@ List<Widget> create_hotkey_btns(context) {
             context: context,
             builder: (BuildContext context) {
               return AlertDialog(
-                title: Text('设置${_hotkey['name']}热键'),
+                title: Text('设置${_hotkey['name']}快捷键'),
                 content: HotKeyRecorder(
                   initalHotKey: hotkey,
                   onHotKeyRecorded: (hotKey) {
@@ -336,7 +345,9 @@ List<Widget> create_hotkey_btns(context) {
             },
           );
         },
-        child: Text("设置 " + (_hotkey['name'] as String) + " 热键"),
+        child: Text('设置“${_hotkey['name']}”快捷键'),
+      ),
+      ),
       );
     }).toList(),
   ];

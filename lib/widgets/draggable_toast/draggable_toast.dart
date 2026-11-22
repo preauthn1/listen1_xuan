@@ -435,8 +435,8 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
         // 首次布局时居中定位
         if (_needsInitialCentering) {
           _needsInitialCentering = false;
-          final centeredX =
-              (areaSize.width - widget.config.expandedWidth) / 2;
+          // 从左下角出现并贴边收起：右侧是设置开关和箭头所在的列，避免遮挡。
+          final centeredX = 0.0;
           // 起始放在可用区域底部（FAB 位置），避免压住列表中部的展开箭头。
           final centeredY = areaSize.height - _effectiveExpandedHeight;
           _currentPosition = Offset(

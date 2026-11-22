@@ -94,13 +94,13 @@ class Bilibili extends BaseProvider {
   bool get supportGetUserFavoritePlaylist => true;
 
   @override
-  String get userCreatedPlaylistSectionTitle => '我创建的哔哩哔哩收藏夹';
+  String get userCreatedPlaylistSectionTitle => 'B 站 · 我的收藏夹';
 
   @override
   Widget get userCreatedPlaylistSectionLeading => _bilibiliSectionIcon;
 
   @override
-  String get userFavoritePlaylistSectionTitle => '我追的哔哩哔哩合集';
+  String get userFavoritePlaylistSectionTitle => 'B 站 · 追更合集';
 
   @override
   Widget get userFavoritePlaylistSectionLeading => _bilibiliSectionIcon;

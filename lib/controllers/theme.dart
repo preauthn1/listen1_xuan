@@ -396,10 +396,15 @@ class ThemeController extends GetxController {
           padding: const WidgetStatePropertyAll(controlPadding),
           shape: const WidgetStatePropertyAll(controlShape),
           textStyle: WidgetStatePropertyAll(labelStyle),
-          // 禁用态保持可读（>=4.5:1 的 onSurfaceVariant），不靠低对比灰暗表达。
-          foregroundColor: disabledAware(cs.onPrimary, cs.onSurfaceVariant),
-          backgroundColor:
-              disabledAware(cs.primary, cs.surfaceContainerHighest),
+          // 禁用态按 M3 规范（文字 38%、底色 8%），并配合旁边的原因说明。
+          foregroundColor: disabledAware(
+            cs.onPrimary,
+            cs.onSurface.withValues(alpha: 0.38),
+          ),
+          backgroundColor: disabledAware(
+            cs.primary,
+            cs.onSurface.withValues(alpha: 0.08),
+          ),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -408,7 +413,8 @@ class ThemeController extends GetxController {
           padding: controlPadding,
           shape: controlShape,
           textStyle: labelStyle,
-          disabledForegroundColor: cs.onSurfaceVariant,
+          // 次要按钮禁用态按 M3 规范降到 38%，与可用态明显区分。
+          disabledForegroundColor: cs.onSurface.withValues(alpha: 0.38),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -418,7 +424,16 @@ class ThemeController extends GetxController {
           shape: controlShape,
           textStyle: labelStyle,
           side: BorderSide(color: cs.outline),
-          disabledForegroundColor: cs.onSurfaceVariant,
+          // 次要按钮禁用态按 M3 规范降到 38%，与可用态明显区分。
+          disabledForegroundColor: cs.onSurface.withValues(alpha: 0.38),
+        ).copyWith(
+          side: WidgetStateProperty.resolveWith(
+            (states) => BorderSide(
+              color: states.contains(WidgetState.disabled)
+                  ? cs.onSurface.withValues(alpha: 0.12)
+                  : cs.outline,
+            ),
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -427,7 +442,8 @@ class ThemeController extends GetxController {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           shape: controlShape,
           textStyle: labelStyle,
-          disabledForegroundColor: cs.onSurfaceVariant,
+          // 次要按钮禁用态按 M3 规范降到 38%，与可用态明显区分。
+          disabledForegroundColor: cs.onSurface.withValues(alpha: 0.38),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(

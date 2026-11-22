@@ -35,8 +35,12 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final settingsRoute = top_routeWithName.isNotEmpty &&
-          top_routeWithName.last.name == RouteName.settingsPage;
+      final routeName =
+          top_routeWithName.isEmpty ? null : top_routeWithName.last.name;
+      final settingsRoute = routeName == RouteName.settingsPage;
+      // 其它子页面自带 AppBar（返回 + 标题），标题栏不再重复显示。
+      final canGoBack = settingsRoute;
+      final title = settingsRoute ? '设置' : '';
       final settings = Get.find<SettingsController>();
       return Material(
         color: Theme.of(context).colorScheme.surface,
@@ -47,17 +51,19 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
             children: [
               SizedBox(
                 width: 40,
-                child: IconButton(
-                  tooltip: '返回',
-                  padding: EdgeInsets.zero,
-                  iconSize: 15,
-                  onPressed: routerPop,
-                  icon: const Icon(LucideIcons.chevronLeft),
-                ),
+                child: canGoBack
+                    ? IconButton(
+                        tooltip: '返回',
+                        padding: EdgeInsets.zero,
+                        iconSize: 15,
+                        onPressed: routerPop,
+                        icon: const Icon(LucideIcons.chevronLeft),
+                      )
+                    : null,
               ),
               Expanded(
                 child: Text(
-                  settingsRoute ? '设置' : 'Listen1',
+                  title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -65,12 +71,12 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
               ),
               if (settingsRoute) ...[
                 WebSocketHelper.buildReactiveButton(
-                  tooltip: 'WebSocket服务器',
+                  tooltip: 'WebSocket 服务器',
                   iconSize: 15,
                   padding: EdgeInsets.zero,
                 ),
                 WebSocketClientHelper.buildReactiveButton(
-                  tooltip: 'WebSocket客户端',
+                  tooltip: 'WebSocket 客户端',
                   iconSize: 15,
                   padding: EdgeInsets.zero,
                 ),
@@ -238,11 +244,11 @@ Widget get _leftBar => Scaffold(
             children: [
           ThemeToggleButton(iconSize: 24.0, padding: EdgeInsets.all(0)),
           WebSocketHelper.buildReactiveButton(
-            tooltip: "WebSocket服务器",
+            tooltip: "WebSocket 服务器",
             inMainPage: true,
           ),
           WebSocketClientHelper.buildReactiveButton(
-            tooltip: "WebSocket客户端",
+            tooltip: "WebSocket 客户端",
             inMainPage: true,
           ),
           IconButton(
@@ -371,9 +377,11 @@ Listener _mainContent() => Listener(
                                       ),
 
                                       Positioned(
-                                        top: isWindows || isMacOS ? 5 : -5,
+                                        top: 0,
+                                        bottom: 0,
                                         right: 20,
-                                        child: Obx(
+                                        child: Center(
+                                          child: Obx(
                                           // filterButton 隐藏时仍会保留内容，
                                           // 这样淡出才有东西可以淡（见 filterButton 注释）。
                                           () => AnimatedOpacity(
@@ -385,6 +393,7 @@ Listener _mainContent() => Listener(
                                             ),
                                             child: filterButton,
                                           ),
+                                        ),
                                         ),
                                       ),
                                     ],

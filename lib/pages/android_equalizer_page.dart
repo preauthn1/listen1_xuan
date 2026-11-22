@@ -359,6 +359,16 @@ class _AndroidEqualizerPageState extends State<AndroidEqualizerPage> {
     return indexed;
   }
 
+  static const _presetLabels = {
+    'flat': '平直',
+    'bass_boost': '低音增强',
+    'vocal': '人声',
+    'pop': '流行',
+    'rock': '摇滚',
+    'classical': '古典',
+    'electronic': '电子',
+  };
+
   Widget _buildPresetWrap(EqSetting eqSetting) {
     final keys = eqSetting.equalizers.keys.toList();
     final selected = eqSetting.nowSelected;
@@ -371,7 +381,7 @@ class _AndroidEqualizerPageState extends State<AndroidEqualizerPage> {
         return GestureDetector(
           onLongPress: () => _showPresetActions(name),
           child: ChoiceChip(
-            label: Text(name),
+            label: Text(_presetLabels[name] ?? name),
             selected: isSelected,
             showCheckmark: false,
             onSelected: (_) {
@@ -690,7 +700,7 @@ class _AndroidEqualizerPageState extends State<AndroidEqualizerPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('均衡器设置'),
+        title: const Text('均衡器'),
         leading: BackButton(onPressed: routerPop),
         actions: [
           IconButton(
@@ -744,7 +754,16 @@ class _AndroidEqualizerPageState extends State<AndroidEqualizerPage> {
               ),
               Card(
                 margin: const EdgeInsets.only(top: 8),
-                child: Obx(() => Text(_playController.nowEq.value)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Obx(() {
+                    final now = _playController.nowEq.value;
+                    return Text(
+                      now.isEmpty ? '未启用均衡器（播放时生效）' : now,
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    );
+                  }),
+                ),
               ),
               10.sbh,
               Text(

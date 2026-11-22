@@ -912,8 +912,8 @@ class UpdController extends GetxController {
           .last;
 
       showDebugSnackbar(
-        '本地版本 buildNumber: $localBuildNumber, 最新版本 buildNumber: $latestBuildNumber',
-        null,
+        '版本检查',
+        '本地 $localBuildNumber，最新 $latestBuildNumber',
       );
       // 删除除最新版本外的其他缓存文件
       if (isAndroid || releases.length > 1) {
