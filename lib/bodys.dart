@@ -218,6 +218,7 @@ Future<dynamic> song_dialog(
                     showSuccessSnackbar('专辑已复制到剪切板', null);
                   },
                 ),
+              TrackDownloadMenuTile(trackFor: () => track),
               ListTile(
                 title: Text('添加到歌单'),
                 onTap: () {
@@ -373,7 +374,6 @@ Future<dynamic> song_dialog(
               //     }
               //   },
               // ),
-              TrackDownloadMenuTile(trackFor: () => track),
               ListTile(
                 title: Text('删除本地缓存'),
                 onTap: () async {
