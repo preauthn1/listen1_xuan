@@ -95,56 +95,63 @@ class PlaylistInfoPage extends StatelessWidget {
                           ).hero4playlistItemImg(args.playListInfo),
                           8.sbh,
                           Obx(
-                            () => Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                Expanded(
-                                  flex: 5,
-                                  child: ElevatedButton(
-                                    onPressed: () async {
-                                      if (controller.tracks.isEmpty) {
-                                        return;
-                                      }
-                                      List<Track> trackList = List<Track>.from(
-                                        controller.tracks,
-                                      );
-                                      set_current_playing(trackList);
-                                      playsong(
-                                        controller.tracks[0],
-                                        isByClick: true,
-                                      );
-                                    },
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        '播放全部（共${controller.tracks.length}首）',
-                                        maxLines: 1,
+                            () => Padding(
+                              // 右侧留出与左侧相同的边距，搜索框不再贴着窗口边缘。
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  Expanded(
+                                    flex: 5,
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        if (controller.tracks.isEmpty) {
+                                          return;
+                                        }
+                                        List<Track> trackList =
+                                            List<Track>.from(controller.tracks);
+                                        set_current_playing(trackList);
+                                        playsong(
+                                          controller.tracks[0],
+                                          isByClick: true,
+                                        );
+                                      },
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          '播放全部（共${controller.tracks.length}首）',
+                                          maxLines: 1,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                Expanded(
-                                  flex: 2,
-                                  child: IconButton(
-                                    onPressed: () async {
-                                      List<Track> trackList = List<Track>.from(
-                                        controller.tracks,
-                                      );
-                                      add_current_playing(trackList);
-                                      showSuccessSnackbar('已添加到当前播放列表', null);
-                                    },
-                                    icon: Icon(Icons.add_box_outlined),
+                                  Expanded(
+                                    flex: 2,
+                                    child: IconButton(
+                                      onPressed: () async {
+                                        List<Track> trackList =
+                                            List<Track>.from(controller.tracks);
+                                        add_current_playing(trackList);
+                                        showSuccessSnackbar('已添加到当前播放列表', null);
+                                      },
+                                      icon: Icon(Icons.add_box_outlined),
+                                    ),
                                   ),
-                                ),
-                                Expanded(
-                                  flex: 4,
-                                  child: TextField(
-                                    focusNode: controller.searchFocusNode,
-                                    controller: controller.searchController,
-                                    decoration: InputDecoration(hintText: '搜索'),
+                                  Expanded(
+                                    flex: 4,
+                                    child: TextField(
+                                      focusNode: controller.searchFocusNode,
+                                      controller: controller.searchController,
+                                      decoration: InputDecoration(
+                                        hintText: '搜索',
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -178,7 +185,8 @@ class PlaylistInfoPage extends StatelessWidget {
     PlaylistInfoController controller,
   ) {
     // 每日推荐、私人 FM 每次内容都不同，收藏没有意义；改为提供「换一批」。
-    final isDynamic = controller.listId.startsWith('nedaily_') ||
+    final isDynamic =
+        controller.listId.startsWith('nedaily_') ||
         controller.listId.startsWith('nefm_');
     return [
       if (controller.listId.startsWith('nefm_'))
