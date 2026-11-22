@@ -304,9 +304,10 @@ Widget _loginRow({
       ),
     ],
   );
+  // 统一宽度，让「登录 / Cookie」与「登录」左右边缘对齐。
   final action = FilledButton.tonal(
     onPressed: onPressed,
-    style: _pillStyle(theme),
+    style: _pillStyle(theme, minWidth: 128),
     child: Text(label, maxLines: 1, softWrap: false, style: _noUnderline),
   );
   return Padding(
