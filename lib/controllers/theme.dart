@@ -396,10 +396,15 @@ class ThemeController extends GetxController {
           padding: const WidgetStatePropertyAll(controlPadding),
           shape: const WidgetStatePropertyAll(controlShape),
           textStyle: WidgetStatePropertyAll(labelStyle),
-          // 禁用态保持可读（>=4.5:1 的 onSurfaceVariant），不靠低对比灰暗表达。
-          foregroundColor: disabledAware(cs.onPrimary, cs.onSurfaceVariant),
-          backgroundColor:
-              disabledAware(cs.primary, cs.surfaceContainerHighest),
+          // 禁用态按 M3 规范（文字 38%、底色 8%），并配合旁边的原因说明。
+          foregroundColor: disabledAware(
+            cs.onPrimary,
+            cs.onSurface.withValues(alpha: 0.38),
+          ),
+          backgroundColor: disabledAware(
+            cs.primary,
+            cs.onSurface.withValues(alpha: 0.08),
+          ),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
