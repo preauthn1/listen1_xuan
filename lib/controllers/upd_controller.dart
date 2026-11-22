@@ -933,17 +933,32 @@ class UpdController extends GetxController {
   /// 更新提示的停靠区域：底边让出播放栏。
   static const EdgeInsets _updateToastArea = EdgeInsets.fromLTRB(16, 100, 16, 80);
 
-  /// 桌面端左下角是侧栏的歌单行和操作栏，收起后的圆形按钮会压住它们；
-  /// 改停在内容区右下角，与常见的桌面浮动按钮位置一致。
-  static bool get _updateToastAtEnd => isWindows || isMacOS;
+  /// 桌面端：卡片从内容区右下角弹出；收起时不留悬浮圆点（无论停在哪里
+  /// 都会压住歌单行或内容），改由侧栏操作栏里的「发现新版本」按钮重新打开。
+  static bool get _isDesktopUpdateUi => isWindows || isMacOS;
+  static bool get _updateToastAtEnd => _isDesktopUpdateUi;
+
+  /// 已发现但用户暂未处理的更新，供侧栏按钮显示与重新打开。
+  final Rxn<(GitHubRelease, ReleaseAsset)> pendingUpdate = Rxn();
+  bool _updateDownloading = false;
+
+  void reopenPendingUpdate() {
+    final pending = pendingUpdate.value;
+    if (pending == null) return;
+    _showReleaseUpdateDialog(pending.$1, pending.$2);
+  }
 
   /// 显示 Release 更新对话框
   void _showReleaseUpdateDialog(
     GitHubRelease release,
     ReleaseAsset latestBuild,
   ) {
+    if (_isDesktopUpdateUi) {
+      pendingUpdate.value = (release, latestBuild);
+    }
     // 用于控制下载进度和加载状态
     RxBool isUpdating = false.obs;
+    ever(isUpdating, (bool v) => _updateDownloading = v);
     RxString progressText = '准备下载'.obs;
 
     // 构建进度指示器 widget，支持显示百分比
@@ -988,6 +1003,8 @@ class UpdController extends GetxController {
       config: DraggableToastConfig(
         areaPadding: _updateToastArea,
         startAtEnd: _updateToastAtEnd,
+        // 下载中仍收成进度圆点；其余情况桌面端收起即关闭，入口在侧栏。
+        dismissOnPeek: _isDesktopUpdateUi ? () => !_updateDownloading : null,
         snapThreshold: 60,
         expandedWidth: 300,
         collapsedSize: 46,
