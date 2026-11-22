@@ -220,12 +220,8 @@ class TrackDownloadMenuTile extends StatelessWidget {
     return Obx(() {
       final task = c.taskOf(track.id);
       final done = c.isDownloaded(track.id);
+      // 与菜单里其他行保持同样的左对齐：不放 leading 图标，状态写在标题里。
       return ListTile(
-        leading: Icon(task != null
-            ? Icons.downloading_rounded
-            : done
-                ? Icons.download_done_rounded
-                : Icons.download_rounded),
         title: Text(task != null ? '下载中…' : done ? '重新下载' : '下载'),
         subtitle: Text(done && task == null ? '已保存到 ${c.locationHint}' : c.includeLyricRx ? '歌曲和歌词' : '仅歌曲'),
         onTap: task != null
@@ -237,6 +233,38 @@ class TrackDownloadMenuTile extends StatelessWidget {
                   showInfoSnackbar('已加入下载', track.title, onTap: () => Get.toNamed(RouteName.trackDownloadsPage, id: 1));
                 }
               },
+      );
+    });
+  }
+}
+
+/// 歌曲行标题后的小标记：下载中显示进度圈，已下载显示勾。
+class TrackDownloadBadge extends StatelessWidget {
+  const TrackDownloadBadge({super.key, required this.trackId});
+  final String trackId;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Get.find<TrackDownloadController>();
+    final color = Theme.of(context).colorScheme.primary;
+    return Obx(() {
+      final task = c.taskOf(trackId);
+      if (task != null) {
+        return Padding(
+          padding: const EdgeInsets.only(left: 6),
+          child: SizedBox.square(
+            dimension: 12,
+            child: CircularProgressIndicator(strokeWidth: 1.5, value: task.progress, color: color),
+          ),
+        );
+      }
+      if (!c.isDownloaded(trackId)) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(left: 6),
+        child: Tooltip(
+          message: '已下载',
+          child: Icon(Icons.download_done_rounded, size: 14, color: color),
+        ),
       );
     });
   }
