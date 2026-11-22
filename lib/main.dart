@@ -72,6 +72,7 @@ import 'package:app_links/app_links.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:listen1_xuan/constants/network_defaults.dart';
+import 'package:listen1_xuan/constants/supabase_proxy.dart';
 part 'main_testBtn.dart';
 part 'pages/main/main_widgets.dart';
 part 'pages/main/main_utils.dart';
@@ -84,7 +85,6 @@ const String supabaseDefaultUrl = 'https://jtvxrwybwvgpqobyhaoy.supabase.co';
 /// 注意必须是 **一级** 子域，Cloudflare 免费版证书不覆盖多层子域。
 /// 在「设置 - Supabase 账号 - 使用备用地址」开关切换，重启应用生效。
 const String supabaseBackupUrl = 'https://sb.040905.xyz';
-const String supabaseProxyToken = String.fromEnvironment('SUPABASE_PROXY_TOKEN');
 
 /// 实际使用的地址，在 main() 中按设置决定
 String supabaseUrl = supabaseDefaultUrl;
@@ -201,19 +201,18 @@ Future<void> _initializeAppForHome(SettingsController settingsController) async 
     _startupWindowConfigured = true;
   }
   // 读取「使用备用地址」开关后，才能确定要连哪个 Supabase 地址
-  supabaseUrl = settingsController.supabaseUseBackupUrl
-      ? supabaseBackupUrl
-      : supabaseDefaultUrl;
-  if (settingsController.supabaseUseBackupUrl &&
-      supabaseProxyToken.isEmpty) {
-    throw StateError(
-      '备用 Supabase 地址需要使用 --dart-define=SUPABASE_PROXY_TOKEN 构建',
-    );
+  // 没有中转令牌的构建（fork、本地构建）即使开关曾被打开也回退到直连，
+  // 不在启动时抛错导致应用打不开。
+  final useBackupUrl =
+      settingsController.supabaseUseBackupUrl && supabaseProxyToken.isNotEmpty;
+  if (settingsController.supabaseUseBackupUrl && !useBackupUrl) {
+    debugPrint('未配置 SUPABASE_PROXY_TOKEN，已回退到 Supabase 直连地址');
   }
+  supabaseUrl = useBackupUrl ? supabaseBackupUrl : supabaseDefaultUrl;
   await Supabase.initialize(
     url: supabaseUrl,
     anonKey: supabaseKey,
-    headers: settingsController.supabaseUseBackupUrl
+    headers: useBackupUrl
         ? {'x-proxy-token': supabaseProxyToken}
         : const {},
     authOptions: FlutterAuthClientOptions(
