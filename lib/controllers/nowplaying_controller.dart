@@ -113,6 +113,10 @@ class NowPlayingPageController extends GetxController {
     isSearching.value = !isSearching.value;
     if (!isSearching.value) {
       clearSearch();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        searchFocusNode.requestFocus();
+      });
     }
   }
 
