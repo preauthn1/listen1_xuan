@@ -36,13 +36,17 @@ class Github {
   }
 
   static Future<Map<String, dynamic>> _requestDeviceCode() async {
-    final response = await _postGithub('$OAUTH_URL/device/code', {
+    // 设备码端点是 /login/device/code（不在 /login/oauth 下）。
+    final response = await _postGithub('https://github.com/login/device/code', {
       'client_id': clientId,
       'scope': 'gist',
     });
     final data = _asJsonMap(response.data);
-    if (response.statusCode != 200) {
-      throw FormatException(data['error_description'] ?? data['error'] ?? '设备授权不可用');
+    if (response.statusCode != 200 || data['error'] != null) {
+      throw _GithubDeviceFlowError(
+        '${data['error'] ?? response.statusCode}',
+        '${data['error_description'] ?? '设备授权不可用'}',
+      );
     }
     for (final key in ['device_code', 'user_code', 'verification_uri']) {
       if (data[key] is! String || (data[key] as String).isEmpty) {
@@ -166,11 +170,22 @@ class Github {
           interval: (device['interval'] as num?)?.toInt() ?? 5,
         ),
       );
-    } catch (_) {
+    } catch (e) {
       status.value = 0;
-      showErrorSnackbar('登录失败', 'GitHub 设备授权不可用，请稍后重试');
+      // 设备授权失败（例如该 OAuth 应用未开启 Device Flow、网络不可达）时，
+      // 改用个人访问令牌登录，并告诉用户真实原因，而不是笼统的「稍后重试」。
+      final reason = e is _GithubDeviceFlowError && e.code == 'device_flow_disabled'
+          ? '此应用的 GitHub 设备授权未开启'
+          : e is _GithubDeviceFlowError
+              ? e.description
+              : '无法连接 GitHub 设备授权服务';
+      Get.dialog(GithubTokenDialog(reason: reason));
     }
   }
+
+  /// 用个人访问令牌登录：只需要 gist 权限，令牌只保存在本机设置中。
+  static Future<void> loginWithToken(String token, {VoidCallback? onCompleted}) =>
+      _completeDeviceAuthorization(token, onCompleted: onCompleted);
 
   static int getStatus() => status.value;
 
@@ -636,6 +651,116 @@ class _GithubDeviceAuthDialogState extends State<GithubDeviceAuthDialog> {
             Navigator.of(context).pop();
           },
           child: const Text('取消'),
+        ),
+      ],
+    );
+  }
+}
+
+class _GithubDeviceFlowError implements Exception {
+  const _GithubDeviceFlowError(this.code, this.description);
+  final String code;
+  final String description;
+  @override
+  String toString() => '$code: $description';
+}
+
+class GithubTokenDialog extends StatefulWidget {
+  const GithubTokenDialog({super.key, required this.reason});
+  final String reason;
+
+  @override
+  State<GithubTokenDialog> createState() => _GithubTokenDialogState();
+}
+
+class _GithubTokenDialogState extends State<GithubTokenDialog> {
+  static final Uri _newTokenUrl = Uri.parse(
+    'https://github.com/settings/tokens/new?scopes=gist&description=Listen1%20Xuan',
+  );
+  final _controller = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final token = _controller.text.trim();
+    if (token.isEmpty) {
+      setState(() => _error = '请先粘贴令牌');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await Github.loginWithToken(token, onCompleted: () {
+        if (mounted) Navigator.of(context).pop();
+        Get.find<SettingsController>().refreshLoginData();
+      });
+    } catch (_) {
+      Github.status.value = 0;
+      if (mounted) setState(() => _error = '令牌无效或已过期，请确认勾选了 gist 权限');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('使用令牌登录 GitHub'),
+      scrollable: true,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('${widget.reason}，可以改用个人访问令牌登录。'),
+            const SizedBox(height: 8),
+            Text(
+              '在 GitHub 创建一个只勾选 gist 权限的令牌，复制后粘贴到下面。'
+              '令牌只保存在本机。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              obscureText: true,
+              enableSuggestions: false,
+              autocorrect: false,
+              decoration: InputDecoration(
+                labelText: '个人访问令牌',
+                errorText: _error,
+                border: const OutlineInputBorder(),
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => g_launchURL(_newTokenUrl),
+          child: const Text('创建令牌'),
+        ),
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _submit,
+          child: _saving
+              ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('验证并保存'),
         ),
       ],
     );
