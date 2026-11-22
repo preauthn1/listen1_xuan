@@ -10,6 +10,7 @@ class MyPlaylist extends StatefulWidget {
 class _MyPlaylistState extends State<MyPlaylist> {
   bool _isExpandedMy = true;
   bool _isExpandedFav = false;
+  bool _isExpandedRecommend = true;
 
   /// 各平台“我的歌单”分组的加载状态，key 为 provider.name。
   final Map<String, _ProviderPlaylistSection> _providerSections = {};
@@ -149,6 +150,67 @@ class _MyPlaylistState extends State<MyPlaylist> {
               ),
             ],
           ),
+        ).sbh(sizeHeight),
+      ),
+    );
+  }
+
+  /// 「为你推荐」里的入口行：与歌单行同高，用图标块代替封面。
+  Widget _buildShortcutTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required double availableWidth,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final iconOnly = _isIconOnlyMode(availableWidth);
+    final compact = _isCompactMode(availableWidth);
+    final size = _coverSize(availableWidth);
+    const sizeHeight = 56.0;
+    final badge = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Icon(icon, size: 24, color: theme.colorScheme.onPrimaryContainer),
+    );
+    return Tooltip(
+      message: title,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: iconOnly ? 0.0 : (compact ? 8.0 : 12.0),
+          ),
+          child: iconOnly
+              ? Center(child: badge)
+              : Row(
+                  children: [
+                    SizedBox(width: sizeHeight, child: Center(child: badge)),
+                    SizedBox(width: compact ? 8.0 : 12.0),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if (!compact)
+                            Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
         ).sbh(sizeHeight),
       ),
     );
@@ -559,6 +621,54 @@ class _MyPlaylistState extends State<MyPlaylist> {
                             ),
                           ),
                         ),
+                        Obx(() {
+                          final netease = providers.firstWhereOrNull(
+                            (p) => p.name == 'netease',
+                          );
+                          if (netease == null ||
+                              netease.loginStatus.value != LoginStatus.loggedIn) {
+                            return const SizedBox.shrink();
+                          }
+                          return _buildExpandableSection(
+                            leading: const Icon(Icons.auto_awesome_rounded, size: 18),
+                            title: '网易云 · 为你推荐',
+                            isExpanded: _isExpandedRecommend,
+                            availableWidth: availableWidth,
+                            onExpandedChanged: (expanded) {
+                              setState(() => _isExpandedRecommend = expanded);
+                            },
+                            body: Column(
+                              children: [
+                                _buildShortcutTile(
+                                  icon: Icons.today_rounded,
+                                  title: '每日推荐',
+                                  subtitle: '每天 6 点更新',
+                                  availableWidth: availableWidth,
+                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
+                                    playListInfo: PlayListInfo(
+                                      id: 'nedaily_today',
+                                      title: '每日推荐',
+                                    ),
+                                    isMy: false,
+                                  )),
+                                ),
+                                _buildShortcutTile(
+                                  icon: Icons.radio_rounded,
+                                  title: '私人 FM',
+                                  subtitle: '按口味连续推荐',
+                                  availableWidth: availableWidth,
+                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
+                                    playListInfo: PlayListInfo(
+                                      id: 'nefm_personal',
+                                      title: '私人 FM',
+                                    ),
+                                    isMy: false,
+                                  )),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
                         ...providers.expand(
                           (p) => [
                             if (p.supportGetUserCreatedPlaylist)
