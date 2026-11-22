@@ -1,0 +1,89 @@
+name: Android debug emulator verification
+
+# 只在 verify 分支上运行：构建 debug APK（不签发布密钥、不上传 APK），
+# 在模拟器里安装、用 adb 走一遍界面，上传截图与 logcat 供核对。
+on:
+  push:
+    branches: [verify/android-emulator]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-emulator-verify
+  cancel-in-progress: true
+
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      TARGET_REF: android-ux
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          path: harness
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          ref: ${{ env.TARGET_REF }}
+          path: app
+
+      - name: Record app commit
+        working-directory: app
+        run: git rev-parse HEAD | tee "$RUNNER_TEMP/app_sha.txt"
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: stable
+          flutter-version: "3.41.9"
+          cache: true
+
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+
+      - name: Configure lite build without Firebase secrets
+        working-directory: app
+        run: |
+          python3 scripts/configure_build.py firebase stub
+          bash scripts/build.sh without
+          flutter pub get
+
+      - name: Build debug APK (x86_64 only)
+        working-directory: app
+        run: flutter build apk --debug --target-platform android-x64 --dart-define=gitHash=$(cut -c1-7 "$RUNNER_TEMP/app_sha.txt")
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run on emulator
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6000M
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          disable-animations: true
+          script: bash harness/.github/scripts/android_emulator_tour.sh app/build/app/outputs/flutter-apk/app-debug.apk out
+
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: android-emulator-tour
+          path: out/
+          if-no-files-found: warn
+          retention-days: 7
