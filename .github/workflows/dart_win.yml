@@ -36,12 +36,22 @@ jobs:
           echo "SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}" >> $env:GITHUB_ENV
           echo "GITHASH (前7位): $GITHASH"
         shell: pwsh
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.13'
+      # ilammy/msvc-dev-cmd has no Node 24 release; load the same x64 developer
+      # environment from vswhere + vcvars64 and export it to later steps.
       - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'Visual Studio with VC tools not found' }
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           channel: stable
@@ -81,14 +91,14 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /O+ /DAPP_VERSION="$env:APP_VERSION" /DBUILD_DIR="$env:BUILD_DIR" /DINSTALLER_OUTPUT_DIR="$env:INSTALLER_OUTPUT_DIR" /DINSTALLER_NAME="$env:INSTALLER_NAME" inno_build.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Installer Artifact (${{ matrix.label }})
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.installer_artifact }}
           path: release_artifacts/${{ matrix.installer }}-${{ env.GITHASH }}.exe
           if-no-files-found: error
       # Canary updater extracts the Actions archive directly (no nested ZIP).
       - name: Upload portable application
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.build_artifact }}
           path: build/windows/x64/runner/Release/**
@@ -102,8 +112,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: windows-build-artifact*
           path: bundles
@@ -137,7 +147,7 @@ jobs:
 
       # 上传新的资产到最新 Release（带 FFmpeg 版 + 精简版）
       - name: Upload New Asset to Release
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           tag_name: ${{ github.ref_name }}
           files: |
