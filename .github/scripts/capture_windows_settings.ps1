@@ -49,7 +49,7 @@ for($i=0;$i -lt 60;$i++){Start-Sleep 1;$p.Refresh();if($p.MainWindowHandle -ne [
 $w=$p.MainWindowHandle
 Start-Sleep 14
 Step darkhome { Snap '32-dark-home' }
-Step darkset { Settings; Snap '30-dark-settings'; Click 500 117 2; Snap '31-dark-thirdparty' }
-Step darkqueue { Home; Click 704 661 2; Snap '33-dark-queue'; Esc }
+Step darkqueue { Click 704 661 2; Snap '33-dark-queue'; Esc; Esc }
+Step darkset { Settings; Snap '30-dark-settings'; Click 500 289 2; Snap '31-dark-desktop'; Click 500 289 2 }
 Step wide { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1500,850,0x40)|Out-Null; Start-Sleep 3; Snap '40-wide-dark-home' }
 Stop-Process $p -Force -ErrorAction SilentlyContinue
