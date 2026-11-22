@@ -69,7 +69,12 @@ Future<bool> xuanEnsureStoragePermission() async {
 }
 
 Future<Directory> xuanGetdataDirectory() async {
-  if (isAndroid) {
+  // 缓存与配置默认写在应用专属目录，不需要存储权限。
+  // 只有用户把缓存目录改到公共路径时，才按原逻辑确认权限。
+  final configuredPath = Get.isRegistered<SettingsController>()
+      ? Get.find<SettingsController>().cacheDirectoryPath
+      : '';
+  if (isAndroid && configuredPath.isNotEmpty) {
     if (!await xuanEnsureStoragePermission()) {
       // 无界面引擎里没有可展示的提示，也不应阻塞播放流程
       if (!isHeadlessEngine) {
@@ -82,9 +87,6 @@ Future<Directory> xuanGetdataDirectory() async {
     }
   }
 
-  final configuredPath = Get.isRegistered<SettingsController>()
-      ? Get.find<SettingsController>().cacheDirectoryPath
-      : '';
   if (configuredPath.isEmpty) {
     return await xuanGetdownloadDirectory();
   }
@@ -100,6 +102,33 @@ Future<Directory> xuanGetDefaultCacheDirectory() async {
   return await xuanGetdownloadDirectory();
 }
 
+/// 旧版本固定使用的公共目录；已有缓存和安装包都在这里。
+const String _legacyAndroidDownloadRoot = '/storage/emulated/0/Download';
+Directory? _androidBaseDirectoryCache;
+
+/// Android 的默认根目录。
+/// - 老用户：公共目录下已有 Listen1 文件夹且权限已授予，继续沿用，
+///   避免缓存歌曲、歌词和安装包“消失”。只查询状态，不弹权限框。
+/// - 新用户：使用应用专属外部目录（getExternalFilesDir），无需任何存储权限，
+///   卸载时由系统清理。
+Future<Directory?> _androidBaseDirectory() async {
+  if (_androidBaseDirectoryCache != null) return _androidBaseDirectoryCache;
+  Directory? result;
+  try {
+    final legacy = Directory(p.join(_legacyAndroidDownloadRoot, downDirName));
+    final granted = await Permission.manageExternalStorage.isGranted ||
+        await Permission.storage.isGranted;
+    if (granted && await legacy.exists()) {
+      result = Directory(_legacyAndroidDownloadRoot);
+    }
+  } catch (e) {
+    debugPrint('检查旧缓存目录失败: $e');
+  }
+  result ??= await getExternalStorageDirectory();
+  _androidBaseDirectoryCache = result;
+  return result;
+}
+
 ///若传入 path，则返回 dataDirectory/path 的字符串路径，否则返回 Directory 对象
 Future<dynamic> xuanGetdownloadDirectory({String? path}) async {
   Directory? tempDir;
@@ -108,7 +137,7 @@ Future<dynamic> xuanGetdownloadDirectory({String? path}) async {
   } else if (isMacOS) {
     tempDir = await getDownloadsDirectory();
   } else if (isAndroid) {
-    tempDir = Directory('/storage/emulated/0/Download');
+    tempDir = await _androidBaseDirectory();
   } else if (isIos) {
     // tempDir = await getdirectory
   }

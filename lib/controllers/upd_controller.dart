@@ -12,7 +12,6 @@ import 'package:listen1_xuan/widgets/ext/ext_widget.dart';
 import 'package:listen1_xuan/widgets/motor_progress_indicator_xuan.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
-import 'package:permission_handler/permission_handler.dart';
 import 'package:system_info3/system_info3.dart';
 
 import '../funcs.dart';
@@ -375,11 +374,9 @@ class UpdController extends GetxController {
 
   Future<void> downloadArtifactAndroid() async {
     try {
-      if (!await Permission.manageExternalStorage.request().isGranted &&
-          !await Permission.storage.request().isGranted) {
-        throw Exception("没有权限访问存储空间");
-      }
-
+      // 安装包写在 xuanGetdownloadDirectory()：新用户为应用专属目录，
+      // 由 install_plugin 的 FileProvider（external-files-path）提供给安装器，
+      // 不需要「所有文件访问」权限；老用户沿用已授权的公共目录。
       final token = await getGithubToken();
       if (token == null) {
         showWarningSnackbar('请先登录Github', null);
@@ -735,8 +732,7 @@ class UpdController extends GetxController {
   }
 
   Future<void> delAndroidApkCache() async {
-    if (await Permission.manageExternalStorage.request().isGranted ||
-        await Permission.storage.request().isGranted) {
+    try {
       Directory tempPath = await xuanGetdownloadDirectory();
       final filelist = tempPath
           .listSync()
@@ -758,8 +754,8 @@ class UpdController extends GetxController {
         }
       }
       showSuccessSnackbar('清理成功', null);
-    } else {
-      showErrorSnackbar('没有权限访问存储空间', null);
+    } catch (e) {
+      showErrorSnackbar('清理安装包缓存失败', '$e');
     }
   }
 
