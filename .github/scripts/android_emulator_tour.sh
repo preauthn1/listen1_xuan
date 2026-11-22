@@ -202,9 +202,10 @@ adb shell input keyevent KEYCODE_BACK; sleep 2
 tap_text '我的' && sleep 2
 tap_text '设置' && sleep 4
 # 展开状态会被记住：点一次没出现入口就再点一次
+# 「下载管理」是缓存分组的第一行，展开后不滚动直接点；没找到则说明分组被收起，再点一次。
 for attempt in 1 2; do
   tap_text '缓存' && sleep 3
-  adb shell input swipe 540 1500 540 1000 300; sleep 2
+  snap "19a-cache-$attempt"
   tap_text '下载管理.*' && break
 done
 sleep 4
