@@ -660,7 +660,13 @@ class _MyHomePageState extends State<MyHomePage>
               resizeToAvoidBottomInset: false,
               backgroundColor:
                   createThemeController().playHBackgroundColor.value,
-              body: Stack(
+              // 手机横屏时左右可能有挖孔/圆角，内容整体避开，背景色铺满。
+              body: SafeArea(
+                top: false,
+                bottom: false,
+                left: isMobile,
+                right: isMobile,
+                child: Stack(
                 children: [
                   Positioned.fill(
                     child: Column(
@@ -729,6 +735,7 @@ class _MyHomePageState extends State<MyHomePage>
                     // 竖屏状态下添加额外的占位空间
                   ),
                 ],
+              ),
               ),
               // floatingActionButton:
               // FloatingActionButton(
