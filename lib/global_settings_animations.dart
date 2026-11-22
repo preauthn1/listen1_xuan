@@ -303,7 +303,9 @@ List<Widget> create_hotkey_btns(context) {
     ...s_hotkeys.map((_hotkey) {
       return ValueListenableBuilder<bool>(
         valueListenable: hotkeyEnabledNotifier,
-        builder: (context, enabled, _) => TextButton(
+        builder: (context, enabled, _) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: OutlinedButton(
         onPressed: !enabled ? null : () async {
           var settings = lengcyGetSettings();
           var hotkeys = settings['hotkeys'];
@@ -344,6 +346,7 @@ List<Widget> create_hotkey_btns(context) {
           );
         },
         child: Text('设置“${_hotkey['name']}”快捷键'),
+      ),
       ),
       );
     }).toList(),
