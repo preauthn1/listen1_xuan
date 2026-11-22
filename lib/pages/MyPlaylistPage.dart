@@ -498,87 +498,90 @@ class _MyPlaylistState extends State<MyPlaylist> {
             : settingsController.songReplaceFabMiniRx.value
             ? settingsController.songReplaceFabLocation.fabMiniLocation
             : settingsController.songReplaceFabLocation.fabLocation,
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            final availableWidth = constraints.maxWidth;
-            return PageScrollToTop(builder: (context, pageScrollController, pageListController) => SingleChildScrollView(
-          controller: pageScrollController,
-              child: Column(
-                children: [
-                  _buildExpandableSection(
-                    leading: const Icon(Icons.library_music, size: 18),
-                    title: '我创建的歌单',
-                    isExpanded: _isExpandedMy,
-                    availableWidth: availableWidth,
-                    onExpandedChanged: (expanded) {
-                      setState(() {
-                        _isExpandedMy = expanded;
-                      });
-                    },
-                    body: Obx(
-                      () => Column(
-                        children: Get.find<MyPlayListController>()
-                            .playerlists
-                            .values
-                            .toList()
-                            .map(
-                              (playlist) => _buildPlaylistTile(
-                                playlist: playlist,
-                                isMy: true,
-                                availableWidth: availableWidth,
+        resizeToAvoidBottomInset: false,
+        body: WidthLayoutBuilder(
+          builder: (context, availableWidth) {
+            return PageScrollToTop(
+              builder: (context, pageScrollController, pageListController) =>
+                  SingleChildScrollView(
+                    controller: pageScrollController,
+                    child: Column(
+                      children: [
+                        _buildExpandableSection(
+                          leading: const Icon(Icons.library_music, size: 18),
+                          title: '我创建的歌单',
+                          isExpanded: _isExpandedMy,
+                          availableWidth: availableWidth,
+                          onExpandedChanged: (expanded) {
+                            setState(() {
+                              _isExpandedMy = expanded;
+                            });
+                          },
+                          body: Obx(
+                            () => Column(
+                              children: Get.find<MyPlayListController>()
+                                  .playerlists
+                                  .values
+                                  .toList()
+                                  .map(
+                                    (playlist) => _buildPlaylistTile(
+                                      playlist: playlist,
+                                      isMy: true,
+                                      availableWidth: availableWidth,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ),
+                        ),
+                        _buildExpandableSection(
+                          leading: const Icon(Icons.star, size: 18),
+                          title: '我收藏的歌单',
+                          isExpanded: _isExpandedFav,
+                          availableWidth: availableWidth,
+                          onExpandedChanged: (expanded) {
+                            setState(() {
+                              _isExpandedFav = expanded;
+                            });
+                          },
+                          body: Obx(
+                            () => Column(
+                              children: Get.find<MyPlayListController>()
+                                  .favoriteplayerlists
+                                  .values
+                                  .map(
+                                    (playlist) => _buildPlaylistTile(
+                                      playlist: playlist,
+                                      isMy: false,
+                                      availableWidth: availableWidth,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ),
+                        ),
+                        ...providers.expand(
+                          (p) => [
+                            if (p.supportGetUserCreatedPlaylist)
+                              _buildProviderSection(
+                                p,
+                                _UserPlaylistType.created,
+                                availableWidth,
                               ),
-                            )
-                            .toList(),
-                      ),
+                            if (p.supportGetUserFavoritePlaylist)
+                              _buildProviderSection(
+                                p,
+                                _UserPlaylistType.favorite,
+                                availableWidth,
+                              ),
+                          ],
+                        ),
+                        // 预留底部浮动按钮的位置，最后一个分组不会被遮住。
+                        const SizedBox(height: 72),
+                      ],
                     ),
                   ),
-                  _buildExpandableSection(
-                    leading: const Icon(Icons.star, size: 18),
-                    title: '我收藏的歌单',
-                    isExpanded: _isExpandedFav,
-                    availableWidth: availableWidth,
-                    onExpandedChanged: (expanded) {
-                      setState(() {
-                        _isExpandedFav = expanded;
-                      });
-                    },
-                    body: Obx(
-                      () => Column(
-                        children: Get.find<MyPlayListController>()
-                            .favoriteplayerlists
-                            .values
-                            .map(
-                              (playlist) => _buildPlaylistTile(
-                                playlist: playlist,
-                                isMy: false,
-                                availableWidth: availableWidth,
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ),
-                  ),
-                  ...providers.expand(
-                    (p) => [
-                      if (p.supportGetUserCreatedPlaylist)
-                        _buildProviderSection(
-                          p,
-                          _UserPlaylistType.created,
-                          availableWidth,
-                        ),
-                      if (p.supportGetUserFavoritePlaylist)
-                        _buildProviderSection(
-                          p,
-                          _UserPlaylistType.favorite,
-                          availableWidth,
-                        ),
-                    ],
-                  ),
-                  // 预留底部浮动按钮的位置，最后一个分组不会被遮住。
-                  const SizedBox(height: 72),
-                ],
-              ),
-            ));
+            );
           },
         ),
       ),
