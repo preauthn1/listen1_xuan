@@ -14,7 +14,7 @@ import 'package:listen1_xuan/provider/loweb.dart';
 import 'package:listen1_xuan/widgets/ext/ext_hero.dart';
 import 'package:listen1_xuan/widgets/ext/ext_widget.dart';
 import 'package:listen1_xuan/widgets/page_scroll_to_top.dart';
-import 'package:marquee/marquee.dart';
+import 'package:listen1_xuan/widgets/overflow_marquee.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -55,20 +55,11 @@ class PlaylistInfoPage extends StatelessWidget {
                         enabled: controller.loading.value,
                         child: SizedBox(
                           height: 48,
-                          child: Marquee(
+                          child: OverflowMarquee(
                             text: controller.loadFailed.value
                                 ? '加载失败'
                                 : controller.result.info.title ?? "加载失败",
-                            style: TextStyle(fontSize: 16),
-                            scrollAxis: Axis.horizontal,
-                            blankSpace: 20.0,
-                            velocity: 50.0,
-                            pauseAfterRound: Duration(seconds: 1),
-                            startPadding: 10.0,
-                            accelerationDuration: Duration(seconds: 1),
-                            accelerationCurve: Curves.linear,
-                            decelerationDuration: Duration(milliseconds: 500),
-                            decelerationCurve: Curves.easeOut,
+                            style: const TextStyle(fontSize: 16),
                           ),
                         ),
                       ),
@@ -104,56 +95,63 @@ class PlaylistInfoPage extends StatelessWidget {
                           ).hero4playlistItemImg(args.playListInfo),
                           8.sbh,
                           Obx(
-                            () => Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                Expanded(
-                                  flex: 5,
-                                  child: ElevatedButton(
-                                    onPressed: () async {
-                                      if (controller.tracks.isEmpty) {
-                                        return;
-                                      }
-                                      List<Track> trackList = List<Track>.from(
-                                        controller.tracks,
-                                      );
-                                      set_current_playing(trackList);
-                                      playsong(
-                                        controller.tracks[0],
-                                        isByClick: true,
-                                      );
-                                    },
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        '播放全部（共${controller.tracks.length}首）',
-                                        maxLines: 1,
+                            () => Padding(
+                              // 右侧留出与左侧相同的边距，搜索框不再贴着窗口边缘。
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  Expanded(
+                                    flex: 5,
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        if (controller.tracks.isEmpty) {
+                                          return;
+                                        }
+                                        List<Track> trackList =
+                                            List<Track>.from(controller.tracks);
+                                        set_current_playing(trackList);
+                                        playsong(
+                                          controller.tracks[0],
+                                          isByClick: true,
+                                        );
+                                      },
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          '播放全部（共${controller.tracks.length}首）',
+                                          maxLines: 1,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                Expanded(
-                                  flex: 2,
-                                  child: IconButton(
-                                    onPressed: () async {
-                                      List<Track> trackList = List<Track>.from(
-                                        controller.tracks,
-                                      );
-                                      add_current_playing(trackList);
-                                      showSuccessSnackbar('已添加到当前播放列表', null);
-                                    },
-                                    icon: Icon(Icons.add_box_outlined),
+                                  Expanded(
+                                    flex: 2,
+                                    child: IconButton(
+                                      onPressed: () async {
+                                        List<Track> trackList =
+                                            List<Track>.from(controller.tracks);
+                                        add_current_playing(trackList);
+                                        showSuccessSnackbar('已添加到当前播放列表', null);
+                                      },
+                                      icon: Icon(Icons.add_box_outlined),
+                                    ),
                                   ),
-                                ),
-                                Expanded(
-                                  flex: 4,
-                                  child: TextField(
-                                    focusNode: controller.searchFocusNode,
-                                    controller: controller.searchController,
-                                    decoration: InputDecoration(hintText: '搜索'),
+                                  Expanded(
+                                    flex: 4,
+                                    child: TextField(
+                                      focusNode: controller.searchFocusNode,
+                                      controller: controller.searchController,
+                                      decoration: InputDecoration(
+                                        hintText: '搜索',
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -186,8 +184,19 @@ class PlaylistInfoPage extends StatelessWidget {
     BuildContext context,
     PlaylistInfoController controller,
   ) {
+    // 每日推荐、私人 FM 每次内容都不同，收藏没有意义；改为提供「换一批」。
+    final isDynamic =
+        controller.listId.startsWith('nedaily_') ||
+        controller.listId.startsWith('nefm_');
     return [
+      if (controller.listId.startsWith('nefm_'))
+        IconButton(
+          tooltip: '换一批',
+          icon: const Icon(Icons.shuffle_rounded),
+          onPressed: () => controller.loadData(),
+        ),
       IconButton(
+        tooltip: '保存为我的歌单',
         icon: Icon(Icons.add),
         onPressed: () async {
           try {
@@ -205,6 +214,7 @@ class PlaylistInfoPage extends StatelessWidget {
       ),
       controller.isMy
           ? IconButton(
+              tooltip: '删除歌单',
               icon: Icon(Icons.delete),
               onPressed: () {
                 showDialog(
@@ -237,7 +247,10 @@ class PlaylistInfoPage extends StatelessWidget {
                 );
               },
             )
+          : isDynamic
+          ? const SizedBox.shrink()
           : IconButton(
+              tooltip: '在浏览器中打开',
               icon: Icon(Icons.link),
               onPressed: () {
                 final sourceUrl = controller.result.info.source_url;
@@ -250,6 +263,7 @@ class PlaylistInfoPage extends StatelessWidget {
             ),
       controller.isMy
           ? IconButton(
+              tooltip: '编辑歌单',
               icon: Icon(Icons.edit),
               onPressed: () async {
                 setInAppHotKeyEnable(false);
@@ -306,8 +320,11 @@ class PlaylistInfoPage extends StatelessWidget {
                 setInAppHotKeyEnable(true);
               },
             )
+          : isDynamic
+          ? const SizedBox.shrink()
           : Obx(
               () => IconButton(
+                tooltip: controller.isFav.value ? '取消收藏' : '收藏歌单',
                 icon: controller.isFav.value
                     ? Icon(Icons.star)
                     : Icon(Icons.star_border),
