@@ -8,24 +8,6 @@ String _searchHintText(String? tip) => startupTipsService.searchHintText(
 Widget _leftBarTitleDragArea(Widget child) =>
     isWindows || isMacOS ? DragToMoveArea(child: child) : child;
 
-/// Windows 标题栏显示的当前页面名；首页留空，侧栏已有应用名。
-const _routeTitles = <String?, String>{
-  RouteName.settingsPage: '设置',
-  RouteName.searchPage: '搜索',
-  RouteName.nowPlayingPage: '当前播放',
-  RouteName.lyricPage: '歌词',
-  RouteName.settingsChangelogPage: '更新日志',
-  RouteName.settingsReadmePage: '说明文档',
-  RouteName.settingsTipsPage: '使用技巧',
-  RouteName.downloadPage: '缓存文件',
-  RouteName.supabaseLoginPage: 'Supabase 登录',
-  RouteName.supabasePasswordLoginPage: 'Supabase 登录',
-  RouteName.cacheNamingPage: '缓存命名方式',
-  RouteName.equalizerPage: '均衡器',
-  RouteName.songReplacePage: '歌曲替换',
-  RouteName.onlineFeedbackPage: '在线反馈',
-};
-
 class _WindowsTitleBar extends StatefulWidget {
   const _WindowsTitleBar();
 
@@ -56,8 +38,9 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
       final routeName =
           top_routeWithName.isEmpty ? null : top_routeWithName.last.name;
       final settingsRoute = routeName == RouteName.settingsPage;
-      final canGoBack = routeName != null && routeName != RouteName.defaultPage;
-      final title = _routeTitles[routeName] ?? '';
+      // 其它子页面自带 AppBar（返回 + 标题），标题栏不再重复显示。
+      final canGoBack = settingsRoute;
+      final title = settingsRoute ? '设置' : '';
       final settings = Get.find<SettingsController>();
       return Material(
         color: Theme.of(context).colorScheme.surface,
