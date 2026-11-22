@@ -627,6 +627,13 @@ void _showOpacityDialog() {
 
 List<Widget> get cacheSettingsTiles {
   final tiles = <Widget>[
+    ListTile(
+      leading: const Icon(Icons.download_for_offline_outlined),
+      title: const Text('下载管理'),
+      subtitle: Text('下载到本地的歌曲和歌词 · ${Get.find<TrackDownloadController>().locationHint}'),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => Get.toNamed(RouteName.trackDownloadsPage, id: 1),
+    ),
     Obx(() {
       WebSocketClientController wscc = Get.find<WebSocketClientController>();
       return ElevatedButton(

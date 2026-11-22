@@ -49,6 +49,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'constants/supabase_proxy.dart';
+import 'controllers/track_download_controller.dart';
 import 'widgets/cookie_import_dialog.dart';
 import 'package:dio/dio.dart';
 import 'package:crypto/crypto.dart';
