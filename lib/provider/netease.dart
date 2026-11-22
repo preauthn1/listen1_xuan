@@ -30,7 +30,9 @@ enum NePlaylistType {
   playlist('neplaylist'),
   album('nealbum'),
   artist('neartist'),
-  dj('nedj');
+  dj('nedj'),
+  daily('nedaily'),
+  fm('nefm');
 
   final String prefix;
   const NePlaylistType(this.prefix);
@@ -115,6 +117,13 @@ class Netease extends BaseProvider {
     return CookieUtils.getCookieValue(cookies, '__csrf') ?? '';
   }
 
+  static const String _anonymousCsrf = '1234567890123456';
+
+  Future<String> _csrfOrAnonymous() async {
+    final csrf = await getCsrf();
+    return csrf.isEmpty ? _anonymousCsrf : csrf;
+  }
+
   Future<dynamic> dioGetWithCookieAndCsrf(String url) async {
     final csrf = await getCsrf();
     final separator = url.contains('?') ? '&' : '?';
@@ -135,10 +144,9 @@ class Netease extends BaseProvider {
     String url,
     dynamic data,
   ) async {
-    final csrf = await getCsrf();
-    if (csrf.isEmpty) {
-      throw const FormatException('网易云 Cookie 缺少 CSRF token');
-    }
+    // 未登录时网易云接口接受任意 16 位 csrf，用于浏览公开歌单；
+    // 与上游行为一致。登录态接口（账号信息等）另有 getUser 判断。
+    final csrf = await _csrfOrAnonymous();
     final separator = url.contains('?') ? '&' : '?';
     final targetUrl =
         '$url$separator${Uri(queryParameters: {'csrf_token': csrf}).query}';
@@ -442,6 +450,106 @@ class Netease extends BaseProvider {
     return PlayList.fromJson({'tracks': tracks, 'info': info});
   }
 
+  /// 歌曲对象（新版字段 ar/al 或旧版字段 artists/album）转成曲目 JSON。
+  Map<String, dynamic>? _neSongToTrack(dynamic song) {
+    if (song is! Map) return null;
+    final id = song['id'];
+    if (id == null) return null;
+    final artists = (song['ar'] ?? song['artists']) as List? ?? const [];
+    final album = (song['al'] ?? song['album']) as Map? ?? const {};
+    final artist = artists.isNotEmpty && artists.first is Map ? artists.first as Map : const {};
+    return {
+      'id': '${NeTrackType.track.prefix}_$id',
+      'title': song['name'],
+      'artist': artists
+          .whereType<Map>()
+          .map((a) => a['name'])
+          .whereType<String>()
+          .join(' / '),
+      'artist_id': 'neartist_${artist['id']}',
+      'album': album['name'],
+      'album_id': 'nealbum_${album['id']}',
+      'source': name,
+      'source_url': 'https://music.163.com/#/song?id=$id',
+      'img_url': album['picUrl'],
+    };
+  }
+
+  Future<void> _requireNeteaseLogin() async {
+    if (await getUser() == null) {
+      throw const FormatException('需要先登录网易云音乐');
+    }
+  }
+
+  /// 每日推荐歌曲（需要登录，每天 6 点更新）。
+  Future<PlayList> neDailyRecommend() async {
+    await _requireNeteaseLogin();
+    final response = await dioPostWithCookieAndCsrf(
+      'https://music.163.com/weapi/v3/discovery/recommend/songs',
+      weapi({'csrf_token': await getCsrf()}),
+    );
+    final res = decodeResponseData(response.data);
+    if (res is! Map || res['code'] != 200) {
+      throw FormatException('每日推荐获取失败（${res is Map ? res['code'] : '响应无效'}）');
+    }
+    final songs = (res['data']?['dailySongs'] as List?) ?? const [];
+    final tracks = songs.map(_neSongToTrack).whereType<Map<String, dynamic>>().toList();
+    final now = DateTime.now();
+    return PlayList.fromJson({
+      'info': {
+        'id': '${NePlaylistType.daily.prefix}_today',
+        'title': '每日推荐 · ${now.month}月${now.day}日',
+        'cover_img_url': tracks.isNotEmpty ? tracks.first['img_url'] : null,
+        'source_url': 'https://music.163.com/#/discover/recommend/taste',
+      },
+      'tracks': tracks,
+    });
+  }
+
+  /// 私人 FM：接口每次返回少量歌曲，这里连续取几批凑成一张可播放的列表。
+  Future<PlayList> nePersonalFm({int batches = 4}) async {
+    await _requireNeteaseLogin();
+    final seen = <String>{};
+    final tracks = <Map<String, dynamic>>[];
+    for (var i = 0; i < batches; i++) {
+      final response = await dioPostWithCookieAndCsrf(
+        'https://music.163.com/weapi/v1/radio/get',
+        weapi({'csrf_token': await getCsrf()}),
+      );
+      final res = decodeResponseData(response.data);
+      if (res is! Map || res['code'] != 200) {
+        if (tracks.isNotEmpty) break;
+        throw FormatException('私人 FM 获取失败（${res is Map ? res['code'] : '响应无效'}）');
+      }
+      for (final song in (res['data'] as List?) ?? const []) {
+        final track = _neSongToTrack(song);
+        if (track != null && seen.add(track['id'] as String)) tracks.add(track);
+      }
+    }
+    return PlayList.fromJson({
+      'info': {
+        'id': '${NePlaylistType.fm.prefix}_personal',
+        'title': '私人 FM',
+        'cover_img_url': tracks.isNotEmpty ? tracks.first['img_url'] : null,
+        'source_url': 'https://music.163.com/#/discover/personal_fm',
+      },
+      'tracks': tracks,
+    });
+  }
+
+  /// 私人 FM「不喜欢」：告诉网易云不再推荐这首歌。
+  Future<void> neFmTrash(String trackId) async {
+    final id = trackId.split('_').last;
+    final response = await dioPostWithCookieAndCsrf(
+      'https://music.163.com/weapi/radio/trash/add?alg=RT&songId=$id&time=25',
+      weapi({'songId': id, 'csrf_token': await getCsrf()}),
+    );
+    final res = decodeResponseData(response.data);
+    if (res is! Map || res['code'] != 200) {
+      throw const FormatException('操作失败，请稍后重试');
+    }
+  }
+
   Future<PlayList> neGetDjradio(String listId) async {
     final id = listId.split('_').last;
     const pageSize = 1000;
@@ -536,10 +644,9 @@ class Netease extends BaseProvider {
       'ids': '[${ids.join(',')}]',
     };
     final data = weapi(t);
-    final csrf = await getCsrf();
-    if (csrf.isEmpty) {
-      throw const FormatException('网易云 Cookie 缺少 CSRF token');
-    }
+    // 未登录时网易云接口接受任意 16 位 csrf，用于浏览公开歌单；
+    // 与上游行为一致。登录态接口（账号信息等）另有 getUser 判断。
+    final csrf = await _csrfOrAnonymous();
     final targetUrl =
         '$targetEndpoint?${Uri(queryParameters: {'csrf_token': csrf}).query}';
     final response = await dioWithCookieManager.post(
@@ -847,6 +954,8 @@ class Netease extends BaseProvider {
     if (prefix == NePlaylistType.album.prefix) return neAlbum(listId);
     if (prefix == NePlaylistType.artist.prefix) return neArtist(listId);
     if (prefix == NePlaylistType.dj.prefix) return neGetDjradio(listId);
+    if (prefix == NePlaylistType.daily.prefix) return neDailyRecommend();
+    if (prefix == NePlaylistType.fm.prefix) return nePersonalFm();
     throw Exception('不支持的网易云歌单类型: $listId');
   }
 

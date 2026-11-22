@@ -28,6 +28,13 @@ class DraggableToastConfig {
   final double borderRadius;
   final double collapsedBorderRadius;
 
+  /// 首次出现时贴在可用区域的右下角（默认左下角）。
+  final bool startAtEnd;
+
+  /// 返回 true 时，「收起」直接关闭 Toast，而不是缩成悬浮圆点。
+  /// 桌面端用它把入口交还给固定的按钮，避免圆点压住内容。
+  final bool Function()? dismissOnPeek;
+
   const DraggableToastConfig({
     this.areaPadding = const EdgeInsets.all(16),
     this.snapThreshold = 60.0,
@@ -42,6 +49,8 @@ class DraggableToastConfig {
     this.collapsedSize = 48,
     this.borderRadius = 16,
     this.collapsedBorderRadius = 24,
+    this.startAtEnd = false,
+    this.dismissOnPeek,
   });
 }
 
@@ -177,6 +186,8 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
 
   void _startAutoPeekTimer() {
     _autoPeekTimer?.cancel();
+    // 收起即关闭的 Toast 不自动收起，否则用户还没看清就消失了。
+    if (widget.config.dismissOnPeek?.call() ?? false) return;
     _autoPeekTimer = Timer(widget.initialDisplayDuration, () {
       if (_state == ToastState.expanded && !_isDragging) {
         _performPeek();
@@ -208,6 +219,25 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
         _measuredHeight = renderBox.size.height;
         _isMeasuring = false;
       });
+      // 首次定位时还不知道卡片高度（按收起尺寸算），贴底出现的卡片会
+      // 超出可用区域、按钮被窗口底边裁掉。量出高度后把位置收回区域内。
+      final area = _cachedAreaSize;
+      if (area != null) {
+        final fixed = Offset(
+          _currentPosition.dx.clamp(
+            0.0,
+            (area.width - widget.config.expandedWidth).clamp(0.0, double.infinity),
+          ),
+          _currentPosition.dy.clamp(
+            0.0,
+            (area.height - _effectiveExpandedHeight).clamp(0.0, double.infinity),
+          ),
+        );
+        if (fixed != _currentPosition) {
+          _currentPosition = fixed;
+          _positionController.value = fixed;
+        }
+      }
       // Now trigger the expand animation
       _expandController.animateTo(1.0);
       _startAutoPeekTimer();
@@ -236,6 +266,10 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
 
   void _performPeek() {
     _cancelAutoDismissTimer();
+    if (widget.config.dismissOnPeek?.call() ?? false) {
+      _controllerHide();
+      return;
+    }
     final areaSize = _cachedAreaSize;
     if (areaSize == null) return;
 
@@ -265,7 +299,14 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
         distances.entries.reduce((a, b) => a.value < b.value ? a : b).key;
 
     _snappedEdge = nearestEdge;
-    final snapPos = _getSnapPosition(nearestEdge, _currentPosition, areaSize);
+    final anchor = (nearestEdge == ToastSnapEdge.left ||
+            nearestEdge == ToastSnapEdge.right)
+        ? Offset(
+            _currentPosition.dx,
+            _currentPosition.dy + _effectiveExpandedHeight - config.collapsedSize,
+          )
+        : _currentPosition;
+    final snapPos = _getSnapPosition(nearestEdge, anchor, areaSize);
     _currentPosition = snapPos;
     _positionController.animateTo(snapPos);
     _expandController.animateTo(0.0);
@@ -436,7 +477,9 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
         if (_needsInitialCentering) {
           _needsInitialCentering = false;
           // 从左下角出现并贴边收起：右侧是设置开关和箭头所在的列，避免遮挡。
-          final centeredX = 0.0;
+          final centeredX = config.startAtEnd
+              ? areaSize.width - widget.config.expandedWidth
+              : 0.0;
           // 起始放在可用区域底部（FAB 位置），避免压住列表中部的展开箭头。
           final centeredY = areaSize.height - _effectiveExpandedHeight;
           _currentPosition = Offset(

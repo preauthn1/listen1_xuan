@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
-import 'package:marquee/marquee.dart';
+import 'package:listen1_xuan/widgets/overflow_marquee.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_windows/webview_windows.dart';
 import 'package:webview_cookie_manager/webview_cookie_manager.dart';
@@ -481,20 +481,10 @@ class _LoginWebviewState extends State<LoginWebview> {
     return Scaffold(
       appBar: AppBar(
         // title: const Text('请登录后，点击右上角保存cooke按钮'),
-        title: Marquee(
-          text: '请登录后，点击右上角保存cookie按钮',
-          style: const TextStyle(fontSize: 20),
-          scrollAxis: Axis.horizontal,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          blankSpace: 20.0,
-          velocity: 100.0,
-          pauseAfterRound: const Duration(seconds: 1),
-          startPadding: 10.0,
-          accelerationDuration: const Duration(seconds: 1),
-          accelerationCurve: Curves.linear,
-          decelerationDuration: const Duration(milliseconds: 500),
-          decelerationCurve: Curves.easeOut,
-        ).sbh(30),
+        title: const OverflowMarquee(
+          text: '请登录后，点击右上角保存 Cookie 按钮',
+          style: TextStyle(fontSize: 20),
+        ),
         leading: BackButton(onPressed: () => Navigator.of(context).pop()),
         actions: [
           Obx(
