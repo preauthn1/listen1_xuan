@@ -408,7 +408,8 @@ class ThemeController extends GetxController {
           padding: controlPadding,
           shape: controlShape,
           textStyle: labelStyle,
-          disabledForegroundColor: cs.onSurfaceVariant,
+          // 次要按钮禁用态按 M3 规范降到 38%，与可用态明显区分。
+          disabledForegroundColor: cs.onSurface.withValues(alpha: 0.38),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -418,7 +419,16 @@ class ThemeController extends GetxController {
           shape: controlShape,
           textStyle: labelStyle,
           side: BorderSide(color: cs.outline),
-          disabledForegroundColor: cs.onSurfaceVariant,
+          // 次要按钮禁用态按 M3 规范降到 38%，与可用态明显区分。
+          disabledForegroundColor: cs.onSurface.withValues(alpha: 0.38),
+        ).copyWith(
+          side: WidgetStateProperty.resolveWith(
+            (states) => BorderSide(
+              color: states.contains(WidgetState.disabled)
+                  ? cs.onSurface.withValues(alpha: 0.12)
+                  : cs.outline,
+            ),
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -427,7 +437,8 @@ class ThemeController extends GetxController {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           shape: controlShape,
           textStyle: labelStyle,
-          disabledForegroundColor: cs.onSurfaceVariant,
+          // 次要按钮禁用态按 M3 规范降到 38%，与可用态明显区分。
+          disabledForegroundColor: cs.onSurface.withValues(alpha: 0.38),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
