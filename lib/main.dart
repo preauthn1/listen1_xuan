@@ -36,6 +36,8 @@ import 'examples/websocket_server_example.dart';
 import 'examples/websocket_client_example.dart';
 import 'packages/circular_theme_reveal/src/circular_theme_reveal_overlay.dart';
 import 'pages/download_page.dart';
+import 'pages/track_downloads_page.dart';
+import 'controllers/track_download_controller.dart';
 import 'pages/nowPlaying_page.dart';
 import 'pages/settings/settings_readme.dart';
 import 'pages/settings/settings_tips_page.dart';
@@ -240,6 +242,7 @@ Future<void> _initializeAppForHome(SettingsController settingsController) async 
   Get.put(BroadcastWsController(), permanent: true);
   Get.put(ScanBroadcastController(), permanent: true);
   Get.put(WsDownloadController(), permanent: true);
+  Get.put(TrackDownloadController(), permanent: true);
   Get.put(Applinkscontroller(), permanent: true);
   Get.put(SupabaseAuthController(), permanent: true);
   Get.put(FeedbackUnreadController(FeedbackApi(Supabase.instance.client)), permanent: true);
@@ -657,7 +660,13 @@ class _MyHomePageState extends State<MyHomePage>
               resizeToAvoidBottomInset: false,
               backgroundColor:
                   createThemeController().playHBackgroundColor.value,
-              body: Stack(
+              // 手机横屏时左右可能有挖孔/圆角，内容整体避开，背景色铺满。
+              body: SafeArea(
+                top: false,
+                bottom: false,
+                left: isMobile,
+                right: isMobile,
+                child: Stack(
                 children: [
                   Positioned.fill(
                     child: Column(
@@ -726,6 +735,7 @@ class _MyHomePageState extends State<MyHomePage>
                     // 竖屏状态下添加额外的占位空间
                   ),
                 ],
+              ),
               ),
               // floatingActionButton:
               // FloatingActionButton(
