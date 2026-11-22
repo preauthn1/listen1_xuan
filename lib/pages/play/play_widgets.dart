@@ -246,7 +246,8 @@ Widget buildPlayPauseButton(double expandProgress) {
                       () => MotorCircularProgressIndicator(
                         key: _playButtonKey,
                         strokeWidth: 4.w,
-                        value: _playController.loading ? null : progress,
+                        // 仅在真正加载时显示转圈；没有歌曲或时长未知时显示静止的空进度环。
+                        value: _playController.loading ? null : (progress ?? 0),
                       ),
                     ),
                   );

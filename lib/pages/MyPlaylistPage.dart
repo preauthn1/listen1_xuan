@@ -472,7 +472,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
       () => Scaffold(
         floatingActionButton: FloatingActionButton(
           heroTag: HeroTags.songReplaceFab,
-          mini: (isWindows &&
+          mini: ((isWindows || MediaQuery.orientationOf(context) == Orientation.landscape) &&
                   !settingsController.settings
                       .containsKey(SettingsController.songReplaceFabLocationKey)) ||
               settingsController.songReplaceFabMiniRx.value,
@@ -487,7 +487,9 @@ class _MyPlaylistState extends State<MyPlaylist> {
           child: Icon(Icons.find_replace_rounded),
         ),
         // Windows 默认放在侧栏右下角并缩小，列表底部留白保证不压住最后一行。
-        floatingActionButtonLocation: isWindows &&
+        // 横屏（含 Android 平板/横屏手机）与 Windows 一样默认缩小并靠右下，
+        // 不再压住侧栏里的平台分组行。
+        floatingActionButtonLocation: (isWindows || MediaQuery.orientationOf(context) == Orientation.landscape) &&
                 !settingsController.settings.containsKey(SettingsController.songReplaceFabLocationKey)
             ? FloatingActionButtonLocation.miniEndFloat
             : settingsController.songReplaceFabMiniRx.value
