@@ -10,6 +10,7 @@ log() { echo "[tour] $*" | tee -a "$OUT/tour.log"; }
 
 snap() {
   local name="$1"
+  dismiss_system_dialogs
   adb exec-out screencap -p > "$OUT/$name.png" 2>/dev/null || log "screencap $name failed"
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 && adb pull /sdcard/ui.xml "$OUT/$name.xml" >/dev/null 2>&1
   log "snap $name"
@@ -18,6 +19,7 @@ snap() {
 # 在 UI 树里按 text/content-desc 找节点中心并点击（Flutter 语义树会导出到无障碍）。
 tap_text() {
   local pattern="$1"
+  dismiss_system_dialogs
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || return 1
   adb pull /sdcard/ui.xml "$OUT/_last.xml" >/dev/null 2>&1 || return 1
   local xy
@@ -38,6 +40,28 @@ PY
   if [[ -z "$xy" ]]; then log "tap_text '$pattern' not found"; return 1; fi
   log "tap '$pattern' at $xy"
   adb shell input tap $xy
+}
+
+
+# 模拟器偶发系统 ANR（如 Pixel Launcher 无响应），会盖住应用并吞掉点击。
+dismiss_system_dialogs() {
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || return 0
+  adb pull /sdcard/ui.xml "$OUT/_sys.xml" >/dev/null 2>&1 || return 0
+  if grep -q "isn't responding\|has stopped\|keeps stopping" "$OUT/_sys.xml"; then
+    log "system dialog detected; pressing Wait"
+    local xy
+    xy=$(python3 - "$OUT/_sys.xml" <<'PY2'
+import re, sys, xml.etree.ElementTree as ET
+for n in ET.parse(sys.argv[1]).getroot().iter('node'):
+    if (n.get('text') or '') in ('Wait', 'Close app') and (n.get('text') == 'Wait'):
+        x1, y1, x2, y2 = map(int, re.findall(r'\d+', n.get('bounds')))
+        print((x1 + x2) // 2, (y1 + y2) // 2); break
+PY2
+)
+    [[ -n "$xy" ]] && adb shell input tap $xy
+    sleep 2
+  fi
+  rm -f "$OUT/_sys.xml"
 }
 
 perms() {
@@ -62,6 +86,9 @@ adb shell appops set "$PKG" MANAGE_EXTERNAL_STORAGE default >/dev/null 2>&1 || t
 adb shell dumpsys package "$PKG" | grep -A40 "requested permissions:" | sed -n '1,40p' > "$OUT/requested_permissions.txt"
 perms before-launch
 
+adb shell am force-stop com.google.android.apps.nexuslauncher >/dev/null 2>&1 || true
+sleep 10
+dismiss_system_dialogs
 log "launch"
 adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
 sleep 25
