@@ -117,6 +117,13 @@ class Netease extends BaseProvider {
     return CookieUtils.getCookieValue(cookies, '__csrf') ?? '';
   }
 
+  static const String _anonymousCsrf = '1234567890123456';
+
+  Future<String> _csrfOrAnonymous() async {
+    final csrf = await getCsrf();
+    return csrf.isEmpty ? _anonymousCsrf : csrf;
+  }
+
   Future<dynamic> dioGetWithCookieAndCsrf(String url) async {
     final csrf = await getCsrf();
     final separator = url.contains('?') ? '&' : '?';
@@ -137,10 +144,9 @@ class Netease extends BaseProvider {
     String url,
     dynamic data,
   ) async {
-    final csrf = await getCsrf();
-    if (csrf.isEmpty) {
-      throw const FormatException('网易云 Cookie 缺少 CSRF token');
-    }
+    // 未登录时网易云接口接受任意 16 位 csrf，用于浏览公开歌单；
+    // 与上游行为一致。登录态接口（账号信息等）另有 getUser 判断。
+    final csrf = await _csrfOrAnonymous();
     final separator = url.contains('?') ? '&' : '?';
     final targetUrl =
         '$url$separator${Uri(queryParameters: {'csrf_token': csrf}).query}';
@@ -638,10 +644,9 @@ class Netease extends BaseProvider {
       'ids': '[${ids.join(',')}]',
     };
     final data = weapi(t);
-    final csrf = await getCsrf();
-    if (csrf.isEmpty) {
-      throw const FormatException('网易云 Cookie 缺少 CSRF token');
-    }
+    // 未登录时网易云接口接受任意 16 位 csrf，用于浏览公开歌单；
+    // 与上游行为一致。登录态接口（账号信息等）另有 getUser 判断。
+    final csrf = await _csrfOrAnonymous();
     final targetUrl =
         '$targetEndpoint?${Uri(queryParameters: {'csrf_token': csrf}).query}';
     final response = await dioWithCookieManager.post(
