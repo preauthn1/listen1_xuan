@@ -38,7 +38,8 @@ jobs:
           # An unsigned fork must not silently become a debug-signed release.
           if [[ "$ALL_KEYS" == true ]]; then
             echo 'ready=true' >> "$GITHUB_OUTPUT"
-          elif [[ "$ANY_KEY" == false && "$FORK" == true && "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == branch ]]; then
+          # Forks without any key skip on branch pushes and manual runs; a tag (release) still fails loudly.
+          elif [[ "$ANY_KEY" == false && "$FORK" == true && "$GITHUB_REF_TYPE" != tag ]]; then
             echo 'ready=false' >> "$GITHUB_OUTPUT"
             echo '::notice::Fork has no Android signing secrets; no APK will be built or published.'
           else
