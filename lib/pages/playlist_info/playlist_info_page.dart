@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:listen1_xuan/bodys.dart';
 import 'package:listen1_xuan/controllers/routeController.dart';
+import 'package:listen1_xuan/controllers/track_download_controller.dart';
 import 'package:listen1_xuan/funcs.dart';
 import 'package:listen1_xuan/global_settings_animations.dart';
 import 'package:listen1_xuan/models/Track.dart';
@@ -195,6 +196,30 @@ class PlaylistInfoPage extends StatelessWidget {
           icon: const Icon(Icons.shuffle_rounded),
           onPressed: () => controller.loadData(),
         ),
+      IconButton(
+        tooltip: '下载全部',
+        icon: const Icon(Icons.download_rounded),
+        onPressed: () async {
+          final tracks = List<Track>.from(controller.tracks);
+          if (tracks.isEmpty) return;
+          final dl = Get.find<TrackDownloadController>();
+          final pending = tracks.where((t) => !dl.isDownloaded(t.id)).toList();
+          final skip = tracks.length - pending.length;
+          final ok = await showConfirmDialog(
+            skip > 0
+                ? '共 ${tracks.length} 首，其中 $skip 首已下载过将跳过。\n保存到 ${dl.locationHint}'
+                : '共 ${tracks.length} 首，保存到 ${dl.locationHint}',
+            '下载全部歌曲？',
+            confirmText: '下载 ${pending.length} 首',
+          );
+          if (!ok || pending.isEmpty) return;
+          final n = await dl.enqueue(pending);
+          if (n > 0) {
+            showInfoSnackbar('已加入下载 $n 首', '可在「下载」页查看进度',
+                onTap: () => Get.toNamed(RouteName.trackDownloadsPage, id: 1));
+          }
+        },
+      ),
       IconButton(
         tooltip: '保存为我的歌单',
         icon: Icon(Icons.add),
@@ -435,6 +460,7 @@ class PlaylistInfoPage extends StatelessWidget {
           ),
           trailing: Builder(
             builder: (iconContext) => IconButton(
+              tooltip: '更多',
               icon: Icon(Icons.more_vert),
               onPressed: () async {
                 await _onTrackMore(context, iconContext, track, controller);
@@ -465,6 +491,7 @@ class PlaylistInfoPage extends StatelessWidget {
           ),
           trailing: Builder(
             builder: (iconContext) => IconButton(
+              tooltip: '更多',
               icon: Icon(Icons.more_vert),
               onPressed: () async {
                 await _onTrackMore(context, iconContext, track, controller);

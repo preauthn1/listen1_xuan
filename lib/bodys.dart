@@ -38,6 +38,7 @@ import 'package:extended_image/extended_image.dart';
 import 'package:expandable/expandable.dart';
 import 'package:universal_io/io.dart' as universal_io;
 import 'settings.dart';
+import 'pages/track_downloads_page.dart';
 import 'package:listen1_xuan/models/Track.dart';
 import 'package:animated_reorderable_list/animated_reorderable_list.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
@@ -372,6 +373,7 @@ Future<dynamic> song_dialog(
               //     }
               //   },
               // ),
+              TrackDownloadMenuTile(trackFor: () => track),
               ListTile(
                 title: Text('删除本地缓存'),
                 onTap: () async {
