@@ -96,7 +96,6 @@ class TrackDownloadsPage extends StatelessWidget {
                   final v = e.value;
                   final audio = v['audio'] as String?;
                   return ListTile(
-                    leading: const Icon(Icons.music_note_rounded),
                     title: Text(v['title'] as String? ?? v['file'] as String? ?? e.key,
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                     subtitle: Text(
@@ -191,11 +190,15 @@ class _TaskTile extends StatelessWidget {
         onTap: state == TrackDownloadState.done && task.audioLocation != null
             ? () => c.reveal(task.audioLocation!)
             : null,
+        // 与「已下载」行一致：右侧统一是 48px 的按钮位。
         trailing: active
             ? IconButton(tooltip: '取消', icon: const Icon(Icons.close_rounded), onPressed: () => c.cancel(task))
             : state == TrackDownloadState.failed || state == TrackDownloadState.canceled
                 ? IconButton(tooltip: '重试', icon: const Icon(Icons.refresh_rounded), onPressed: () => c.retry(task))
-                : Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary),
+                : SizedBox.square(
+                    dimension: 48,
+                    child: Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary),
+                  ),
       );
     });
   }
