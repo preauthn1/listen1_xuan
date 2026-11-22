@@ -287,6 +287,8 @@ void main() async {
     const SystemUiOverlayStyle(
       systemNavigationBarColor: Colors.transparent, // 设置导航栏背景色为透明
       systemNavigationBarDividerColor: Colors.transparent, // 设置导航栏分割线为透明
+      // 透明导航栏上不强制系统加半透明遮罩，手势条区域与播放栏背景一致。
+      systemNavigationBarContrastEnforced: false,
     ),
   );
   // 无界面音频启动后再挂载 Activity 时，重新注册 Android 返回手势处理。
@@ -627,32 +629,24 @@ class _MyHomePageState extends State<MyHomePage>
         child: OrientationBuilder(
           builder: (context, orientation) {
             globalHorizon = orientation == Orientation.landscape;
-            if (globalHorizon) {
-              homeController.selectedIndex.value = provider.indexOfFirstOnH;
-              debugPrint('当前为横屏模式');
-              SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-            } else {
-              homeController.selectedIndex.value = provider.indexOfFirstOnV;
-              if (!Get.find<XSearchController>().showSearchArea.value) {
-                Get.find<XSearchController>().showSearchArea.value = true;
+            final newDir = globalHorizon ? 2 : 1;
+            // OrientationBuilder 会随任意父级重建（键盘弹出、换主题等）重跑。
+            // 只在方向真正变化（或首次构建）时才重置首页标签和系统栏模式，
+            // 否则竖屏下选中的标签会被意外切回第一个平台。
+            final orientationChanged = last_dir != newDir;
+            final flag = last_dir != 0 && orientationChanged;
+            if (orientationChanged) {
+              if (globalHorizon) {
+                homeController.selectedIndex.value = provider.indexOfFirstOnH;
+                SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+              } else {
+                homeController.selectedIndex.value = provider.indexOfFirstOnV;
+                if (!Get.find<XSearchController>().showSearchArea.value) {
+                  Get.find<XSearchController>().showSearchArea.value = true;
+                }
+                SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
               }
-              debugPrint('当前为竖屏模式');
-              SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-            }
-
-            bool flag = false;
-            if (orientation == Orientation.portrait) {
-              // 竖屏逻辑
-              if (last_dir == 2) {
-                flag = true;
-              }
-              last_dir = 1;
-            } else {
-              // 横屏逻辑
-              if (last_dir == 1) {
-                flag = true;
-              }
-              last_dir = 2;
+              last_dir = newDir;
             }
             if (flag) {
               Get.offAllNamed('/', id: 1);

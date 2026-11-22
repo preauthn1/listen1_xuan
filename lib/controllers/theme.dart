@@ -326,7 +326,9 @@ class ThemeController extends GetxController {
               systemOverlayStyle: SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
                 statusBarIconBrightness: statusBarIconBrightness,
-                systemNavigationBarColor: Get.theme.colorScheme.surface,
+                systemNavigationBarColor: Colors.transparent,
+                // 深色主题下导航键/手势条用浅色，浅色主题下用深色。
+                systemNavigationBarIconBrightness: statusBarIconBrightness,
               ),
             ),
           )
@@ -341,7 +343,9 @@ class ThemeController extends GetxController {
               systemOverlayStyle: SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
                 statusBarIconBrightness: statusBarIconBrightness,
-                systemNavigationBarColor: Get.theme.colorScheme.surface,
+                systemNavigationBarColor: Colors.transparent,
+                // 深色主题下导航键/手势条用浅色，浅色主题下用深色。
+                systemNavigationBarIconBrightness: statusBarIconBrightness,
               ),
             ),
           );
