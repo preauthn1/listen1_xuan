@@ -648,6 +648,15 @@ Listener _mainContent() => Listener(
                   );
                   addAndCleanReapeatRoute(route, RouteName.settingsTipsPage);
                   return route;
+                case RouteName.trackDownloadsPage:
+                  var route = ThemedGetPageRoute(
+                    settings: settings,
+                    transition: Transition.rightToLeftWithFade,
+                    page: () => const TrackDownloadsPage(),
+                    middlewares: [ListenPopMiddleware()],
+                  );
+                  addAndCleanReapeatRoute(route, RouteName.trackDownloadsPage);
+                  return route;
                 case RouteName.downloadPage:
                   var route = ThemedGetPageRoute(
                     settings: settings,

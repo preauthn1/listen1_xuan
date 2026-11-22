@@ -278,6 +278,7 @@ class RouteName {
   static const String onlineFeedbackIssuePage = '/online_feedback/issue';
   static const String onlineFeedbackProfilePage = '/online_feedback/profile';
   static const String downloadPage = '/download';
+  static const String trackDownloadsPage = '/track_downloads';
   static const String supabaseLoginPage = '/supabase_login';
   static const String supabasePasswordLoginPage = '/supabase_password_login';
   static const String cacheNamingPage = '/cache_naming';
