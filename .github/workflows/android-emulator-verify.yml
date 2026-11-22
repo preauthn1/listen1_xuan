@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
-      TARGET_REF: download-lyrics
+      TARGET_REF: main
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

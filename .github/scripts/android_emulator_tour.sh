@@ -173,15 +173,22 @@ snap 15-playlist
 tap_text '下载全部' >/dev/null 2>&1; sleep 3
 snap 15b-download-all-confirm
 tap_text '取消' ; sleep 2
+# 先授予通知权限，便于检查下载进度/完成通知
+adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
 tap_text '更多' && sleep 3
 snap 16-track-menu
-adb shell input swipe 540 1700 540 900 300; sleep 2
-tap_text '下载' && sleep 3
+tap_text '下载' && sleep 2
 snap 17-after-download-tap
-# 可能弹通知权限，不授予
-tap_text '不允许|Don.t allow' && sleep 2
-sleep 40
+for i in 1 2 3 4 5 6 7 8; do
+  sleep 4
+  snap "17b-progress-$i"
+  grep -q '已下载\|保存在' "$OUT/17b-progress-$i.xml" 2>/dev/null && break
+done
+sleep 10
 snap 18-download-done
+adb shell cmd statusbar expand-notifications; sleep 3
+snap 18b-notification
+adb shell cmd statusbar collapse; sleep 2
 log "public downloads:"
 adb shell ls -la /sdcard/Download/Listen1/Music 2>&1 | tee -a "$OUT/tour.log"
 adb shell content query --uri content://media/external/downloads --projection _display_name:relative_path:mime_type:_size 2>&1 | tail -10 | tee -a "$OUT/tour.log"
@@ -191,8 +198,11 @@ adb shell input keyevent KEYCODE_BACK; sleep 2
 tap_text '我的' && sleep 2
 tap_text '设置' && sleep 4
 tap_text '缓存' && sleep 3
+adb shell input swipe 540 1500 540 1000 300; sleep 2
 tap_text '下载管理.*' && sleep 4
 snap 19-downloads-page
+# 第二次点同一首：菜单应显示「重新下载」
+adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input keyevent KEYCODE_BACK; sleep 2
 
