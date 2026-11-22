@@ -116,6 +116,14 @@ tap_text '设置' && sleep 5
 snap 06-settings
 tap_text '第三方平台登录' && sleep 3
 snap 07-settings-login
+tap_text '导入 Cookie' && sleep 3
+snap 07b-cookie-dialog
+# 粘贴一条缺少 MUSIC_U 的示例，看是否给出明确提示（不使用真实凭据）
+adb shell input text 'demo=1'; sleep 1
+tap_text '导入并验证' && sleep 3
+snap 07c-cookie-missing
+adb shell input keyevent KEYCODE_BACK; sleep 1
+tap_text '取消' ; sleep 2
 tap_text '第三方平台登录' && sleep 2
 tap_text '缓存' && sleep 3
 adb shell input swipe 540 1700 540 900 400; sleep 2
