@@ -307,7 +307,7 @@ List<Widget> create_hotkey_btns(context) {
             context: context,
             builder: (BuildContext context) {
               return AlertDialog(
-                title: Text('设置${_hotkey['name']}热键'),
+                title: Text('设置${_hotkey['name']}快捷键'),
                 content: HotKeyRecorder(
                   initalHotKey: hotkey,
                   onHotKeyRecorded: (hotKey) {
@@ -336,7 +336,7 @@ List<Widget> create_hotkey_btns(context) {
             },
           );
         },
-        child: Text("设置 " + (_hotkey['name'] as String) + " 热键"),
+        child: Text('${_hotkey['name']} 快捷键'),
       );
     }).toList(),
   ];

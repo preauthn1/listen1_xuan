@@ -84,13 +84,13 @@ class QQ extends BaseProvider {
   bool get supportGetUserFavoritePlaylist => true;
 
   @override
-  String get userCreatedPlaylistSectionTitle => '我创建的QQ音乐歌单';
+  String get userCreatedPlaylistSectionTitle => 'QQ 音乐 · 我创建的';
 
   @override
   Widget get userCreatedPlaylistSectionLeading => _qqSectionIcon;
 
   @override
-  String get userFavoritePlaylistSectionTitle => '我收藏的QQ音乐歌单';
+  String get userFavoritePlaylistSectionTitle => 'QQ 音乐 · 我收藏的';
 
   @override
   Widget get userFavoritePlaylistSectionLeading => _qqSectionIcon;

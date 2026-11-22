@@ -8,6 +8,24 @@ String _searchHintText(String? tip) => startupTipsService.searchHintText(
 Widget _leftBarTitleDragArea(Widget child) =>
     isWindows || isMacOS ? DragToMoveArea(child: child) : child;
 
+/// Windows 标题栏显示的当前页面名；首页留空，侧栏已有应用名。
+const _routeTitles = <String?, String>{
+  RouteName.settingsPage: '设置',
+  RouteName.searchPage: '搜索',
+  RouteName.nowPlayingPage: '当前播放',
+  RouteName.lyricPage: '歌词',
+  RouteName.settingsChangelogPage: '更新日志',
+  RouteName.settingsReadmePage: '说明文档',
+  RouteName.settingsTipsPage: '使用技巧',
+  RouteName.downloadPage: '缓存文件',
+  RouteName.supabaseLoginPage: 'Supabase 登录',
+  RouteName.supabasePasswordLoginPage: 'Supabase 登录',
+  RouteName.cacheNamingPage: '缓存命名方式',
+  RouteName.equalizerPage: '均衡器',
+  RouteName.songReplacePage: '歌曲替换',
+  RouteName.onlineFeedbackPage: '在线反馈',
+};
+
 class _WindowsTitleBar extends StatefulWidget {
   const _WindowsTitleBar();
 
@@ -35,8 +53,11 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final settingsRoute = top_routeWithName.isNotEmpty &&
-          top_routeWithName.last.name == RouteName.settingsPage;
+      final routeName =
+          top_routeWithName.isEmpty ? null : top_routeWithName.last.name;
+      final settingsRoute = routeName == RouteName.settingsPage;
+      final canGoBack = routeName != null && routeName != RouteName.defaultPage;
+      final title = _routeTitles[routeName] ?? '';
       final settings = Get.find<SettingsController>();
       return Material(
         color: Theme.of(context).colorScheme.surface,
@@ -47,17 +68,19 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
             children: [
               SizedBox(
                 width: 40,
-                child: IconButton(
-                  tooltip: '返回',
-                  padding: EdgeInsets.zero,
-                  iconSize: 15,
-                  onPressed: routerPop,
-                  icon: const Icon(LucideIcons.chevronLeft),
-                ),
+                child: canGoBack
+                    ? IconButton(
+                        tooltip: '返回',
+                        padding: EdgeInsets.zero,
+                        iconSize: 15,
+                        onPressed: routerPop,
+                        icon: const Icon(LucideIcons.chevronLeft),
+                      )
+                    : null,
               ),
               Expanded(
                 child: Text(
-                  settingsRoute ? '设置' : 'Listen1',
+                  title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -65,12 +88,12 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
               ),
               if (settingsRoute) ...[
                 WebSocketHelper.buildReactiveButton(
-                  tooltip: 'WebSocket服务器',
+                  tooltip: 'WebSocket 服务器',
                   iconSize: 15,
                   padding: EdgeInsets.zero,
                 ),
                 WebSocketClientHelper.buildReactiveButton(
-                  tooltip: 'WebSocket客户端',
+                  tooltip: 'WebSocket 客户端',
                   iconSize: 15,
                   padding: EdgeInsets.zero,
                 ),
@@ -238,11 +261,11 @@ Widget get _leftBar => Scaffold(
             children: [
           ThemeToggleButton(iconSize: 24.0, padding: EdgeInsets.all(0)),
           WebSocketHelper.buildReactiveButton(
-            tooltip: "WebSocket服务器",
+            tooltip: "WebSocket 服务器",
             inMainPage: true,
           ),
           WebSocketClientHelper.buildReactiveButton(
-            tooltip: "WebSocket客户端",
+            tooltip: "WebSocket 客户端",
             inMainPage: true,
           ),
           IconButton(

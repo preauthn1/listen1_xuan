@@ -255,7 +255,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
         ? provider.getUserCreatedPlaylist(userId)
         : provider.getUserFavoritePlaylist(userId);
     if (future == null) {
-      throw StateError('该平台未实现该歌单接口');
+      throw const _SectionLoadError('该平台暂不支持此歌单');
     }
     return future;
   }
@@ -277,7 +277,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
     try {
       final user = await provider.getUser();
       if (user == null) {
-        throw StateError('未登录或登录已失效');
+        throw const _SectionLoadError('尚未登录，请在 设置 › 第三方平台登录 中登录');
       }
       final playlists = await _fetchUserPlaylists(provider, type, user.userId);
 
@@ -293,7 +293,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
       if (!mounted) return;
       setState(() {
         section.loading = false;
-        section.error = e.toString();
+        section.error = e is _SectionLoadError ? e.message : '加载失败，请稍后重试';
       });
     }
   }
@@ -318,15 +318,28 @@ class _MyPlaylistState extends State<MyPlaylist> {
   }
 
   Widget _buildSectionError(String error, VoidCallback onRetry) {
+    final theme = Theme.of(context);
+    // 与分组标题文字左缘对齐（12 + 24 图标 + 12 间距），不再居中打断列表节奏。
     return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
+      padding: const EdgeInsetsDirectional.fromSTEB(48, 0, 12, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(error, textAlign: TextAlign.center),
-          TextButton.icon(
+          Expanded(
+            child: Text(
+              error,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: '重试',
+            visualDensity: VisualDensity.compact,
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('重试'),
+            icon: const Icon(Icons.refresh, size: 18),
           ),
         ],
       ),
@@ -558,6 +571,8 @@ class _MyPlaylistState extends State<MyPlaylist> {
                         ),
                     ],
                   ),
+                  // 预留底部浮动按钮的位置，最后一个分组不会被遮住。
+                  const SizedBox(height: 72),
                 ],
               ),
             ));
@@ -566,6 +581,13 @@ class _MyPlaylistState extends State<MyPlaylist> {
       ),
     );
   }
+}
+
+class _SectionLoadError implements Exception {
+  const _SectionLoadError(this.message);
+  final String message;
+  @override
+  String toString() => message;
 }
 
 class _ProviderPlaylistSection {

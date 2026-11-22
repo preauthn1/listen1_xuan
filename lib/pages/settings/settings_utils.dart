@@ -341,7 +341,7 @@ Future<void> outputPlaylistToGithubGist() async {
       context: Get.context!,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('导出歌单到Github Gist'),
+          title: Text('导出歌单到 GitHub Gist'),
           content: Container(
             width: double.maxFinite,
             child: ListView.builder(
