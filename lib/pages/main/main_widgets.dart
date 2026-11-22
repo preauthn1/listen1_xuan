@@ -239,7 +239,8 @@ Widget get _leftBar => Scaffold(
         child: Align(
           alignment: Alignment.center,
           child: PriorityResponsiveActionRow(
-            hidePriority: const [2, 1, 0, 3],
+            // 窄时依次隐藏：WS 客户端、WS 服务器、主题、歌曲替换；设置最后保留。
+            hidePriority: isMobile ? const [2, 1, 0, 3, 4] : const [2, 1, 0, 3],
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
           ThemeToggleButton(iconSize: 24.0, padding: EdgeInsets.all(0)),
@@ -251,6 +252,19 @@ Widget get _leftBar => Scaffold(
             tooltip: "WebSocket 客户端",
             inMainPage: true,
           ),
+          if (isMobile)
+            IconButton(
+              tooltip: '歌曲替换列表',
+              icon: const Icon(Icons.find_replace_rounded),
+              onPressed: () {
+                final routeController = Get.find<RouteController>();
+                if (routeController.inSongReplacePage.value) {
+                  Get.back(id: 1);
+                  return;
+                }
+                Get.toNamed(RouteName.songReplacePage, id: 1);
+              },
+            ),
           IconButton(
             tooltip: "设置",
             icon: const FeedbackUnreadBadge(child: Icon(Icons.settings)),
