@@ -285,6 +285,7 @@ Widget _loginRow({
   required Widget status,
   required String label,
   required VoidCallback onPressed,
+  VoidCallback? onImportCookie,
 }) {
   final theme = Theme.of(context);
   final identity = Row(
@@ -322,12 +323,23 @@ Widget _loginRow({
     style: _pillStyle(theme, minWidth: 128),
     child: Text(label, maxLines: 1, softWrap: false, style: _noUnderline),
   );
+  // 「Cookie」：直接粘贴或从文件导入浏览器里的登录 Cookie。
+  final importAction = onImportCookie == null
+      ? null
+      : IconButton(
+          tooltip: '导入 Cookie',
+          onPressed: onImportCookie,
+          icon: const Icon(Icons.cookie_outlined),
+        );
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),
     child: Row(
       children: [
         Expanded(child: identity),
-        const SizedBox(width: 16),
+        const SizedBox(width: 8),
+        // 没有导入入口的行（GitHub）用同宽占位，保持登录按钮右缘对齐。
+        importAction ?? const SizedBox(width: 48),
+        const SizedBox(width: 8),
         action,
       ],
     ),
@@ -401,6 +413,9 @@ Widget _buildThirdPartyLoginPanel(BuildContext context) {
                   }),
                   label: provider.loginActionText,
                   onPressed: () => provider.login(context),
+                  onImportCookie: provider.supportCookieImport
+                      ? () => showCookieImportDialog(context, provider)
+                      : null,
                 ),
               _loginRow(
                 context: context,
