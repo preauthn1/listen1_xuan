@@ -64,6 +64,32 @@ PY2
   rm -f "$OUT/_sys.xml"
 }
 
+
+# 点击 y 坐标大于 $1 的第一个可点击节点（用于点开首页第一张歌单、歌单第一首歌的「更多」）。
+tap_first_below() {
+  local miny="$1" pattern="${2:-.+}"
+  dismiss_system_dialogs
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || return 1
+  adb pull /sdcard/ui.xml "$OUT/_last.xml" >/dev/null 2>&1 || return 1
+  local xy
+  xy=$(python3 - "$OUT/_last.xml" "$miny" "$pattern" <<'PY3'
+import re, sys, xml.etree.ElementTree as ET
+miny = int(sys.argv[2]); pat = re.compile(sys.argv[3])
+skip = {'我的','B站','网易','QQ','酷狗','设置','全部','歌曲替换列表','正在播放列表','未播放'}
+for n in ET.parse(sys.argv[1]).getroot().iter('node'):
+    label = (n.get('content-desc') or n.get('text') or '').strip()
+    if n.get('clickable') != 'true' or not label or label in skip: continue
+    if not pat.fullmatch(label.split('\n')[0]): continue
+    x1, y1, x2, y2 = map(int, re.findall(r'\d+', n.get('bounds')))
+    if y1 >= miny:
+        print((x1 + x2) // 2, (y1 + y2) // 2); break
+PY3
+)
+  if [[ -z "$xy" ]]; then log "tap_first_below $miny not found"; return 1; fi
+  log "tap first below $miny at $xy"
+  adb shell input tap $xy
+}
+
 perms() {
   log "permissions ($1):"
   adb shell dumpsys package "$PKG" | grep -E "permission\.(MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|READ_PHONE_STATE|POST_NOTIFICATIONS|READ_MEDIA)" | sort -u | tee -a "$OUT/tour.log"
@@ -138,6 +164,37 @@ adb shell input swipe 540 1900 540 400 300; sleep 2
 adb shell input swipe 540 1900 540 400 300; sleep 2
 snap 09b-settings-bottom
 adb shell input keyevent KEYCODE_BACK; sleep 3
+
+# 下载：网易云首页第一张歌单 → 第一首的「更多」→「下载」
+tap_text '网易' && sleep 8
+snap 14-netease-home
+tap_first_below 400 && sleep 10
+snap 15-playlist
+tap_text '下载全部' >/dev/null 2>&1; sleep 3
+snap 15b-download-all-confirm
+tap_text '取消' ; sleep 2
+tap_text '更多' && sleep 3
+snap 16-track-menu
+adb shell input swipe 540 1700 540 900 300; sleep 2
+tap_text '下载' && sleep 3
+snap 17-after-download-tap
+# 可能弹通知权限，不授予
+tap_text '不允许|Don.t allow' && sleep 2
+sleep 40
+snap 18-download-done
+log "public downloads:"
+adb shell ls -la /sdcard/Download/Listen1/Music 2>&1 | tee -a "$OUT/tour.log"
+adb shell content query --uri content://media/external/downloads --projection _display_name:relative_path:mime_type:_size 2>&1 | tail -10 | tee -a "$OUT/tour.log"
+adb shell dumpsys notification --noredact 2>/dev/null | grep -A3 "track_downloads" | head -20 | tee -a "$OUT/tour.log"
+adb shell input keyevent KEYCODE_BACK; sleep 2
+adb shell input keyevent KEYCODE_BACK; sleep 2
+tap_text '我的' && sleep 2
+tap_text '设置' && sleep 4
+tap_text '缓存' && sleep 3
+tap_text '下载管理.*' && sleep 4
+snap 19-downloads-page
+adb shell input keyevent KEYCODE_BACK; sleep 2
+adb shell input keyevent KEYCODE_BACK; sleep 2
 
 # 转屏再转回
 adb shell settings put system accelerometer_rotation 0
