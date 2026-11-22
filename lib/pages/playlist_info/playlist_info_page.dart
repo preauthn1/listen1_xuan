@@ -14,7 +14,7 @@ import 'package:listen1_xuan/provider/loweb.dart';
 import 'package:listen1_xuan/widgets/ext/ext_hero.dart';
 import 'package:listen1_xuan/widgets/ext/ext_widget.dart';
 import 'package:listen1_xuan/widgets/page_scroll_to_top.dart';
-import 'package:marquee/marquee.dart';
+import 'package:listen1_xuan/widgets/overflow_marquee.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -55,20 +55,11 @@ class PlaylistInfoPage extends StatelessWidget {
                         enabled: controller.loading.value,
                         child: SizedBox(
                           height: 48,
-                          child: Marquee(
+                          child: OverflowMarquee(
                             text: controller.loadFailed.value
                                 ? '加载失败'
                                 : controller.result.info.title ?? "加载失败",
-                            style: TextStyle(fontSize: 16),
-                            scrollAxis: Axis.horizontal,
-                            blankSpace: 20.0,
-                            velocity: 50.0,
-                            pauseAfterRound: Duration(seconds: 1),
-                            startPadding: 10.0,
-                            accelerationDuration: Duration(seconds: 1),
-                            accelerationCurve: Curves.linear,
-                            decelerationDuration: Duration(milliseconds: 500),
-                            decelerationCurve: Curves.easeOut,
+                            style: const TextStyle(fontSize: 16),
                           ),
                         ),
                       ),
