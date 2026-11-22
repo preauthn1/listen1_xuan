@@ -249,6 +249,9 @@ Widget _buildSupabasePanel() {
 /// 避免打开后下次启动失败。
 Widget _supabaseBackupUrlSwitch() => Obx(() {
       final settings = Get.find<SettingsController>();
+      // 先读取开关值：Obx 内必须每次都访问到 observable，
+      // 否则 Release 构建会抛错并显示成一大块灰色。
+      final enabled = settings.supabaseUseBackupUrl;
       final available = supabaseProxyToken.isNotEmpty;
       return SwitchListTile(
         contentPadding: EdgeInsets.zero,
@@ -256,7 +259,7 @@ Widget _supabaseBackupUrlSwitch() => Obx(() {
         subtitle: Text(available
             ? '通过自建中转连接 Supabase，需重启应用生效'
             : '此版本未配置中转令牌，无法使用备用地址'),
-        value: available && settings.supabaseUseBackupUrl,
+        value: available && enabled,
         onChanged: available
             ? (bool value) {
                 settings.supabaseUseBackupUrl = value;
@@ -286,6 +289,8 @@ Widget _loginRow({
   required String label,
   required VoidCallback onPressed,
   VoidCallback? onImportCookie,
+  bool loggedIn = false,
+  VoidCallback? onLogout,
 }) {
   final theme = Theme.of(context);
   final identity = Row(
@@ -317,12 +322,25 @@ Widget _loginRow({
       ),
     ],
   );
-  // 统一宽度，让「登录 / Cookie」与「登录」左右边缘对齐。
-  final action = FilledButton.tonal(
-    onPressed: onPressed,
-    style: _pillStyle(theme, minWidth: 128),
-    child: Text(label, maxLines: 1, softWrap: false, style: _noUnderline),
-  );
+  // 统一宽度，让各行按钮左右边缘对齐。已登录时改为「退出」，
+  // 换账号可用左侧的 Cookie 导入或退出后重新登录。
+  final Widget action = loggedIn && onLogout != null
+      ? OutlinedButton(
+          onPressed: onLogout,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(128, 40),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            foregroundColor: theme.colorScheme.error,
+            side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.6)),
+            textStyle: theme.textTheme.labelLarge?.merge(_noUnderline) ?? _noUnderline,
+          ),
+          child: const Text('退出', maxLines: 1, softWrap: false, style: _noUnderline),
+        )
+      : FilledButton.tonal(
+          onPressed: onPressed,
+          style: _pillStyle(theme, minWidth: 128),
+          child: Text(label, maxLines: 1, softWrap: false, style: _noUnderline),
+        );
   // 「Cookie」：直接粘贴或从文件导入浏览器里的登录 Cookie。
   final importAction = onImportCookie == null
       ? null
@@ -389,7 +407,7 @@ Widget _buildThirdPartyLoginPanel(BuildContext context) {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final provider in music_providers.provider.getLoginProviders())
-                _loginRow(
+                Obx(() => _loginRow(
                   context: context,
                   icon: provider.loginIcon,
                   name: provider.loginDisplayName,
@@ -416,15 +434,37 @@ Widget _buildThirdPartyLoginPanel(BuildContext context) {
                   onImportCookie: provider.supportCookieImport
                       ? () => showCookieImportDialog(context, provider)
                       : null,
-                ),
-              _loginRow(
+                  loggedIn: provider.loginStatus.value == LoginStatus.loggedIn,
+                  onLogout: () async {
+                    if (await showConfirmDialog(
+                      '退出后需要重新登录或导入 Cookie 才能使用该平台的个人歌单。',
+                      '退出${provider.loginDisplayName}？',
+                      confirmLevel: ConfirmLevel.warning,
+                      confirmText: '退出',
+                    )) {
+                      await provider.logout();
+                    }
+                  },
+                )),
+              Obx(() => _loginRow(
                 context: context,
                 icon: Iconify(Mdi.github, size: 20, color: theme.colorScheme.onSurface),
                 name: 'GitHub',
-                status: Obx(() => Text(Github.getStatusText())),
+                status: Text(Github.getStatusText()),
                 label: '登录',
                 onPressed: () => Github.openAuthUrl(),
-              ),
+                loggedIn: Github.status.value == 2,
+                onLogout: () async {
+                  if (await showConfirmDialog(
+                    '退出后将无法同步 Gist 歌单和下载测试版。',
+                    '退出 GitHub？',
+                    confirmLevel: ConfirmLevel.warning,
+                    confirmText: '退出',
+                  )) {
+                    await Github.logout();
+                  }
+                },
+              )),
               // 行自带 6px 垂直内边距，补到上下各 14px。
               const Padding(
                 padding: EdgeInsets.only(top: 8, bottom: 14),
