@@ -177,8 +177,18 @@ class PlaylistInfoPage extends StatelessWidget {
     BuildContext context,
     PlaylistInfoController controller,
   ) {
+    // 每日推荐、私人 FM 每次内容都不同，收藏没有意义；改为提供「换一批」。
+    final isDynamic = controller.listId.startsWith('nedaily_') ||
+        controller.listId.startsWith('nefm_');
     return [
+      if (controller.listId.startsWith('nefm_'))
+        IconButton(
+          tooltip: '换一批',
+          icon: const Icon(Icons.shuffle_rounded),
+          onPressed: () => controller.loadData(),
+        ),
       IconButton(
+        tooltip: '保存为我的歌单',
         icon: Icon(Icons.add),
         onPressed: () async {
           try {
@@ -196,6 +206,7 @@ class PlaylistInfoPage extends StatelessWidget {
       ),
       controller.isMy
           ? IconButton(
+              tooltip: '删除歌单',
               icon: Icon(Icons.delete),
               onPressed: () {
                 showDialog(
@@ -228,7 +239,10 @@ class PlaylistInfoPage extends StatelessWidget {
                 );
               },
             )
+          : isDynamic
+          ? const SizedBox.shrink()
           : IconButton(
+              tooltip: '在浏览器中打开',
               icon: Icon(Icons.link),
               onPressed: () {
                 final sourceUrl = controller.result.info.source_url;
@@ -241,6 +255,7 @@ class PlaylistInfoPage extends StatelessWidget {
             ),
       controller.isMy
           ? IconButton(
+              tooltip: '编辑歌单',
               icon: Icon(Icons.edit),
               onPressed: () async {
                 setInAppHotKeyEnable(false);
@@ -297,8 +312,11 @@ class PlaylistInfoPage extends StatelessWidget {
                 setInAppHotKeyEnable(true);
               },
             )
+          : isDynamic
+          ? const SizedBox.shrink()
           : Obx(
               () => IconButton(
+                tooltip: controller.isFav.value ? '取消收藏' : '收藏歌单',
                 icon: controller.isFav.value
                     ? Icon(Icons.star)
                     : Icon(Icons.star_border),
