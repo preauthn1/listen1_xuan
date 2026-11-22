@@ -5,10 +5,19 @@ Widget buildCoverImage(double size, {double? borderRadius}) {
   final radius = borderRadius ?? 8.0;
   return GestureDetector(
     onTap: () => _openLyricPage(),
-    child: Obx(() {
+    child: Builder(builder: (context) => Obx(() {
       Track? mediaItem = _playController.nowPlayingTrackRx.value;
       return isEmpty(mediaItem?.img_url)
-          ? Container(color: Get.theme.cardColor)
+          // 无封面时用主题的次级表面色加音符图标，深色模式下不再是刺眼的白块。
+          ? Container(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.music_note_rounded,
+                size: size * 0.5,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            )
           : ExtendedImage.network(
               mediaItem!.img_url!,
               fit: BoxFit.cover,
@@ -23,7 +32,7 @@ Widget buildCoverImage(double size, {double? borderRadius}) {
                 return null;
               },
             );
-    }).clipSmoothRectSize(size).sbs(size),
+    })).clipSmoothRectSize(size).sbs(size),
   );
 }
 
