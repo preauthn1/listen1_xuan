@@ -261,8 +261,8 @@ ButtonStyle _pillStyle(ThemeData theme, {double minWidth = 96}) {
     minimumSize: Size(minWidth, 40),
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
     textStyle: theme.textTheme.labelLarge?.merge(_noUnderline) ?? _noUnderline,
-    disabledBackgroundColor: theme.colorScheme.surfaceContainerHighest,
-    disabledForegroundColor: theme.colorScheme.onSurfaceVariant,
+    disabledBackgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+    disabledForegroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.38),
   );
 }
 
@@ -764,6 +764,8 @@ Widget desktopSettingsTiles(
     mainAxisSize: MainAxisSize.min,
     children:
         [
+              // 第一个是「启用热键」开关（ListTile 自带内边距），其余为快捷键按钮。
+              ...create_hotkey_btns(context).take(1),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Wrap(
@@ -771,7 +773,7 @@ Widget desktopSettingsTiles(
                   alignment: WrapAlignment.start,
                   spacing: 8,
                   runSpacing: 0,
-                  children: create_hotkey_btns(context),
+                  children: create_hotkey_btns(context).skip(1).toList(),
                 ),
               ),
               Padding(
