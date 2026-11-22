@@ -26,8 +26,8 @@ import re, sys, xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
 pat = re.compile(sys.argv[2])
 for n in root.iter('node'):
-    label = (n.get('text') or '') + ' ' + (n.get('content-desc') or '')
-    if pat.search(label):
+    label = (n.get('content-desc') or n.get('text') or '').strip()
+    if pat.fullmatch(label) or pat.fullmatch(label.split('\n')[0]):
         m = re.findall(r'\d+', n.get('bounds', ''))
         if len(m) == 4:
             x1, y1, x2, y2 = map(int, m)
@@ -73,25 +73,34 @@ tap_text '不允许|Don.t allow' && sleep 2
 sleep 8
 snap 02-home
 
-# 竖屏首页：切到第三个平台标签，再弹出键盘，确认标签不会被重置
-tap_text '^QQ$|QQ 音乐' && sleep 4
+# 竖屏首页：切到 QQ 标签，再弹出键盘，确认标签不会被重置
+tap_text 'QQ' && sleep 4
 snap 03-tab-qq
-tap_text '搜索' && sleep 3
+log "tap search field"
+adb shell input tap 560 202; sleep 3
 snap 04-search-keyboard
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input keyevent KEYCODE_BACK; sleep 3
 snap 05-after-keyboard
+tap_text '我的' && sleep 3
 
 # 设置页
 tap_text '设置' && sleep 5
 snap 06-settings
+tap_text '第三方平台登录' && sleep 3
+snap 07-settings-login
+tap_text '第三方平台登录' && sleep 2
 tap_text '缓存' && sleep 3
-snap 07-settings-cache
-adb shell input swipe 540 1700 540 700 400; sleep 2
-snap 08-settings-cache-scrolled
-tap_text '缓存' ; sleep 2
-tap_text '歌单/配置文件|配置文件' && sleep 3
+adb shell input swipe 540 1700 540 900 400; sleep 2
+snap 08-settings-cache
+tap_text '缓存' && sleep 2
+adb shell input swipe 540 900 540 1900 300; sleep 2
+tap_text '歌单/配置文件' && sleep 3
 snap 09-settings-config
+tap_text '歌单/配置文件' && sleep 2
+adb shell input swipe 540 1900 540 400 300; sleep 2
+adb shell input swipe 540 1900 540 400 300; sleep 2
+snap 09b-settings-bottom
 adb shell input keyevent KEYCODE_BACK; sleep 3
 
 # 转屏再转回
@@ -104,6 +113,9 @@ snap 11-portrait-again
 # 深色模式
 adb shell cmd uimode night yes; sleep 6
 snap 12-dark-home
+tap_text '设置' && sleep 4
+snap 13-dark-settings
+adb shell input keyevent KEYCODE_BACK; sleep 2
 
 perms after-tour
 log "app files:"
