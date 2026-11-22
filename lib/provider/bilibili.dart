@@ -76,6 +76,8 @@ class Bilibili extends BaseProvider {
   @override
   Widget get loginIcon => _bilibiliSectionIcon;
   @override
+  List<String> get requiredCookieNames => const ['SESSDATA'];
+  @override
   List<String> get cookieUrls => const [
     'https://api.bilibili.com',
     'https://www.bilibili.com',
@@ -278,10 +280,10 @@ class Bilibili extends BaseProvider {
   // #region 登录 / 用户
 
   @override
-  String get loginButtonText => '登录哔哩哔哩 / 设置 Cookie';
+  String get loginButtonText => '登录哔哩哔哩';
 
   @override
-  String get loginActionText => '登录 / Cookie';
+  String get loginActionText => '登录';
 
   @override
   Future<void> login(BuildContext context) async {
@@ -1355,7 +1357,8 @@ class _BilibiliLoginFormState extends State<_BilibiliLoginForm> {
                 if (_saving) return;
                 _saving = true;
                 try {
-                  await widget.provider.saveToken(value);
+                  // 与独立的 Cookie 导入一致：校验 SESSDATA 并过滤到 B 站域名。
+                  await widget.provider.importCookies(value);
                   showSuccessSnackbar('设置成功', null);
                   if (context.mounted) Navigator.of(context).pop();
                 } catch (e) {
