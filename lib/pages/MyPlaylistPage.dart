@@ -470,10 +470,9 @@ class _MyPlaylistState extends State<MyPlaylist> {
 
     return Obx(
       () => Scaffold(
-        // 手机横屏时侧栏很矮，浮动按钮必然压住平台行右侧的刷新按钮；
-        // 此时改由侧栏底部操作栏提供同一入口。
-        floatingActionButton: isMobile &&
-                MediaQuery.orientationOf(context) == Orientation.landscape
+        // 横屏布局（含桌面）里侧栏较窄，浮动按钮会压住平台行右侧的刷新按钮；
+        // 此时由侧栏底部操作栏提供同一入口，浮动按钮只用于竖屏。
+        floatingActionButton: MediaQuery.orientationOf(context) == Orientation.landscape
             ? null
             : FloatingActionButton(
           heroTag: HeroTags.songReplaceFab,
