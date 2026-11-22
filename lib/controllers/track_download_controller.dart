@@ -10,6 +10,7 @@ import 'package:listen1_xuan/constants/network_defaults.dart';
 import 'package:listen1_xuan/controllers/DioController.dart';
 import 'package:listen1_xuan/controllers/cache_controller.dart';
 import 'package:listen1_xuan/controllers/play_controller.dart';
+import 'package:listen1_xuan/controllers/routeController.dart';
 import 'package:listen1_xuan/controllers/settings_controller.dart';
 import 'package:listen1_xuan/funcs.dart';
 import 'package:listen1_xuan/global_settings_animations.dart';
@@ -411,6 +412,15 @@ class TrackDownloadController extends GetxController {
     try {
       final legacy = await _channel.invokeMethod<bool>('needsLegacyPermission') ?? false;
       if (!legacy) return true;
+      if (await Permission.storage.isGranted) return true;
+      // Android 9 及以下写公共「下载」文件夹需要存储权限，先说明用途再弹系统框。
+      final ok = await showConfirmDialog(
+        '下载的歌曲和歌词会保存到「下载/Listen1/Music」，方便在文件管理器和其他播放器中使用。'
+            '这个系统版本需要存储权限才能写入该文件夹。',
+        '需要存储权限',
+        confirmText: '继续',
+      );
+      if (!ok) return false;
       return await Permission.storage.request().isGranted;
     } catch (_) {
       return true;
@@ -474,7 +484,8 @@ class TrackDownloadController extends GetxController {
     } else if (_batchDone > 0) {
       showSuccessSnackbar(
         _batchDone == 1 ? '已下载' : '已下载 $_batchDone 首',
-        '保存在 $locationHint',
+        '保存在 $locationHint，点此查看',
+        onTap: () => Get.toNamed(RouteName.trackDownloadsPage, id: 1),
       );
     }
     if (kDebugMode) debugPrint('download batch done=$_batchDone failed=$_batchFailed');
