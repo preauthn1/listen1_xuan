@@ -470,9 +470,14 @@ class _MyPlaylistState extends State<MyPlaylist> {
 
     return Obx(
       () => Scaffold(
-        floatingActionButton: FloatingActionButton(
+        // 手机横屏时侧栏很矮，浮动按钮必然压住平台行右侧的刷新按钮；
+        // 此时改由侧栏底部操作栏提供同一入口。
+        floatingActionButton: isMobile &&
+                MediaQuery.orientationOf(context) == Orientation.landscape
+            ? null
+            : FloatingActionButton(
           heroTag: HeroTags.songReplaceFab,
-          mini: ((isWindows || MediaQuery.orientationOf(context) == Orientation.landscape) &&
+          mini: (isWindows &&
                   !settingsController.settings
                       .containsKey(SettingsController.songReplaceFabLocationKey)) ||
               settingsController.songReplaceFabMiniRx.value,
@@ -487,9 +492,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
           child: Icon(Icons.find_replace_rounded),
         ),
         // Windows 默认放在侧栏右下角并缩小，列表底部留白保证不压住最后一行。
-        // 横屏（含 Android 平板/横屏手机）与 Windows 一样默认缩小并靠右下，
-        // 不再压住侧栏里的平台分组行。
-        floatingActionButtonLocation: (isWindows || MediaQuery.orientationOf(context) == Orientation.landscape) &&
+        floatingActionButtonLocation: isWindows &&
                 !settingsController.settings.containsKey(SettingsController.songReplaceFabLocationKey)
             ? FloatingActionButtonLocation.miniEndFloat
             : settingsController.songReplaceFabMiniRx.value
