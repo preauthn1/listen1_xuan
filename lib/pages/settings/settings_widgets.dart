@@ -764,12 +764,15 @@ Widget desktopSettingsTiles(
     mainAxisSize: MainAxisSize.min,
     children:
         [
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                alignment: WrapAlignment.start,
-                spacing: 4,
-
-                children: create_hotkey_btns(context),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  alignment: WrapAlignment.start,
+                  spacing: 8,
+                  runSpacing: 0,
+                  children: create_hotkey_btns(context),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),

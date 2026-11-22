@@ -157,7 +157,7 @@ void init_hotkeys() async {
     Get.find<SettingsController>().setSettings(settings);
   }
   enable_hotkey = hotskeys["enable"];
-  hotkeyEnabledNotifier.value = enable_hotkey;
+  hotkeyEnabledNotifier.value = enable_hotkey == true;
   if (hotskeys['copy_totp'] != null) {
     set_hotkey(null, HotKey.fromJson(hotskeys['copy_totp']), 'copy_totp');
   }
@@ -265,7 +265,7 @@ Future<void> set_hotkey(s_hotkey, hotkey, name) async {
 var enable_hotkey_setstate;
 var enable_hotkey;
 /// 热键总开关的可监听副本，用于在关闭时禁用各快捷键按钮。
-final ValueNotifier<bool> hotkeyEnabledNotifier = ValueNotifier<bool>(true);
+final ValueNotifier<bool> hotkeyEnabledNotifier = ValueNotifier<bool>(false);
 
 List<Widget> create_hotkey_btns(context) {
   if (!(isWindows || isMacOS)) return [];
@@ -285,7 +285,7 @@ List<Widget> create_hotkey_btns(context) {
           value: enable_hotkey,
           onChanged: (bool value) async {
             enable_hotkey = value;
-            hotkeyEnabledNotifier.value = value;
+            hotkeyEnabledNotifier.value = value == true;
             var settings = lengcyGetSettings();
             var hotkeys = settings['hotkeys'];
             hotkeys['enable'] = value;
