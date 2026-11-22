@@ -83,7 +83,9 @@ class PlaylistController extends GetxController {
 
       logger.t('加载更多歌单数据成功: $result');
       final knownIds = playlists.map((playlist) => playlist.info.id).toSet();
-      final newPlaylists = result.where((playlist) => knownIds.add(playlist.info.id)).toList();
+      final newPlaylists = result
+          .where((playlist) => knownIds.add(playlist.info.id))
+          .toList();
       // 部分接口越界时会重复返回已有页，没有新歌单也应结束加载。
       if (newPlaylists.isEmpty) {
         hasMore.value = false;
@@ -161,20 +163,18 @@ class PlaylistPage extends GetView<PlaylistController> {
     final String controllerTag = tag;
     Get.put(PlaylistController(source: source), tag: controllerTag);
 
-    return Scaffold(
-      body: Center(
-        child: Obx(() {
-          if (controller.loading.value) {
-            return globalLoadingAnime;
-          }
+    return Center(
+      child: Obx(() {
+        if (controller.loading.value) {
+          return globalLoadingAnime;
+        }
 
-          if (controller.loadFailed.value) {
-            return _buildErrorView(context);
-          }
+        if (controller.loadFailed.value) {
+          return _buildErrorView(context);
+        }
 
-          return _buildPlaylistLayout(context);
-        }),
-      ),
+        return _buildPlaylistLayout(context);
+      }),
     );
   }
 
@@ -201,101 +201,108 @@ class PlaylistPage extends GetView<PlaylistController> {
         );
       }
 
-      return PageScrollToTop(scrollController: controller.scrollController, builder: (context, pageScrollController, pageListController) => SingleChildScrollView(
-        controller: pageScrollController,
+      return PageScrollToTop(
+        scrollController: controller.scrollController,
+        builder: (context, pageScrollController, pageListController) =>
+            SingleChildScrollView(
+              controller: pageScrollController,
 
-        child: Column(
-          children: [
-            _buildPlaylistWrap(context),
-            // 下方的三种状态互斥：加载更多失败 / 加载中 / 可以继续加载。
-            if (controller.loadMoreFailed.value)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    Text(
-                      '加载更多失败',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                        fontWeight: FontWeight.bold,
+              child: Column(
+                children: [
+                  _buildPlaylistWrap(context),
+                  // 下方的三种状态互斥：加载更多失败 / 加载中 / 可以继续加载。
+                  if (controller.loadMoreFailed.value)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          Text(
+                            '加载更多失败',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          8.sbh,
+                          SelectableText(
+                            controller.loadMoreError.value,
+                            textAlign: TextAlign.center,
+                          ),
+                          12.sbh,
+                          FilledButton.icon(
+                            onPressed: () => controller.loadMoreData(),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('重试'),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (controller.loadingMore.value)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    )
+                  // 手动加载更多按钮
+                  else if (controller.hasMore.value)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: ElevatedButton(
+                        onPressed: () => controller.loadMoreData(),
+                        child: const Text('加载更多'),
+                      ),
+                    )
+                  // 没有更多数据的提示
+                  else if (controller.playlists.isNotEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text(
+                        '没有更多数据了',
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
                       ),
                     ),
-                    8.sbh,
-                    SelectableText(
-                      controller.loadMoreError.value,
-                      textAlign: TextAlign.center,
-                    ),
-                    12.sbh,
-                    FilledButton.icon(
-                      onPressed: () => controller.loadMoreData(),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('重试'),
-                    ),
-                  ],
-                ),
-              )
-            else if (controller.loadingMore.value)
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: CircularProgressIndicator(),
-              )
-            // 手动加载更多按钮
-            else if (controller.hasMore.value)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: ElevatedButton(
-                  onPressed: () => controller.loadMoreData(),
-                  child: const Text('加载更多'),
-                ),
-              )
-            // 没有更多数据的提示
-            else if (controller.playlists.isNotEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  '没有更多数据了',
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
-                ),
+                ],
               ),
-          ],
-        ),
-      ));
+            ),
+      );
     });
   }
 
   /// 首屏加载失败：展示具体原因并提供重试。
   Widget _buildErrorView(BuildContext context) {
     return Center(
-      child: PageScrollToTop(builder: (context, pageScrollController, pageListController) => SingleChildScrollView(
-        controller: pageScrollController,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Theme.of(context).colorScheme.error,
+      child: PageScrollToTop(
+        builder: (context, pageScrollController, pageListController) =>
+            SingleChildScrollView(
+              controller: pageScrollController,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  12.sbh,
+                  const Text(
+                    '加载失败',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  8.sbh,
+                  SelectableText(
+                    controller.loadError.value,
+                    textAlign: TextAlign.center,
+                  ),
+                  16.sbh,
+                  FilledButton.icon(
+                    onPressed: () => controller.loadData(),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('重试'),
+                  ),
+                ],
+              ),
             ),
-            12.sbh,
-            const Text(
-              '加载失败',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            8.sbh,
-            SelectableText(
-              controller.loadError.value,
-              textAlign: TextAlign.center,
-            ),
-            16.sbh,
-            FilledButton.icon(
-              onPressed: () => controller.loadData(),
-              icon: const Icon(Icons.refresh),
-              label: const Text('重试'),
-            ),
-          ],
-        ),
-      )),
+      ),
     );
   }
 
