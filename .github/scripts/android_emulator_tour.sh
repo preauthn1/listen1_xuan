@@ -133,7 +133,12 @@ adb shell input keyevent KEYCODE_BACK; sleep 3
 # 转屏再转回
 adb shell settings put system accelerometer_rotation 0
 adb shell settings put system user_rotation 1; sleep 6
+# 首次进入沉浸模式时系统会提示「Viewing full screen」，先关掉
+tap_text 'Got it' && sleep 2
 snap 10-landscape
+tap_text '歌曲替换列表' && sleep 4
+snap 10b-landscape-song-replace
+adb shell input keyevent KEYCODE_BACK; sleep 3
 adb shell settings put system user_rotation 0; sleep 6
 snap 11-portrait-again
 
