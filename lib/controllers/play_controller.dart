@@ -154,44 +154,67 @@ class PlayController extends GetxController
     }
   }
 
-  /// 初始化音频会话，监听蓝牙断开等系统音频事件
+  /// 初始化音频会话：配置播放类别，并在 Android 上监听蓝牙断开等系统音频事件。
+  /// iOS 必须显式声明 playback 类别，否则控制中心不会把本应用当成 Now Playing。
   Future<void> _initAudioSession() async {
-    if (!isAndroid) return;
     try {
       final session = await AudioSession.instance;
       await session.configure(
-        const AudioSessionConfiguration(
-          androidAudioAttributes: AndroidAudioAttributes(
-            contentType: AndroidAudioContentType.music,
-            usage: AndroidAudioUsage.media,
-          ),
-          androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
-          androidWillPauseWhenDucked: true,
-        ),
+        isAndroid
+            ? const AudioSessionConfiguration(
+                androidAudioAttributes: AndroidAudioAttributes(
+                  contentType: AndroidAudioContentType.music,
+                  usage: AndroidAudioUsage.media,
+                ),
+                androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
+                androidWillPauseWhenDucked: true,
+              )
+            : const AudioSessionConfiguration(
+                avAudioSessionCategory: AVAudioSessionCategory.playback,
+                avAudioSessionMode: AVAudioSessionMode.defaultMode,
+              ),
       );
       debugPrint('Audio session configured: ${session.configuration}');
-      // 监听蓝牙/耳机断开事件 -> 自动暂停播放
-      session.becomingNoisyEventStream.listen((_) {
-        if (isplaying.value) {
-          globalPause();
-        }
-      });
-      session.devicesChangedEventStream.listen((event) {
-        if (event.devicesRemoved.any(
-          (device) =>
-              device.type == AudioDeviceType.bluetoothA2dp ||
-              device.type == AudioDeviceType.wiredHeadphones,
-        )) {
+      if (isAndroid) {
+        // 监听蓝牙/耳机断开事件 -> 自动暂停播放
+        session.becomingNoisyEventStream.listen((_) {
           if (isplaying.value) {
             globalPause();
           }
-        }
-      });
+        });
+        session.devicesChangedEventStream.listen((event) {
+          if (event.devicesRemoved.any(
+            (device) =>
+                device.type == AudioDeviceType.bluetoothA2dp ||
+                device.type == AudioDeviceType.wiredHeadphones,
+          )) {
+            if (isplaying.value) {
+              globalPause();
+            }
+          }
+        });
+      }
       session.interruptionEventStream.listen((event) {
         debugPrint('Audio session interruption event: $event');
       });
     } catch (e) {
       logger.e('初始化音频会话失败: $e');
+    }
+  }
+
+  Future<void>? _audioSessionReady;
+
+  /// 开始出声前先激活音频会话。
+  /// iOS 上若会话未激活就开始播放，系统不会把本应用认定为当前 Now Playing，
+  /// 控制中心媒体卡片会一直是别的应用或空白；Android 的会话由 audio_service 管。
+  Future<void> activateAudioSession() async {
+    await _audioSessionReady;
+    if (!isIos) return;
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(true);
+    } catch (e) {
+      logger.e('激活音频会话失败: $e');
     }
   }
 
@@ -334,8 +357,8 @@ class PlayController extends GetxController
     logger.d(music_player.state.audioParams);
     music_player.stream.error.listen((error) => processMusicPlayerError(error));
     music_player.stream.log.listen((log) => debugPrint('$log'));
-    // 初始化音频会话（注册蓝牙断开等系统事件监听）
-    _initAudioSession();
+    // 初始化音频会话（配置类别/注册系统事件监听）
+    _audioSessionReady = _initAudioSession();
     // 初始化播放按钮旋转动画控制器
     playVPlayBtnProcessControllerInit();
     // androidEQEnabled =
@@ -371,9 +394,14 @@ class PlayController extends GetxController
     debounce(isplaying, (callback) {
       broadcastWs();
       updateContinuePlay();
-      AudioSession.instance.then((session) {
-        session.setActive(isplaying.value);
-      });
+      // iOS 暂停时不关会话，避免丢掉控制中心的 Now Playing 归属；
+      // 恢复播放前由 activateAudioSession() 保证会话处于 active。
+      // Android 的会话开关仍由这里同步。
+      if (isAndroid) {
+        AudioSession.instance.then((session) {
+          session.setActive(isplaying.value);
+        });
+      }
     }, time: Duration(milliseconds: 300));
     debounce(showPlayVInlineLyricVisible, (value) {
       if (value && !showPlayVInlineLyricOp.value) {
@@ -578,6 +606,7 @@ class PlayController extends GetxController
   Future<void> requestPlay() async {
     if (music_player.state.playlist.medias.isNotEmpty) {
       pendingPlay = false;
+      await activateAudioSession();
       await music_player.play();
       return;
     }
@@ -592,9 +621,10 @@ class PlayController extends GetxController
   }
 
   /// 在音频源加载完成后调用，消费待播放意图。
-  void consumePendingPlay() {
+  Future<void> consumePendingPlay() async {
     if (!pendingPlay) return;
     pendingPlay = false;
+    await activateAudioSession();
     music_player.play();
   }
 
@@ -705,10 +735,11 @@ class PlayController extends GetxController
         }
       }
       if (start) {
+        await activateAudioSession();
         music_player.play();
         pendingPlay = false;
       } else {
-        consumePendingPlay();
+        await consumePendingPlay();
       }
       await change_playback_state(track);
     } catch (e, stackTrace) {
