@@ -53,6 +53,25 @@ class KugouSign {
     return '${e()}${e()}-${e()}-${e()}-${e()}-${e()}${e()}${e()}';
   }
 
+  // 标准版 RSA 公钥（KuGouMusicApi util/crypto.js 的 publicRasKey）。
+  static final BigInt _rsaN = BigInt.parse(
+    'c8006ed03842d2628209bd314984ca5ed6cfe06e30c95f9d4704d9c49791d7a9'
+    '35ba950ecb0bc8ebf5f5994f0bac927a7eb151b3c1de343303fa539c83136ecc'
+    'fd7d7e511e2dbce18eaa9f784c9b50d443e75865979e0a5e216e46c684066a8d'
+    '6b998580bbaa22d73f5790286bb14742e83244e44db6d707ffe162c5c7002d45',
+    radix: 16,
+  );
+  static final BigInt _rsaE = BigInt.from(0x10001);
+
+  /// 酷狗的「无填充」RSA：明文右侧补零到 128 字节后直接 modPow，输出大写十六进制。
+  static String rsaRaw(String plain) {
+    final bytes = utf8.encode(plain);
+    if (bytes.length > 128) throw ArgumentError('RSA 明文超过 128 字节');
+    final padded = List<int>.filled(128, 0)..setRange(0, bytes.length, bytes);
+    final m = BigInt.parse(padded.map((b) => b.toRadixString(16).padLeft(2, '0')).join(), radix: 16);
+    return m.modPow(_rsaE, _rsaN).toRadixString(16).padLeft(256, '0').toUpperCase();
+  }
+
   static String randomString(int len, [Random? rnd]) {
     const chars = '1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     final r = rnd ?? Random.secure();
