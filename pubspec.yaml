@@ -110,6 +110,7 @@ dependencies:
   msix: ^3.16.12
   win32_registry: ^3.0.3
   dynamic_color: 1.8.1
+  responsive_framework: ^1.5.1
   bonsoir: ^6.0.3
   punycode: ^1.0.0
   iconify_flutter_plus: ^1.0.4
