@@ -21,17 +21,20 @@ class SettingsTipsPage extends StatelessWidget {
           if (tips.isEmpty) {
             return const Center(child: Text('暂无Tip'));
           }
-          return PageScrollToTop(superList: true, topInset: 16, builder: (context, pageScrollController, pageListController) => SuperListView.separated(
+          return PageScrollToTop(superList: true, topInset: 16, builder: (context, pageScrollController, pageListController) => LayoutBuilder(builder: (context, constraints) => SuperListView.separated(
           controller: pageScrollController,
           listController: pageListController,
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(
+              horizontal: ((constraints.maxWidth - 760) / 2).clamp(16.0, double.infinity),
+              vertical: 16,
+            ),
             itemCount: tips.length,
             separatorBuilder: (_, __) => const Divider(),
             itemBuilder: (context, index) => ListTile(
               leading: const Icon(Icons.lightbulb_outline),
               title: Text(tips[index]),
             ),
-          ));
+          )));
         },
       ),
     );
