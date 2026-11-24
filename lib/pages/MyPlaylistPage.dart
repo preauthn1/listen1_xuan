@@ -11,6 +11,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
   bool _isExpandedMy = true;
   bool _isExpandedFav = false;
   bool _isExpandedRecommend = true;
+  bool _isExpandedKugouRecommend = true;
 
   /// 各平台“我的歌单”分组的加载状态，key 为 provider.name。
   final Map<String, _ProviderPlaylistSection> _providerSections = {};
@@ -660,6 +661,54 @@ class _MyPlaylistState extends State<MyPlaylist> {
                                   onTap: () => Ro.toArg(PlaylistInfoArgs(
                                     playListInfo: PlayListInfo(
                                       id: 'nefm_personal',
+                                      title: '私人 FM',
+                                    ),
+                                    isMy: false,
+                                  )),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        Obx(() {
+                          final kugou = providers.firstWhereOrNull(
+                            (p) => p.name == 'kugou',
+                          );
+                          if (kugou == null ||
+                              kugou.loginStatus.value != LoginStatus.loggedIn) {
+                            return const SizedBox.shrink();
+                          }
+                          return _buildExpandableSection(
+                            leading: kugou.loginIcon,
+                            title: '酷狗音乐 · 为你推荐',
+                            isExpanded: _isExpandedKugouRecommend,
+                            availableWidth: availableWidth,
+                            onExpandedChanged: (expanded) {
+                              setState(() => _isExpandedKugouRecommend = expanded);
+                            },
+                            body: Column(
+                              children: [
+                                _buildShortcutTile(
+                                  icon: Icons.today_rounded,
+                                  title: '每日推荐',
+                                  subtitle: '每天更新',
+                                  availableWidth: availableWidth,
+                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
+                                    playListInfo: PlayListInfo(
+                                      id: 'kgdaily_today',
+                                      title: '每日推荐',
+                                    ),
+                                    isMy: false,
+                                  )),
+                                ),
+                                _buildShortcutTile(
+                                  icon: Icons.radio_rounded,
+                                  title: '私人 FM',
+                                  subtitle: '按口味连续推荐',
+                                  availableWidth: availableWidth,
+                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
+                                    playListInfo: PlayListInfo(
+                                      id: 'kgfm_personal',
                                       title: '私人 FM',
                                     ),
                                     isMy: false,

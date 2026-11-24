@@ -192,9 +192,12 @@ class PlaylistInfoPage extends StatelessWidget {
     // 每日推荐、私人 FM 每次内容都不同，收藏没有意义；改为提供「换一批」。
     final isDynamic =
         controller.listId.startsWith('nedaily_') ||
-        controller.listId.startsWith('nefm_');
+        controller.listId.startsWith('nefm_') ||
+        controller.listId.startsWith('kgdaily_') ||
+        controller.listId.startsWith('kgfm_');
+    final isFm = controller.listId.startsWith('nefm_') || controller.listId.startsWith('kgfm_');
     return [
-      if (controller.listId.startsWith('nefm_'))
+      if (isFm)
         IconButton(
           tooltip: '换一批',
           icon: const Icon(Icons.shuffle_rounded),
