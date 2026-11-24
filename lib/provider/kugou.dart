@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart' hide Response;
 import 'package:dio/dio.dart';
@@ -77,7 +78,14 @@ class Kugou extends BaseProvider {
   String get loginDisplayName => '酷狗音乐';
 
   @override
-  Widget get loginIcon => const Icon(Icons.music_note_rounded, size: 18);
+  Widget get loginIcon => ExtendedImage.network(
+        'https://www.kugou.com/yy/static/images/play/logo.png',
+        width: 18,
+        height: 18,
+        cache: true,
+        borderRadius: BorderRadius.circular(4),
+        shape: BoxShape.rectangle,
+      );
 
   @override
   List<String> get cookieUrls => const ['https://kugou.com', 'https://login-user.kugou.com'];
