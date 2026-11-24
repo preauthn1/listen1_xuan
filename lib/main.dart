@@ -56,6 +56,7 @@ import 'play.dart';
 import 'global_settings_animations.dart';
 import 'widgets.dart';
 import 'widgets/priority_responsive_action_row.dart';
+import 'widgets/responsive_layout.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:preload_page_view/preload_page_view.dart';
@@ -384,6 +385,8 @@ class MyApp extends StatelessWidget {
                 child: widget ?? SizedBox.shrink(),
               );
               widget = FToastBuilder()(context, widget);
+              // 全局断点：页面可用 ResponsiveBreakpoints.of(context) 判断布局档位。
+              widget = responsiveAppBuilder(context, widget);
               // 处理 MediaQuery 异常问题，特别是小米澎湃系统
               MediaQueryData mediaQuery = MediaQuery.of(context);
               double safeTop = mediaQuery.padding.top;
