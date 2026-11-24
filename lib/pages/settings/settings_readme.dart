@@ -117,8 +117,14 @@ class _RepositoryDocumentPageState extends State<RepositoryDocumentPage> {
       );
     }
     return PageScrollToTop(
-      builder: (context, pageScrollController, pageListController) => Markdown(
+      builder: (context, pageScrollController, pageListController) => LayoutBuilder(
+        builder: (context, constraints) => Markdown(
         controller: pageScrollController,
+        // 宽屏时左右留白，正文最宽 800，滚动条仍贴在窗口右边。
+        padding: EdgeInsets.symmetric(
+          horizontal: ((constraints.maxWidth - 800) / 2).clamp(16.0, double.infinity),
+          vertical: 16,
+        ),
         imageDirectory: document.imageDirectory,
         onTapLink: (text, href, title) {
           if (href != null) {
@@ -127,6 +133,7 @@ class _RepositoryDocumentPageState extends State<RepositoryDocumentPage> {
         },
         selectable: true,
         data: document.content!,
+      ),
       ),
     );
   }
