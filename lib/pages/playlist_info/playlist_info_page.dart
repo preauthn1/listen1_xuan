@@ -116,6 +116,9 @@ class PlaylistInfoPage extends StatelessWidget {
                                         List<Track> trackList =
                                             List<Track>.from(controller.tracks);
                                         set_current_playing(trackList);
+                                        // 私人 FM 是电台：队列快播完时自动续上
+                                        personalFmActive.value =
+                                            controller.listId.startsWith('nefm_');
                                         playsong(
                                           controller.tracks[0],
                                           isByClick: true,
