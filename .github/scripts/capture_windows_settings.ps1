@@ -16,6 +16,20 @@ public class UI {
  [DllImport("user32")] public static extern void keybd_event(byte vk,byte scan,uint f,UIntPtr extra);
 }
 '@ -ReferencedAssemblies System.Drawing
+# 运行器默认桌面 1024x768，窗口放不大；先把分辨率调到 1920x1080。
+Add-Type @'
+using System; using System.Runtime.InteropServices;
+public class Disp {
+ [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi)]
+ public struct DEVMODE { [MarshalAs(UnmanagedType.ByValTStr, SizeConst=32)] public string dmDeviceName; public short dmSpecVersion, dmDriverVersion, dmSize, dmDriverExtra; public int dmFields, dmPositionX, dmPositionY, dmDisplayOrientation, dmDisplayFixedOutput; public short dmColor, dmDuplex, dmYResolution, dmTTOption, dmCollate; [MarshalAs(UnmanagedType.ByValTStr, SizeConst=32)] public string dmFormName; public short dmLogPixels; public int dmBitsPerPel, dmPelsWidth, dmPelsHeight, dmDisplayFlags, dmDisplayFrequency, dmICMMethod, dmICMIntent, dmMediaType, dmDitherType, dmReserved1, dmReserved2, dmPanningWidth, dmPanningHeight; }
+ [DllImport("user32.dll")] public static extern int EnumDisplaySettings(string d, int m, ref DEVMODE dm);
+ [DllImport("user32.dll")] public static extern int ChangeDisplaySettings(ref DEVMODE dm, int f);
+ public static string Set(int w, int h) { DEVMODE dm = new DEVMODE(); dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE)); EnumDisplaySettings(null, -1, ref dm); dm.dmPelsWidth = w; dm.dmPelsHeight = h; dm.dmFields = 0x80000 | 0x100000; return ChangeDisplaySettings(ref dm, 0) + " now " + dm.dmPelsWidth + "x" + dm.dmPelsHeight; }
+}
+'@
+try { Write-Host ("ChangeDisplaySettings: " + [Disp]::Set(1920,1080)) } catch { Write-Host "resolution change failed: $_" }
+Add-Type -AssemblyName System.Windows.Forms
+Write-Host ("screen: " + [System.Windows.Forms.Screen]::PrimaryScreen.Bounds)
 $p=Start-Process (Resolve-Path app/listen1_xuan.exe) -WorkingDirectory (Resolve-Path app) -PassThru
 for($i=0;$i -lt 60;$i++){Start-Sleep 1;$p.Refresh();if($p.HasExited){throw "App exited: $($p.ExitCode)"};if($p.MainWindowHandle -ne [intptr]::Zero){break}}
 $w=$p.MainWindowHandle;if($w -eq [intptr]::Zero){throw 'No app window'}
@@ -58,5 +72,5 @@ Step wide { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1500,850,0x40)|Out-Null; St
 Step wideinfo { Click 20 20 2; Esc; Click 90 135 3; Click 150 190 5; Snap '41-wide-dark-playlist-info' }
 Step widesettings { Settings; Snap '42-wide-dark-settings'; Click 750 117 2; Snap '43-wide-dark-thirdparty'; Click 750 117 2 }
 Step widedocs { Settings; Wheel 750 400 60; Snap '44-wide-dark-settings-bottom' }
-Step fullhd { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1900,1000,0x40)|Out-Null; Start-Sleep 3; Settings; Snap '45-1900-settings'; Home; Snap '46-1900-home' }
+Step fullhd { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1900,1000,0x40)|Out-Null; Start-Sleep 3; Settings; Snap '45-1900-settings'; Click 20 20 2; Esc; Esc; Click 600 400 1; Snap '46-1900-home' }
 Stop-Process $p -Force -ErrorAction SilentlyContinue
