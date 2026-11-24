@@ -8,6 +8,7 @@ import 'package:flutter_lyric/core/lyric_model.dart';
 import 'package:flutter/material.dart'
     hide CircularProgressIndicator, LinearProgressIndicator;
 import 'package:listen1_xuan/bodys.dart';
+import 'package:listen1_xuan/provider/netease.dart';
 import 'package:listen1_xuan/controllers/controllers.dart';
 import 'package:listen1_xuan/controllers/theme.dart';
 import 'package:listen1_xuan/main.dart';
@@ -130,6 +131,14 @@ Future<void> onPlaybackCompleted({
   }
   if (nowplaying_track['index'] != -1) {
     final index = nowplaying_track['index'];
+    if (personalFmActive.value) {
+      await _refillPersonalFmIfNeeded(current_playing, index);
+      final refreshed = await get_current_playing();
+      if (playmode.value != 2 && index + 1 < refreshed.length) {
+        await playsong(refreshed[index + 1], start: start);
+        return;
+      }
+    }
     switch (playmode.value) {
       case 0:
         if (index + 1 < current_playing.length) {
@@ -198,7 +207,29 @@ void add_current_playing(List<Track> tracks) {
   _playController.add_current_playing(tracks);
 }
 
+/// 当前播放队列是否来自网易云私人 FM。换成别的歌单播放时自动关闭。
+final personalFmActive = false.obs;
+bool _fmRefilling = false;
+
+/// 私人 FM：离队列末尾不足 2 首时补一批，让电台一直播下去。
+Future<void> _refillPersonalFmIfNeeded(List<Track> queue, int index) async {
+  if (!personalFmActive.value || _fmRefilling) return;
+  if (index < queue.length - 2) return;
+  _fmRefilling = true;
+  try {
+    final more = await Get.find<Netease>().nePersonalFmMore(
+      queue.map((t) => t.id).toSet(),
+    );
+    if (more.isNotEmpty) add_current_playing(more);
+  } catch (e) {
+    debugPrint('私人 FM 续播失败: $e');
+  } finally {
+    _fmRefilling = false;
+  }
+}
+
 void set_current_playing(List<Track> tracks) async {
+  personalFmActive.value = false;
   _playController.set_current_playing(tracks);
 }
 
