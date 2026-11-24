@@ -94,6 +94,7 @@ class _KugouLoginDialogState extends State<KugouLoginDialog> {
           break;
         case 2:
           setState(() => _status = '已扫码，请在酷狗音乐中确认登录');
+          break;
         case 4:
           final token = result.token ?? '';
           final userid = result.userid ?? '';
@@ -103,12 +104,14 @@ class _KugouLoginDialogState extends State<KugouLoginDialog> {
           _done = true;
           _timer?.cancel();
           Navigator.of(context).pop();
+          break;
         case 0:
           setState(() {
             _done = true;
             _status = '二维码已过期，请刷新';
           });
           _timer?.cancel();
+          break;
         default:
           setState(() {
             _done = true;
