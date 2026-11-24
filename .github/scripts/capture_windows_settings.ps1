@@ -42,8 +42,10 @@ function Snap($name){MoveTo 300 5;Start-Sleep -Milliseconds 500;$r=New-Object UI
 function Step($name,[scriptblock]$b){try{& $b}catch{Write-Host "STEP $name failed: $_"}}
 Start-Sleep 14
 function Home(){ for($k=0;$k -lt 4;$k++){ Esc }; Click 600 300 1 }
-function Settings(){ Home; Click 178 599 3 }
-Step toast {Snap '00-update-toast'; Click 600 300 1; Click 138 599 2; Snap '00b-update-reopen'}
+# 侧栏底部按钮居中排列：有「发现新版本」时 4 个（齿轮 x≈178），没有时 3 个（齿轮 x≈157）。
+$global:GearX = 157
+function Settings(){ Home; Click $global:GearX 599 3 }
+Step toast {Snap '00-update-toast'; Click 600 300 1; Snap '00b-update-reopen'}
 Step home {Snap '01-home'}
 Step created {Click 90 135 4; Snap '02-my-created'}
 Step bili {Click 90 225 5; Snap '04-bili'}
