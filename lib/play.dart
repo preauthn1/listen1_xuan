@@ -8,6 +8,7 @@ import 'package:flutter_lyric/core/lyric_model.dart';
 import 'package:flutter/material.dart'
     hide CircularProgressIndicator, LinearProgressIndicator;
 import 'package:listen1_xuan/bodys.dart';
+import 'package:listen1_xuan/provider/netease.dart';
 import 'package:listen1_xuan/controllers/controllers.dart';
 import 'package:listen1_xuan/controllers/theme.dart';
 import 'package:listen1_xuan/main.dart';
@@ -130,6 +131,14 @@ Future<void> onPlaybackCompleted({
   }
   if (nowplaying_track['index'] != -1) {
     final index = nowplaying_track['index'];
+    if (personalFmActive.value) {
+      await _refillPersonalFmIfNeeded(current_playing, index);
+      final refreshed = await get_current_playing();
+      if (playmode.value != 2 && index + 1 < refreshed.length) {
+        await playsong(refreshed[index + 1], start: start);
+        return;
+      }
+    }
     switch (playmode.value) {
       case 0:
         if (index + 1 < current_playing.length) {
@@ -170,7 +179,10 @@ Future<void> onPlaybackCompleted({
           break;
         }
         await _playController.music_player.seek(Duration.zero);
-        if (start) await _playController.music_player.play();
+        if (start) {
+          await _playController.activateAudioSession();
+          await _playController.music_player.play();
+        }
         break;
       default:
         break;
@@ -195,7 +207,29 @@ void add_current_playing(List<Track> tracks) {
   _playController.add_current_playing(tracks);
 }
 
+/// 当前播放队列是否来自网易云私人 FM。换成别的歌单播放时自动关闭。
+final personalFmActive = false.obs;
+bool _fmRefilling = false;
+
+/// 私人 FM：离队列末尾不足 2 首时补一批，让电台一直播下去。
+Future<void> _refillPersonalFmIfNeeded(List<Track> queue, int index) async {
+  if (!personalFmActive.value || _fmRefilling) return;
+  if (index < queue.length - 2) return;
+  _fmRefilling = true;
+  try {
+    final more = await Get.find<Netease>().nePersonalFmMore(
+      queue.map((t) => t.id).toSet(),
+    );
+    if (more.isNotEmpty) add_current_playing(more);
+  } catch (e) {
+    debugPrint('私人 FM 续播失败: $e');
+  } finally {
+    _fmRefilling = false;
+  }
+}
+
 void set_current_playing(List<Track> tracks) async {
+  personalFmActive.value = false;
   _playController.set_current_playing(tracks);
 }
 
@@ -526,10 +560,14 @@ IconButton _button(
 );
 
 Future<void> globalPlayOrPause() async {
+  if (!_playController.music_player.state.playing) {
+    await _playController.activateAudioSession();
+  }
   await _playController.music_player.playOrPause();
 }
 
 Future<void> globalPlay() async {
+  await _playController.activateAudioSession();
   _playController.music_player.play();
 }
 
@@ -769,7 +807,9 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     //     .map(_transformEvent)
     //     .pipe(playbackState);
     // ... and also the current media item via mediaItem.
-    mediaItem.add(_item);
+    // 占位曲目只给 Android/macOS 用：iOS 一旦发布占位元数据，
+    // 控制中心会直接把“test”这种假卡片当成当前播放。
+    if (!isIos) mediaItem.add(_item);
 
     // Load the player.
     // TODO 初始化问题
@@ -958,7 +998,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
       androidCompactActionIndices:
           Get.find<SettingsController>().androidActionSort,
       // 空闲释放后持续上报 idle，原生侧才不会因为普通状态更新又把会话激活
-      processingState: (_sessionIdle || noTrack)
+      processingState: ((_sessionIdle || noTrack) && !isIos)
           ? AudioProcessingState.idle
           : (_music_player.state.completed
                 ? AudioProcessingState.completed

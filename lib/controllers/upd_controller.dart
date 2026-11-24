@@ -28,6 +28,7 @@ import 'hyper_download_controller.dart';
 import 'routeController.dart';
 
 import 'settings_controller.dart';
+import '../services/app_version.dart';
 
 class UpdController extends GetxController {
   static const String buildGitHash = String.fromEnvironment('gitHash');
@@ -872,6 +873,16 @@ class UpdController extends GetxController {
     }
   }
 
+  /// 本地构建号（pubspec 的 +N）。Android 用原生渠道拿不含 ABI 偏移的基础构建号。
+  Future<int> _localBuildNumber() async {
+    final version = await loadAppVersion();
+    return int.tryParse(version.split('+').last) ?? 0;
+  }
+
+  /// Release 的构建号，取自 tag（如 2.7.5+55）。
+  static int _releaseBuildNumber(GitHubRelease release) =>
+      int.tryParse(release.tagName.split('+').last.trim()) ?? 0;
+
   /// 检查 Releases 更新
   /// 获取所有 releases 列表，比较最新版本的 buildNumber 和本地应用的 buildNumber
   /// 如果有新版本，弹出更新对话框，并删除除最新版本外的其他缓存文件
@@ -916,11 +927,24 @@ class UpdController extends GetxController {
         await delReleasesCache(releases.skip(1).toList(), latestBuildNumber);
       }
 
-      if (localBuildNumber != latestBuildNumber &&
+      // 只按版本号判断：本仓库（fork）自己构建的包，提交号永远不会等于上游
+      // Release 安装包里的提交号，用提交号比较会导致每次启动都提示「新版本」。
+      // 构建号（tag 里 + 后面的数字）更大才算新版本；相同构建号视为已是最新。
+      final localBuild = await _localBuildNumber();
+      final releaseBuild = _releaseBuildNumber(latestRelease);
+      final isNewer = localBuild > 0 && releaseBuild > localBuild;
+      showDebugSnackbar(
+        '版本检查',
+        '本地构建号 $localBuild，最新构建号 $releaseBuild',
+      );
+      if (isNewer &&
           !kDebugMode &&
+          localBuildNumber != latestBuildNumber &&
           localBuildNumber != rLatestBuildNumber) {
         // 有新版本可用
         _showReleaseUpdateDialog(latestRelease, latestBuild);
+      } else {
+        pendingUpdate.value = null;
       }
     } catch (e, stackTrace) {
       debugPrint('检查 Releases 更新失败: $e\n$stackTrace');

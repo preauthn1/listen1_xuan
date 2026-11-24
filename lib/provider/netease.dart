@@ -506,24 +506,53 @@ class Netease extends BaseProvider {
     });
   }
 
-  /// 私人 FM：接口每次返回少量歌曲，这里连续取几批凑成一张可播放的列表。
-  Future<PlayList> nePersonalFm({int batches = 4}) async {
+  /// 私人 FM 每次只返回 3 首左右，它本来就是「边听边取」的电台，不是固定歌单。
+  /// 打开时先取几批；播放队列快到末尾时由 [nePersonalFmMore] 继续补充
+  /// （见 play.dart 的 onPlaybackCompleted），因此可以一直播下去。
+  Future<List<Map<String, dynamic>>> _fmBatch() async {
+    final response = await dioPostWithCookieAndCsrf(
+      'https://music.163.com/weapi/v1/radio/get',
+      weapi({'csrf_token': await getCsrf()}),
+    );
+    final res = decodeResponseData(response.data);
+    if (res is! Map || res['code'] != 200) {
+      throw FormatException('私人 FM 获取失败（${res is Map ? res['code'] : '响应无效'}）');
+    }
+    return ((res['data'] as List?) ?? const [])
+        .map(_neSongToTrack)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
+  /// 取下一批 FM 歌曲，跳过 [exclude] 里已有的。
+  Future<List<Track>> nePersonalFmMore(Set<String> exclude, {int want = 6}) async {
+    final out = <Track>[];
+    final seen = {...exclude};
+    for (var i = 0; i < 4 && out.length < want; i++) {
+      final batch = await _fmBatch();
+      if (batch.isEmpty) break;
+      for (final t in batch) {
+        if (seen.add(t['id'] as String)) out.add(Track.fromJson(t));
+      }
+    }
+    return out;
+  }
+
+  Future<PlayList> nePersonalFm({int batches = 10}) async {
     await _requireNeteaseLogin();
     final seen = <String>{};
     final tracks = <Map<String, dynamic>>[];
     for (var i = 0; i < batches; i++) {
-      final response = await dioPostWithCookieAndCsrf(
-        'https://music.163.com/weapi/v1/radio/get',
-        weapi({'csrf_token': await getCsrf()}),
-      );
-      final res = decodeResponseData(response.data);
-      if (res is! Map || res['code'] != 200) {
+      List<Map<String, dynamic>> batch;
+      try {
+        batch = await _fmBatch();
+      } catch (_) {
         if (tracks.isNotEmpty) break;
-        throw FormatException('私人 FM 获取失败（${res is Map ? res['code'] : '响应无效'}）');
+        rethrow;
       }
-      for (final song in (res['data'] as List?) ?? const []) {
-        final track = _neSongToTrack(song);
-        if (track != null && seen.add(track['id'] as String)) tracks.add(track);
+      if (batch.isEmpty) break;
+      for (final track in batch) {
+        if (seen.add(track['id'] as String)) tracks.add(track);
       }
     }
     return PlayList.fromJson({
