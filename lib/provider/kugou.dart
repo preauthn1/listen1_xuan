@@ -1,23 +1,35 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:extended_image/extended_image.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart' hide Response;
 import 'package:dio/dio.dart';
 import 'package:listen1_xuan/constants/const.dart';
 import 'package:listen1_xuan/controllers/DioController.dart';
-import 'package:listen1_xuan/models/PlayListFilters.dart';
+import 'package:listen1_xuan/controllers/settings_controller.dart';
 import 'package:listen1_xuan/models/Playlist.dart';
+import 'package:listen1_xuan/models/ProviderUser.dart';
 import 'package:listen1_xuan/models/SearchPlayListRes.dart';
 import 'package:listen1_xuan/models/SearchRes.dart';
 import 'package:listen1_xuan/models/Track.dart';
 import 'package:listen1_xuan/models/bootStrapTrackRes.dart';
 import 'package:listen1_xuan/settings.dart';
+import 'package:listen1_xuan/utils/cookie_utils.dart';
 import 'package:listen1_xuan/utils/response_utils.dart';
 
 import 'base.dart';
+import 'kugou_gateway.dart';
+import 'kugou_login_dialog.dart';
+import 'kugou_sign.dart';
 
 enum KgPlaylistType {
   playlist('kgplaylist'),
   album('kgalbum'),
-  artist('kgartist');
+  artist('kgartist'),
+  daily('kgdaily'),
+  fm('kgfm'),
+  user('kguser');
 
   final String prefix;
   const KgPlaylistType(this.prefix);
@@ -31,6 +43,18 @@ enum KgTrackType {
 }
 
 class Kugou extends BaseProvider {
+  final Map<String, Map<String, dynamic>> _userPlaylistInfo = {};
+  late final KugouGateway _gateway = KugouGateway(
+    dio: dioWithCookieManager,
+    // BroadcastWsController persists a UUID in settings and exists before providers are registered.
+    guid: Get.find<SettingsController>().settings['deviceId'] as String? ?? KugouSign.randomGuid(),
+  );
+
+  KugouSession get _session {
+    final cookies = CookieUtils.parseCookieString(token);
+    return KugouSession.fromCookies({for (final c in cookies) c.name: c.value});
+  }
+
   @override
   String get id => 'kg';
 
@@ -43,9 +67,49 @@ class Kugou extends BaseProvider {
   @override
   bool get searchable => true;
 
-  /// 酷狗无需登录即可搜索 / 播放，也没有用户歌单接口。
+  /// 酷狗支持搜索/播放，也支持登录后的歌单、每日推荐和私人 FM。
   @override
-  bool get supportLogin => false;
+  bool get supportLogin => true;
+
+  @override
+  String get credentialKey => 'kg';
+
+  @override
+  String get loginDisplayName => '酷狗音乐';
+
+  @override
+  Widget get loginIcon => ExtendedImage.network(
+        'https://www.kugou.com/yy/static/images/play/logo.png',
+        width: 18,
+        height: 18,
+        cache: true,
+        borderRadius: BorderRadius.circular(4),
+        shape: BoxShape.rectangle,
+      );
+
+  @override
+  List<String> get cookieUrls => const ['https://kugou.com', 'https://login-user.kugou.com'];
+
+  @override
+  List<String> get requiredCookieNames => const ['token', 'userid'];
+
+  @override
+  bool get supportGetUserCreatedPlaylist => true;
+
+  @override
+  bool get supportGetUserFavoritePlaylist => true;
+
+  @override
+  String get userCreatedPlaylistSectionTitle => '酷狗音乐 · 我创建的';
+
+  @override
+  String get userFavoritePlaylistSectionTitle => '酷狗音乐 · 我收藏的';
+
+  @override
+  Widget get userCreatedPlaylistSectionLeading => loginIcon;
+
+  @override
+  Widget get userFavoritePlaylistSectionLeading => loginIcon;
 
   @override
   bool get supportLyric => true;
@@ -64,11 +128,140 @@ class Kugou extends BaseProvider {
     'referer': 'https://www.kugou.com/',
   };
 
+  @override
+  Future<void> login(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420, maxHeight: 580),
+          child: KugouLoginDialog(provider: this, gateway: _gateway),
+        ),
+      ),
+    );
+    await getUser();
+  }
+
+  @override
+  Future<ProviderUser?> fetchUser() async {
+    final session = _session;
+    if (!session.loggedIn) return null;
+    try {
+      final data = await _gateway.userDetail(session);
+      final displayName = '${data['nickname'] ?? data['user_name'] ?? data['username'] ?? ''}';
+      final userId = '${data['userid'] ?? data['user_id'] ?? session.userid}';
+      if (displayName.isEmpty || userId.isEmpty) return null;
+      return ProviderUser(platform: name, userId: userId, name: displayName);
+    } on KugouApiException catch (e) {
+      if (e.isAuthError) return null;
+      rethrow;
+    }
+  }
+
+  PlayList _toUserPlaylist(Map<String, dynamic> item, {required bool mine}) {
+    final id = '${item['global_collection_id'] ?? item['listid'] ?? ''}';
+    _userPlaylistInfo[id] = item;
+    return PlayList.fromJson({'info': {
+      'id': '${KgPlaylistType.user.prefix}_$id',
+      'title': item['name'] ?? item['specialname'] ?? '酷狗歌单',
+      'cover_img_url': '${item['pic'] ?? item['picurl'] ?? item['cover'] ?? ''}'.replaceAll('{size}', '400'),
+      'source_url': 'https://www.kugou.com/',
+    }, 'is_mine': mine ? 1 : 0, 'is_fav': mine ? 0 : 1});
+  }
+
+  @override
+  Future<List<PlayList>> getUserCreatedPlaylist(String userId) async {
+    final s = _session;
+    final all = await _gateway.userPlaylists(s);
+    return all.where((p) => '${p['userid'] ?? p['list_create_userid'] ?? ''}' == s.userid).map((p) => _toUserPlaylist(p, mine: true)).toList();
+  }
+
+  @override
+  Future<List<PlayList>> getUserFavoritePlaylist(String userId) async {
+    final s = _session;
+    final all = await _gateway.userPlaylists(s);
+    return all.where((p) => '${p['userid'] ?? p['list_create_userid'] ?? ''}' != s.userid).map((p) => _toUserPlaylist(p, mine: false)).toList();
+  }
+
+  /// 登录后的歌单、每日推荐和私人 FM。
+  Future<void> _requireKugouLogin() async {
+    if (await getUser() == null) throw const FormatException('需要先登录酷狗音乐');
+  }
+
+  Map<String, dynamic>? _gatewayTrack(Map<String, dynamic> item) {
+    final hash = '${item['hash'] ?? item['FileHash'] ?? ''}';
+    if (hash.isEmpty) return null;
+    final singers = item['singerinfo'] as List?;
+    final artist = singers == null
+        ? '${item['author_name'] ?? item['SingerName'] ?? ''}'
+        : singers.whereType<Map>().map((s) => '${s['name'] ?? ''}').where((s) => s.isNotEmpty).join(' / ');
+    final firstSinger = singers == null || singers.isEmpty || singers.first is! Map
+        ? null
+        : singers.first as Map;
+    final album = item['albuminfo'] as Map?;
+    final cover = '${item['sizable_cover'] ?? item['cover'] ?? ''}'.replaceAll('{size}', '400');
+    return {
+      'id': '${KgTrackType.track.prefix}_$hash',
+      'title': item['songname'] ?? item['name'] ?? item['SongName'] ?? item['filename'] ?? '',
+      'artist': artist,
+      'artist_id': firstSinger == null ? '' : '${KgPlaylistType.artist.prefix}_${firstSinger['id']}',
+      'album': item['album_name'] ?? album?['name'] ?? item['AlbumName'] ?? '',
+      'album_id': '${KgPlaylistType.album.prefix}_${item['album_id'] ?? album?['id'] ?? 0}',
+      'source': name,
+      'source_url': 'https://www.kugou.com/song/#hash=$hash&album_id=${item['album_id'] ?? 0}',
+      'img_url': cover,
+      'lyric_url': hash,
+    };
+  }
+
+  Future<PlayList> _dailyRecommend() async {
+    // 酷狗服务未登录也返回通用推荐；页面入口仅在已登录时显示，确保和网易云一致。
+    await _requireKugouLogin();
+    final tracks = (await _gateway.dailyRecommend(_session)).map(_gatewayTrack).whereType<Map<String, dynamic>>().toList();
+    final now = DateTime.now();
+    return PlayList.fromJson({'info': {
+      'id': '${KgPlaylistType.daily.prefix}_today',
+      'title': '每日推荐 · ${now.month}月${now.day}日',
+      'cover_img_url': tracks.isEmpty ? null : tracks.first['img_url'],
+      'source_url': 'https://www.kugou.com/',
+    }, 'tracks': tracks});
+  }
+
+  Future<PlayList> _personalFm() async {
+    await _requireKugouLogin();
+    final tracks = (await _gateway.personalFm(_session)).map(_gatewayTrack).whereType<Map<String, dynamic>>().toList();
+    return PlayList.fromJson({'info': {
+      'id': '${KgPlaylistType.fm.prefix}_personal',
+      'title': '私人 FM',
+      'cover_img_url': tracks.isEmpty ? null : tracks.first['img_url'],
+      'source_url': 'https://www.kugou.com/',
+    }, 'tracks': tracks});
+  }
+
+  Future<PlayList> _userPlaylist(String listId) async {
+    await _requireKugouLogin();
+    final rawId = listId.substring('${KgPlaylistType.user.prefix}_'.length);
+    final info = _userPlaylistInfo[rawId];
+    final id = info?['global_collection_id']?.toString() ?? rawId;
+    final tracks = (await _gateway.playlistTracks(_session, id)).map(_gatewayTrack).whereType<Map<String, dynamic>>().toList();
+    return PlayList.fromJson({'info': {
+      'id': listId,
+      'title': info?['name'] ?? info?['specialname'] ?? '酷狗歌单',
+      'cover_img_url': '${info?['pic'] ?? info?['picurl'] ?? (tracks.isEmpty ? '' : tracks.first['img_url'])}'.replaceAll('{size}', '400'),
+      'source_url': 'https://www.kugou.com/',
+    }, 'tracks': tracks});
+  }
+
   // #region 歌单详情
 
   @override
   Future<PlayList> getPlaylist(String listId) async {
     final prefix = listId.split('_').first;
+    if (prefix == KgPlaylistType.daily.prefix) return _dailyRecommend();
+    if (prefix == KgPlaylistType.fm.prefix) return _personalFm();
+    if (prefix == KgPlaylistType.user.prefix) return _userPlaylist(listId);
     if (prefix == KgPlaylistType.playlist.prefix) {
       return _getPlaylist(listId);
     }
@@ -281,7 +474,20 @@ class Kugou extends BaseProvider {
     Function(Track track, Object? error) failure,
   ) async {
     final trackId = track.id.replaceFirst('${KgTrackType.track.prefix}_', '');
+    final albumId = int.tryParse((track.album_id ?? '').split('_').last) ?? 0;
     try {
+      // 已登录时优先走官方已签名接口，会员/受限曲目才有机会取得播放地址。
+      // 服务端要求额外验证或没有可播 URL 时，再维持原有公开接口的兼容路径。
+      if (_session.loggedIn) {
+        final signed = await _gateway.songUrl(_session, trackId, albumId: albumId);
+        if (signed != null) {
+          success(
+            BootSuccessRes(url: signed.$1, platform: name, bitrate: '${signed.$2 ~/ 1000}kbps'),
+            track,
+          );
+          return;
+        }
+      }
       final targetUrl =
           'https://m.kugou.com/app/i/getSongInfo.php?cmd=playInfo&hash=$trackId';
       final response = await dioWithCookieManager.get(targetUrl);
