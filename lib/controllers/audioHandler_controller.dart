@@ -71,10 +71,11 @@ class AudioHandlerController extends GetxController {
         );
       }
     }
-    // Android 上把会话提前置为 active 并发布真实暂停态元数据，
-    // 控制中心的媒体卡片才会立刻归属本应用（可再点一次直接播放）。
+    // 把真实暂停态元数据提前发布给系统，控制中心的媒体卡片才会归属本应用
+    // （可再点一次直接播放）。iOS 同样需要：会话刚激活时若没有已发布的元数据，
+    // 系统不会把本应用当成 Now Playing。
     // 失败不得阻断后面的 loading 收尾，否则 Play 组件会卡在加载态。
-    if (isAndroid) {
+    if (isAndroid || isIos) {
       try {
         await (audioHandler as AudioPlayerHandler)
             .activateSessionWithCurrentTrack();

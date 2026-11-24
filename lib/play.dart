@@ -170,7 +170,10 @@ Future<void> onPlaybackCompleted({
           break;
         }
         await _playController.music_player.seek(Duration.zero);
-        if (start) await _playController.music_player.play();
+        if (start) {
+          await _playController.activateAudioSession();
+          await _playController.music_player.play();
+        }
         break;
       default:
         break;
@@ -526,10 +529,14 @@ IconButton _button(
 );
 
 Future<void> globalPlayOrPause() async {
+  if (!_playController.music_player.state.playing) {
+    await _playController.activateAudioSession();
+  }
   await _playController.music_player.playOrPause();
 }
 
 Future<void> globalPlay() async {
+  await _playController.activateAudioSession();
   _playController.music_player.play();
 }
 
@@ -769,7 +776,9 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     //     .map(_transformEvent)
     //     .pipe(playbackState);
     // ... and also the current media item via mediaItem.
-    mediaItem.add(_item);
+    // 占位曲目只给 Android/macOS 用：iOS 一旦发布占位元数据，
+    // 控制中心会直接把“test”这种假卡片当成当前播放。
+    if (!isIos) mediaItem.add(_item);
 
     // Load the player.
     // TODO 初始化问题
@@ -958,7 +967,7 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
       androidCompactActionIndices:
           Get.find<SettingsController>().androidActionSort,
       // 空闲释放后持续上报 idle，原生侧才不会因为普通状态更新又把会话激活
-      processingState: (_sessionIdle || noTrack)
+      processingState: ((_sessionIdle || noTrack) && !isIos)
           ? AudioProcessingState.idle
           : (_music_player.state.completed
                 ? AudioProcessingState.completed

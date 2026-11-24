@@ -633,6 +633,7 @@ class _CacheDirectoryTileState extends State<_CacheDirectoryTile> {
       Get.back(); // 关闭加载对话框
       showSuccessSnackbar('缓存路径已设置', directory.path);
       if (wasPlaying) {
+        await playController.activateAudioSession();
         await playController.music_player.play();
       }
     } catch (e) {
