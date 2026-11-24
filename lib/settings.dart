@@ -50,6 +50,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'constants/supabase_proxy.dart';
 import 'controllers/track_download_controller.dart';
+import 'widgets/responsive_layout.dart';
 import 'widgets/cookie_import_dialog.dart';
 import 'package:dio/dio.dart';
 import 'package:crypto/crypto.dart';
@@ -185,7 +186,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ],
               ),
-            SliverToBoxAdapter(
+            SliverContentMaxWidth(
+              sliver: SliverToBoxAdapter(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: <Widget>[
@@ -762,6 +764,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   88.sbh,
                 ],
               ),
+            ),
             ),
           ],
         ),

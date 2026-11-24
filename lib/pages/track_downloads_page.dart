@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:listen1_xuan/controllers/routeController.dart';
 import 'package:listen1_xuan/controllers/track_download_controller.dart';
 import 'package:listen1_xuan/funcs.dart';
+import 'package:listen1_xuan/widgets/responsive_layout.dart';
 
 /// 「下载」页：进行中/失败的任务和已下载的歌曲。
 class TrackDownloadsPage extends StatelessWidget {
@@ -34,6 +35,7 @@ class TrackDownloadsPage extends StatelessWidget {
         final hasFinished = tasks.any((t) => !t.isActive);
         return CustomScrollView(
           slivers: [
+            for (final sliver in <Widget>[
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -113,6 +115,7 @@ class TrackDownloadsPage extends StatelessWidget {
                 },
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 96)),
+            ]) SliverContentMaxWidth(maxWidth: 760, sliver: sliver),
           ],
         );
       }),
