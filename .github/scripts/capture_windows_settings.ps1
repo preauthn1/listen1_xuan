@@ -74,5 +74,5 @@ Step wide { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1500,850,0x40)|Out-Null; St
 Step wideinfo { Click 20 20 2; Esc; Click 90 135 3; Click 150 190 5; Snap '41-wide-dark-playlist-info' }
 Step widesettings { Settings; Snap '42-wide-dark-settings'; Click 750 117 2; Snap '43-wide-dark-thirdparty'; Click 750 117 2 }
 Step widedocs { Settings; Wheel 750 400 60; Snap '44-wide-dark-settings-bottom' }
-Step fullhd { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1900,1000,0x40)|Out-Null; Start-Sleep 3; Settings; Snap '45-1900-settings'; Click 20 20 2; Esc; Esc; Click 600 400 1; Snap '46-1900-home' }
+Step fullhd { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1900,1000,0x40)|Out-Null; Start-Sleep 3; Settings; Snap '45-1900-settings'; Click 20 20 3; Snap '46-1900-home' }
 Stop-Process $p -Force -ErrorAction SilentlyContinue
