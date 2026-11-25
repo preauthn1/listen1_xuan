@@ -116,9 +116,10 @@ class PlaylistInfoPage extends StatelessWidget {
                                         List<Track> trackList =
                                             List<Track>.from(controller.tracks);
                                         set_current_playing(trackList);
-                                        // 私人 FM 是电台：队列快播完时自动续上
+                                        // 私人 FM / 个性电台是电台：队列快播完时自动续上
                                         personalFmActive.value =
-                                            controller.listId.startsWith('nefm_');
+                                            isRadioListId(controller.listId);
+                                        personalFmListId = controller.listId;
                                         playsong(
                                           controller.tracks[0],
                                           isByClick: true,
@@ -194,8 +195,10 @@ class PlaylistInfoPage extends StatelessWidget {
         controller.listId.startsWith('nedaily_') ||
         controller.listId.startsWith('nefm_') ||
         controller.listId.startsWith('kgdaily_') ||
-        controller.listId.startsWith('kgfm_');
-    final isFm = controller.listId.startsWith('nefm_') || controller.listId.startsWith('kgfm_');
+        controller.listId.startsWith('kgfm_') ||
+        controller.listId.startsWith('qqradar_') ||
+        controller.listId.startsWith('qqradio_');
+    final isFm = isRadioListId(controller.listId);
     return [
       if (isFm)
         IconButton(

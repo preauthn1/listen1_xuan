@@ -12,6 +12,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
   bool _isExpandedFav = false;
   bool _isExpandedRecommend = true;
   bool _isExpandedKugouRecommend = true;
+  bool _isExpandedQQRecommend = true;
 
   /// 各平台“我的歌单”分组的加载状态，key 为 provider.name。
   final Map<String, _ProviderPlaylistSection> _providerSections = {};
@@ -675,6 +676,54 @@ class _MyPlaylistState extends State<MyPlaylist> {
                                     playListInfo: PlayListInfo(
                                       id: 'nefm_personal',
                                       title: '私人 FM',
+                                    ),
+                                    isMy: false,
+                                  )),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        Obx(() {
+                          final qq = providers.firstWhereOrNull(
+                            (p) => p.name == 'qq',
+                          );
+                          if (qq == null ||
+                              qq.loginStatus.value != LoginStatus.loggedIn) {
+                            return const SizedBox.shrink();
+                          }
+                          return _buildExpandableSection(
+                            leading: qq.loginIcon,
+                            title: 'QQ 音乐 · 为你推荐',
+                            isExpanded: _isExpandedQQRecommend,
+                            availableWidth: availableWidth,
+                            onExpandedChanged: (expanded) {
+                              setState(() => _isExpandedQQRecommend = expanded);
+                            },
+                            body: Column(
+                              children: [
+                                _buildShortcutTile(
+                                  icon: Icons.radar_rounded,
+                                  title: '雷达推荐',
+                                  subtitle: '按口味推荐的歌曲',
+                                  availableWidth: availableWidth,
+                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
+                                    playListInfo: PlayListInfo(
+                                      id: 'qqradar_today',
+                                      title: '雷达推荐',
+                                    ),
+                                    isMy: false,
+                                  )),
+                                ),
+                                _buildShortcutTile(
+                                  icon: Icons.radio_rounded,
+                                  title: '个性电台',
+                                  subtitle: '猜你喜欢，连续播放',
+                                  availableWidth: availableWidth,
+                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
+                                    playListInfo: PlayListInfo(
+                                      id: 'qqradio_personal',
+                                      title: '个性电台',
                                     ),
                                     isMy: false,
                                   )),
