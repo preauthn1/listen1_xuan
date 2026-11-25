@@ -108,7 +108,13 @@ jobs:
 
 
   publish:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_call') && github.ref_type == 'tag'
+    # Tags publish everywhere. On the upstream repository a push to main or
+    # feat/dual-build-ffmpeg also publishes to the release named after the
+    # pubspec version (upstream behaviour); forks stay tag-only.
+    if: >-
+      (github.ref_type == 'tag' && (github.event_name == 'push' || github.event_name == 'workflow_call')) ||
+      (github.repository == 'HBWuChang/listen1_xuan' && github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/dual-build-ffmpeg'))
     needs: build
     runs-on: windows-latest
     permissions:
