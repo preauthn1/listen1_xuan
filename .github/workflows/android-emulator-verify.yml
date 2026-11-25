@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
-      TARGET_REF: download-polish
+      TARGET_REF: b970458f231acac9a7325641bebb7d1212f9f8da
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
