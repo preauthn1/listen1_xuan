@@ -267,11 +267,18 @@ jobs:
                   archive.write(apk, apk.name)
           PYZIP
 
-      # 从 pubspec.yaml 提取版本号
+      # Single source of truth: the release is always named after the pubspec
+      # version; a tag build must push exactly that tag.
       - name: Extract Version from pubspec.yaml
         id: extract_version
+        shell: bash
         run: |
-          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//')
+          set -euo pipefail
+          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | tr -d '\r')
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match pubspec.yaml version '$version'."
+            exit 1
+          fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
           echo "VERSION=$version"
 
@@ -292,7 +299,7 @@ jobs:
       - name: Upload New Asset to Release
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ env.VERSION }}
           prerelease: ${{ !contains(github.event.head_commit.message, 'sta') }}
           fail_on_unmatched_files: true
           files: |
