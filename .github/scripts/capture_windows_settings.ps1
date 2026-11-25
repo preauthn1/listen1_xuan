@@ -51,7 +51,7 @@ Step created {Click 90 135 4; Snap '02-my-created'}
 Step bili {Click 90 225 5; Snap '04-bili'}
 Step playlistinfo {Home; Click 90 135 3; Click 150 190 5; Snap '05-playlist-info'; Esc}
 Step queue {Click 743 661 2; Snap '06-queue'; Esc}
-Step settings {Settings; Snap '10-settings'}
+Step settings {Settings; Snap '10-settings'; Click 500 352 3; Snap '10b-update-expanded'; Click 500 352 2}
 Step supabase { Settings; Click 610 61 3; Snap '11-supabase'; Click 610 61 2 }
 $rows=@(@('12-thirdparty',117),@('13-playlist-config',174),@('14-cache',231),@('15-desktop',289),@('16-update',353),@('17-appearance',418),@('18-playback',475),@('19-misc',532))
 foreach($r in $rows){ Step $r[0] { Settings; Wheel 600 300 -60; Click 500 $r[1] 2; Snap ($r[0]+'-a'); Wheel 600 300 4; Snap ($r[0]+'-b'); Wheel 600 300 -60; Click 500 $r[1] 2 } }
