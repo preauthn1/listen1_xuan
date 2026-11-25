@@ -295,7 +295,7 @@ class Kugou extends BaseProvider {
   Future<PlayList> _getAlbum(String listId) async {
     final albumId = listId.split('_').last;
     final infoResponse = await dioWithCookieManager.get(
-      'https://mobilecdnbj.kugou.com/api/v3/album/info?albumid=$albumId',
+      'http://mobilecdnbj.kugou.com/api/v3/album/info?albumid=$albumId',
     );
     final infoData = decodeResponseData(infoResponse.data)['data'];
     final info = {
@@ -305,7 +305,7 @@ class Kugou extends BaseProvider {
       'source_url': 'https://www.kugou.com/album/${infoData['albumid']}.html',
     };
     final songResponse = await dioWithCookieManager.get(
-      'https://mobilecdnbj.kugou.com/api/v3/album/song?albumid=$albumId&page=1&pagesize=100',
+      'http://mobilecdnbj.kugou.com/api/v3/album/song?albumid=$albumId&page=1&pagesize=100',
     );
     final songs = decodeResponseData(songResponse.data)['data']['info'] as List;
     final tracks = await _convertAll(
@@ -319,7 +319,7 @@ class Kugou extends BaseProvider {
   Future<PlayList> _getArtist(String listId) async {
     final artistId = listId.split('_').last;
     final infoResponse = await dioWithCookieManager.get(
-      'https://mobilecdnbj.kugou.com/api/v3/singer/info?singerid=$artistId',
+      'http://mobilecdnbj.kugou.com/api/v3/singer/info?singerid=$artistId',
     );
     final infoData = decodeResponseData(infoResponse.data)['data'];
     final info = {
@@ -329,7 +329,7 @@ class Kugou extends BaseProvider {
       'source_url': 'https://www.kugou.com/singer/$artistId.html',
     };
     final songResponse = await dioWithCookieManager.get(
-      'https://mobilecdnbj.kugou.com/api/v3/singer/song?singerid=$artistId&page=1&pagesize=30',
+      'http://mobilecdnbj.kugou.com/api/v3/singer/song?singerid=$artistId&page=1&pagesize=30',
     );
     final songs = decodeResponseData(songResponse.data)['data']['info'] as List;
     final tracks = await _convertAll(
@@ -416,7 +416,7 @@ class Kugou extends BaseProvider {
       return SearchPlayListRes.empty();
     }
     final targetUrl =
-        'https://mobilecdnbj.kugou.com/api/v3/search/special?keyword=${Uri.encodeComponent(keywords)}&pagesize=20&filter=0&page=$curpage';
+        'http://mobilecdnbj.kugou.com/api/v3/search/special?keyword=${Uri.encodeComponent(keywords)}&pagesize=20&filter=0&page=$curpage';
     try {
       final response = await dioWithCookieManager.get(targetUrl);
       final data = decodeResponseData(response.data);
@@ -619,7 +619,7 @@ class Kugou extends BaseProvider {
         track.img_url = _replaceSize(data['album_img']);
       }
       final albumResponse = await dioWithCookieManager.get(
-        'https://mobilecdnbj.kugou.com/api/v3/album/info?albumid=${item['album_id']}',
+        'http://mobilecdnbj.kugou.com/api/v3/album/info?albumid=${item['album_id']}',
       );
       final albumData = decodeResponseData(albumResponse.data);
       track.album = (albumData['status'] != 0 && albumData['data'] != null)
@@ -684,7 +684,7 @@ class Kugou extends BaseProvider {
 
     try {
       final albumResponse = await dioWithCookieManager.get(
-        'https://mobilecdnbj.kugou.com/api/v3/album/info?albumid=${item['album_id']}',
+        'http://mobilecdnbj.kugou.com/api/v3/album/info?albumid=${item['album_id']}',
       );
       final albumData = decodeResponseData(albumResponse.data);
       track.album = (albumData['status'] != 0 && albumData['data'] != null)
