@@ -31,6 +31,7 @@ class HyperDownloadController extends GetxController {
   final currentCount = 0.obs;
   final totalCount = 0.obs;
   int _currentTaskId = -1;
+  bool _dialogShown = false;
   late HyperDownload _hyperDownload;
 
   @override
@@ -58,6 +59,16 @@ class HyperDownloadController extends GetxController {
     Function(String)? onFailed,
     Function(DownloadProgressInfo)? onProgress,
   }) async {
+    // onFailed 只报告一次：下载失败、完成处理失败、异常只会走其中一条。
+    var failureReported = false;
+    void reportFailure(String reason) {
+      isDownloading.value = false;
+      _closeDownloadDialog();
+      if (failureReported) return;
+      failureReported = true;
+      onFailed?.call(reason);
+    }
+
     try {
       // 重置下载状态
       _resetDownloadState();
@@ -72,181 +83,110 @@ class HyperDownloadController extends GetxController {
       }
 
       // Do not send credentials or signed URLs through a third-party proxy.
-      final proxyUrl = url;
+      final failure = await _runDownload(
+        url: url,
+        savePath: savePath,
+        threadCount: threadCount,
+        onProgress: onProgress,
+      );
+      if (!isDownloading.value) return; // 用户已取消
+      if (failure != null) {
+        reportFailure('下载失败: $failure');
+        return;
+      }
 
-      // 使用 Completer 等待下载完成或失败
-      final completer = Completer<bool>();
-
+      // 字节已下载完：先关掉带「取消」按钮的进度框，再做校验、解压、安装，
+      // 否则进度框会在 100% 时一直挡着（安卓上直到系统安装器返回）。
+      _closeDownloadDialog();
       try {
-        _hyperDownload.startDownload(
-          url: proxyUrl,
-          savePath: savePath,
-          threadCount: threadCount,
-          downloadProgress:
-              ({
-                required double progress,
-                required double speed,
-                required double remainTime,
-                required int count,
-                required int total,
-              }) {
-                downloadProgress.value = progress;
-                downloadSpeed.value = speed;
-                this.remainTime.value = remainTime;
-                currentCount.value = count;
-                totalCount.value = total;
-                // 调用进度回调
-                onProgress?.call(
-                  DownloadProgressInfo(
-                    progress: progress,
-                    speed: speed,
-                    remainTime: remainTime,
-                    currentCount: count,
-                    totalCount: total,
-                  ),
-                );
-              },
-          downloadComplete: () {
-            debugPrint('Proxy download completed');
-            unawaited(() async {
-              try {
-                await onComplete?.call();
-                isDownloading.value = false;
-                _closeDownloadDialog();
-                if (!completer.isCompleted) completer.complete(true);
-              } catch (error) {
-                isDownloading.value = false;
-                _closeDownloadDialog();
-                onFailed?.call('下载完成处理失败: $error');
-                if (!completer.isCompleted) completer.complete(false);
-              }
-            }());
-          },
-          downloadFailed: (String reason) {
-            debugPrint('Proxy download failed: $reason');
-            if (!completer.isCompleted) completer.complete(false);
-          },
-          downloadTaskId: (int id) {
-            debugPrint('Download task id: $id');
-            _currentTaskId = id;
-          },
-          prepareWorking: (bool ret) {
-            debugPrint('Prepare working: $ret');
-          },
-          downloadingLog: (String log) {
-            debugPrint('Downloading log: $log');
-          },
-          workingMerge: (bool ret) {
-            debugPrint('Working merge: $ret');
-          },
-        );
-
-        // 等待代理下载完成或失败
-        final proxySuccess = await completer.future;
-
-        if (proxySuccess) {
-          return;
-        }
-      } catch (e) {
-        debugPrint('Proxy download error: $e');
-        if (!completer.isCompleted) completer.complete(false);
+        await onComplete?.call();
+      } catch (error) {
+        reportFailure('下载完成处理失败: $error');
+        return;
       }
-
-      // 如果代理下载失败，尝试普通下载
-      if (isDownloading.value) {
-        debugPrint('Proxy download failed, attempting regular download: $url');
-        final regularCompleter = Completer<void>();
-
-        try {
-          _hyperDownload.startDownload(
-            url: url,
-            savePath: savePath,
-            threadCount: threadCount,
-            downloadProgress:
-                ({
-                  required double progress,
-                  required double speed,
-                  required double remainTime,
-                  required int count,
-                  required int total,
-                }) {
-                  downloadProgress.value = progress;
-                  downloadSpeed.value = speed;
-                  this.remainTime.value = remainTime;
-                  currentCount.value = count;
-                  totalCount.value = total;
-                  // 调用进度回调
-                  onProgress?.call(
-                    DownloadProgressInfo(
-                      progress: progress,
-                      speed: speed,
-                      remainTime: remainTime,
-                      currentCount: count,
-                      totalCount: total,
-                    ),
-                  );
-                },
-            downloadComplete: () {
-              debugPrint('Regular download completed');
-              unawaited(() async {
-                try {
-                  await onComplete?.call();
-                  isDownloading.value = false;
-                  _closeDownloadDialog();
-                  if (!regularCompleter.isCompleted) regularCompleter.complete();
-                } catch (error) {
-                  isDownloading.value = false;
-                  _closeDownloadDialog();
-                  onFailed?.call('下载完成处理失败: $error');
-                  if (!regularCompleter.isCompleted) {
-                    regularCompleter.completeError(error);
-                  }
-                }
-              }());
-            },
-            downloadFailed: (String reason) {
-              debugPrint('Regular download failed: $reason');
-              isDownloading.value = false;
-              _closeDownloadDialog();
-              onFailed?.call('代理和普通下载均失败: $reason');
-              if (!regularCompleter.isCompleted) {
-                regularCompleter.completeError(StateError(reason));
-              }
-            },
-            downloadTaskId: (int id) {
-              debugPrint('Download task id: $id');
-              _currentTaskId = id;
-            },
-            prepareWorking: (bool ret) {
-              debugPrint('Prepare working: $ret');
-            },
-            downloadingLog: (String log) {
-              debugPrint('Downloading log: $log');
-            },
-            workingMerge: (bool ret) {
-              debugPrint('Working merge: $ret');
-            },
-          );
-
-          // 等待普通下载完成
-          await regularCompleter.future;
-        } catch (e) {
-          debugPrint('Regular download error: $e');
-          isDownloading.value = false;
-          _closeDownloadDialog();
-          onFailed?.call('下载失败: $e');
-        }
-      }
+      isDownloading.value = false;
     } catch (e) {
       debugPrint('Download error: $e');
-      isDownloading.value = false;
-      _closeDownloadDialog();
-      onFailed?.call(e.toString());
+      reportFailure(e.toString());
+    }
+  }
+
+  Completer<String?>? _activeAttempt;
+
+  /// 运行一次下载；成功返回 null，失败返回原因。取消时返回「已取消」。
+  Future<String?> _runDownload({
+    required String url,
+    required String savePath,
+    required int threadCount,
+    Function(DownloadProgressInfo)? onProgress,
+  }) async {
+    final completer = Completer<String?>();
+    _activeAttempt = completer;
+    try {
+      _hyperDownload.startDownload(
+        url: url,
+        savePath: savePath,
+        threadCount: threadCount,
+        downloadProgress:
+            ({
+              required double progress,
+              required double speed,
+              required double remainTime,
+              required int count,
+              required int total,
+            }) {
+              downloadProgress.value = progress;
+              downloadSpeed.value = speed;
+              this.remainTime.value = remainTime;
+              currentCount.value = count;
+              totalCount.value = total;
+              // 调用进度回调
+              onProgress?.call(
+                DownloadProgressInfo(
+                  progress: progress,
+                  speed: speed,
+                  remainTime: remainTime,
+                  currentCount: count,
+                  totalCount: total,
+                ),
+              );
+            },
+        downloadComplete: () {
+          debugPrint('Download completed');
+          if (!completer.isCompleted) completer.complete(null);
+        },
+        downloadFailed: (String reason) {
+          debugPrint('Download failed: $reason');
+          if (!completer.isCompleted) completer.complete(reason);
+        },
+        downloadTaskId: (int id) {
+          debugPrint('Download task id: $id');
+          _currentTaskId = id;
+        },
+        prepareWorking: (bool ret) {
+          debugPrint('Prepare working: $ret');
+        },
+        downloadingLog: (String log) {
+          debugPrint('Downloading log: $log');
+        },
+        workingMerge: (bool ret) {
+          debugPrint('Working merge: $ret');
+        },
+      );
+    } catch (e) {
+      debugPrint('Download error: $e');
+      if (!completer.isCompleted) completer.complete(e.toString());
+    }
+    try {
+      return await completer.future;
+    } finally {
+      if (identical(_activeAttempt, completer)) _activeAttempt = null;
     }
   }
 
   /// 显示不可关闭的下载进度对话框
   void _showDownloadDialog() {
+    _dialogShown = true;
     Get.dialog(
       barrierDismissible: false,
       AlertDialog(
@@ -285,6 +225,9 @@ class HyperDownloadController extends GetxController {
 
   /// 关闭下载对话框
   void _closeDownloadDialog() {
+    // 只关自己弹出的进度框，不误关其它对话框。
+    if (!_dialogShown) return;
+    _dialogShown = false;
     try {
       if (Get.isDialogOpen ?? false) {
         Get.back();
@@ -337,6 +280,8 @@ class HyperDownloadController extends GetxController {
     isDownloading.value = false;
     _closeDownloadDialog();
     _currentTaskId = -1;
+    final attempt = _activeAttempt;
+    if (attempt != null && !attempt.isCompleted) attempt.complete('已取消');
   }
 
   /// 重置下载状态
