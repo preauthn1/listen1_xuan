@@ -12,15 +12,18 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # 按架构选 runner：Intel 包在原生 Intel 镜像上编译（macos-15-intel），
+    # 不再和 iOS、Apple Silicon 包抢 arm64 池；实测 arm64 池经常排队十几分钟，
+    # Intel 池通常一分钟内分到机器。
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { arch: arm64,  tag: apple-silicon, ffmpeg: with,    variant: ffmpeg, artifact: macos-app-artifact-ffmpeg }
-          - { arch: x86_64, tag: intel,         ffmpeg: with,    variant: ffmpeg, artifact: macos-app-artifact-ffmpeg }
-          - { arch: arm64,  tag: apple-silicon, ffmpeg: without, variant: lite,   artifact: macos-app-artifact }
-          - { arch: x86_64, tag: intel,         ffmpeg: without, variant: lite,   artifact: macos-app-artifact }
+          - { arch: arm64,  tag: apple-silicon, runner: macos-latest,   ffmpeg: with,    variant: ffmpeg, artifact: macos-app-artifact-ffmpeg }
+          - { arch: x86_64, tag: intel,         runner: macos-15-intel, ffmpeg: with,    variant: ffmpeg, artifact: macos-app-artifact-ffmpeg }
+          - { arch: arm64,  tag: apple-silicon, runner: macos-latest,   ffmpeg: without, variant: lite,   artifact: macos-app-artifact }
+          - { arch: x86_64, tag: intel,         runner: macos-15-intel, ffmpeg: without, variant: lite,   artifact: macos-app-artifact }
     steps:
       - name: Output Commit Information
         env:
