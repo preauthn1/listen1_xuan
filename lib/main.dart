@@ -713,7 +713,8 @@ class _MyHomePageState extends State<MyHomePage>
 
                   /// The desktop workspace uses the rail/topbar action instead
                   /// of a mobile FAB, which otherwise floats over the player.
-                  if (!globalHorizon)
+                  /// Mobile keeps the FAB in both orientations (upstream offsets).
+                  if (!isDesktop)
                     Positioned.fill(
                       child: SafeArea(
                         top: false,
@@ -721,7 +722,10 @@ class _MyHomePageState extends State<MyHomePage>
                         child: Align(
                           alignment: Alignment.bottomRight,
                           child: Padding(
-                            padding: EdgeInsets.only(bottom: 300.w, right: 40.w),
+                            padding: EdgeInsets.only(
+                              bottom: globalHorizon ? 76 : 300.w,
+                              right: globalHorizon ? 16 : 40.w,
+                            ),
                             child: WebSocketClientControlPanel.floatingActionButton,
                           ),
                         ),
