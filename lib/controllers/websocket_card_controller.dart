@@ -53,6 +53,9 @@ class WebSocketCardController extends GetxController {
   /// Settings key for the explicit LAN opt-in (default off).
   static const String allowLanSettingKey = 'wsServerAllowLan';
 
+  /// Settings key holding the persisted server pairing token.
+  static const String serverTokenSettingKey = 'wsServerToken';
+
   /// 是否允许局域网设备连接（默认关闭，仅本机回环）
   final RxBool _allowLan = false.obs;
   final RxInt _port = 25917.obs;
@@ -133,6 +136,15 @@ class WebSocketCardController extends GetxController {
 
       _allowLan.value = settings[allowLanSettingKey] == true;
 
+      // 配对令牌只生成一次并持久化，服务器重启后已配对的客户端仍可重连。
+      final savedToken = settings[serverTokenSettingKey];
+      if (savedToken is String && savedToken.isNotEmpty) {
+        _accessToken.value = savedToken;
+      } else {
+        _accessToken.value = WebSocketServerController.generateAccessToken();
+        settings[serverTokenSettingKey] = _accessToken.value;
+      }
+
       // Keep the saved address even while LAN is off so turning LAN back on
       // restores it; [bindHost] still forces loopback while the opt-in is off.
       final configuredHost = settings['wsServerHost'] as String?;
@@ -171,6 +183,9 @@ class WebSocketCardController extends GetxController {
       settings['wsServerPort'] = _port.value;
       settings['wsServerHost'] = _host.value;
       settings[allowLanSettingKey] = _allowLan.value;
+      if (_accessToken.value.isNotEmpty) {
+        settings[serverTokenSettingKey] = _accessToken.value;
+      }
 
       // 触发设置保存
       settingsController.setSettings(settings);
@@ -197,6 +212,19 @@ class WebSocketCardController extends GetxController {
     selectBestAvailableAddress.value = enabled ? _host.value : bindHost;
     saveWebSocketSettings();
     unawaited(refreshIpAddresses());
+  }
+
+  /// 重新生成配对令牌：旧令牌立即失效，已连接的客户端会被断开，需要重新扫码。
+  Future<void> regenerateAccessToken() async {
+    final token = WebSocketServerController.generateAccessToken();
+    _accessToken.value = token;
+    saveWebSocketSettings();
+    final server = wsServerController;
+    if (server != null) {
+      await server.rotateAccessToken(token);
+      i_clientCount.value = 0;
+    }
+    _showSuccess('配对令牌已重新生成，旧客户端需要重新扫码配对');
   }
 
   /// 更新服务器按钮显示设置
@@ -327,7 +355,10 @@ class WebSocketCardController extends GetxController {
       if (success) {
         _isServerRunning.value = true;
         _serverUrl.value = wsServerController!.serverUrl;
-        _accessToken.value = wsServerController!.accessToken;
+        if (_accessToken.value != wsServerController!.accessToken) {
+          _accessToken.value = wsServerController!.accessToken;
+          saveWebSocketSettings();
+        }
         _updateStatusMessage('运行中');
         _logger.i('$_tag WebSocket服务器启动成功: $serverUrl');
 
@@ -338,7 +369,6 @@ class WebSocketCardController extends GetxController {
         wsServerController = null;
         _isServerRunning.value = false;
         _serverUrl.value = '';
-        _accessToken.value = '';
         _updateStatusMessage('启动失败');
         _showError('服务器启动失败，请检查端口 $_port 是否被占用或其他资源冲突');
         _logger.e('$_tag 启动服务器失败: 服务器返回 false');
@@ -348,7 +378,6 @@ class WebSocketCardController extends GetxController {
       wsServerController = null;
       _isServerRunning.value = false;
       _serverUrl.value = '';
-      _accessToken.value = '';
       i_clientCount.value = 0;
       _updateStatusMessage('启动失败');
       final errorMsg = '启动服务器异常: $e';
@@ -465,7 +494,6 @@ class WebSocketCardController extends GetxController {
 
       _isServerRunning.value = false;
       _serverUrl.value = '';
-      _accessToken.value = '';
       i_clientCount.value = 0;
       _updateStatusMessage('已停止');
       _showSuccess('WebSocket 服务器已停止');

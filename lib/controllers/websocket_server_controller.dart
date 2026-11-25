@@ -35,7 +35,25 @@ class WebSocketServerController extends GetxController {
   final Logger _logger = createAppLogger();
   HttpServer? _server;
 
-  final String accessToken;
+  String _accessToken;
+
+  /// Current pairing token required in the `x-listen1-pairing-token` header.
+  String get accessToken => _accessToken;
+
+  /// Generate a random 256-bit pairing token.
+  static String generateAccessToken() => base64UrlEncode(
+    List<int>.generate(32, (_) => Random.secure().nextInt(256)),
+  );
+
+  /// Replace the pairing token and drop every client paired with the old one.
+  /// HTTP routes check the token per request, so they are invalidated at once.
+  Future<void> rotateAccessToken(String token) async {
+    if (token.isEmpty) throw ArgumentError('token must not be empty');
+    _accessToken = token;
+    await _closeAllConnections();
+    _clientCount.value = 0;
+  }
+
   /// 所有活跃的 WebSocket 连接
   final List<WebSocketConnection> _connections = <WebSocketConnection>[];
   int _pendingConnections = 0;
@@ -101,10 +119,9 @@ class WebSocketServerController extends GetxController {
     Duration pongTimeout = const Duration(seconds: 5),
   }) : _host = host,
        _port = port,
-       accessToken = accessToken ??
-           base64UrlEncode(
-             List<int>.generate(32, (_) => Random.secure().nextInt(256)),
-           ),
+       _accessToken = (accessToken == null || accessToken.isEmpty)
+           ? generateAccessToken()
+           : accessToken,
        _pingInterval = pingInterval,
        _pongTimeout = pongTimeout;
 
