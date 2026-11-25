@@ -13,6 +13,7 @@ import 'package:listen1_xuan/widgets/motor_progress_indicator_xuan.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:system_info3/system_info3.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../funcs.dart';
 import '../global_settings_animations.dart';
@@ -171,6 +172,28 @@ class UpdController extends GetxController {
     return matches.first.group(0)!.toLowerCase();
   }
 
+  /// Query keys GitHub puts on Azure Blob SAS redirects. Actions artifact
+  /// downloads use user-delegation SAS URLs, which add the `sk*` and `spr`
+  /// keys (verified on a live productionresultssa*.blob.core.windows.net
+  /// redirect). `sig` is still required by the callers.
+  static const Set<String> _allowedBlobSasQueryKeys = {
+    'sv',
+    'st',
+    'se',
+    'sr',
+    'sp',
+    'spr',
+    'sig',
+    'rscd',
+    'rsct',
+    'skoid',
+    'sktid',
+    'skt',
+    'ske',
+    'sks',
+    'skv',
+  };
+
   bool _isTrustedGithubReleaseUrl(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null ||
@@ -195,16 +218,7 @@ class UpdController extends GetxController {
           (uri.host == 'objects.githubusercontent.com' ||
               (uri.queryParameters.containsKey('sig') &&
                   uri.queryParameters.keys.every(
-                    (key) => const {
-                      'sv',
-                      'st',
-                      'se',
-                      'sr',
-                      'sp',
-                      'sig',
-                      'rscd',
-                      'rsct',
-                    }.contains(key),
+                    _allowedBlobSasQueryKeys.contains,
                   )));
     }
     if (uri.host == 'api.github.com') {
@@ -248,11 +262,9 @@ class UpdController extends GetxController {
         throw const FormatException('GitHub 重定向地址不受信任');
       }
       if (target.host.endsWith('.blob.core.windows.net')) {
-        const allowed = {
-          'sv', 'st', 'se', 'sr', 'sp', 'sig', 'rscd', 'rsct'
-        };
         if (!target.queryParameters.containsKey('sig') ||
-            target.queryParameters.keys.any((key) => !allowed.contains(key))) {
+            target.queryParameters.keys
+                .any((key) => !_allowedBlobSasQueryKeys.contains(key))) {
           throw const FormatException('GitHub 签名地址参数不受信任');
         }
       }
@@ -333,7 +345,7 @@ class UpdController extends GetxController {
 
       final digest = (art['digest'] as String?)?.trim();
       if (digest == null || digest.isEmpty) {
-        throw const FormatException('构建产物缺少 SHA-256 校验值');
+        throw _MissingChecksumException(_artifactPageUrl(art));
       }
       final needDownload = !await _checkFileHash(filePath, digest, [
         'certutil',
@@ -367,6 +379,9 @@ class UpdController extends GetxController {
       } else {
         await _performWindowsExtractAndUpdate(tempPath, filePath);
       }
+    } on _MissingChecksumException catch (e) {
+      // 在开始下载前抛出，此时没有进度框可关。
+      await _offerOpenReleasePage(e.pageUrl);
     } catch (e) {
       _closeProgressDialog();
       showErrorSnackbar('下载失败', e.toString());
@@ -400,7 +415,7 @@ class UpdController extends GetxController {
 
       final digest = (selectedArt['digest'] as String?)?.trim();
       if (digest == null || digest.isEmpty) {
-        throw const FormatException('构建产物缺少 SHA-256 校验值');
+        throw _MissingChecksumException(_artifactPageUrl(selectedArt));
       }
       final downloadUrl = selectedArt["archive_download_url"];
       final actualDownloadUrl = await _getActualDownloadUrl(downloadUrl, token);
@@ -420,6 +435,9 @@ class UpdController extends GetxController {
             await _extractAndInstallApk(tempPath, filePath);
           },
       );
+    } on _MissingChecksumException catch (e) {
+      // 在开始下载前抛出，此时没有进度框可关。
+      await _offerOpenReleasePage(e.pageUrl);
     } catch (e) {
       _closeProgressDialog();
       showErrorSnackbar('下载失败', e.toString());
@@ -579,7 +597,7 @@ class UpdController extends GetxController {
       // 检查文件哈希
       final digest = (art['digest'] as String?)?.trim();
       if (digest == null || digest.isEmpty) {
-        throw const FormatException('构建产物缺少 SHA-256 校验值');
+        throw _MissingChecksumException(_artifactPageUrl(art));
       }
       final needDownload = !await _checkFileHash(filePath, digest, [
         'shasum',
@@ -616,6 +634,9 @@ class UpdController extends GetxController {
       } else {
         showErrorSnackbar('安装包文件不存在', null);
       }
+    } on _MissingChecksumException catch (e) {
+      // 在开始下载前抛出，此时没有进度框可关。
+      await _offerOpenReleasePage(e.pageUrl);
     } catch (e) {
       _closeProgressDialog();
       showErrorSnackbar('下载失败', e.toString());
@@ -927,20 +948,25 @@ class UpdController extends GetxController {
         await delReleasesCache(releases.skip(1).toList(), latestBuildNumber);
       }
 
-      // 只按版本号判断：本仓库（fork）自己构建的包，提交号永远不会等于上游
-      // Release 安装包里的提交号，用提交号比较会导致每次启动都提示「新版本」。
-      // 构建号（tag 里 + 后面的数字）更大才算新版本；相同构建号视为已是最新。
+      // 优先按构建号（tag 里 + 后面的数字）判断：本仓库（fork）自己构建的包，
+      // 提交号永远不会等于上游 Release 安装包里的提交号，单纯比较提交号会导致
+      // 每次启动都提示「新版本」。
+      // - 两边构建号都能解析：只有 Release 构建号更大才提示；相同构建号视为
+      //   已是最新（同一 tag 下重新上传的包不再提示），更小（fork 领先）不提示。
+      // - 任一构建号无法解析（tag 没有 +N，或本地拿不到构建号）：回退到上游
+      //   的提交号比较，避免永远不提示更新。
       final localBuild = await _localBuildNumber();
       final releaseBuild = _releaseBuildNumber(latestRelease);
-      final isNewer = localBuild > 0 && releaseBuild > localBuild;
+      final hashDiffers = localBuildNumber != latestBuildNumber &&
+          localBuildNumber != rLatestBuildNumber;
+      final isNewer = (localBuild > 0 && releaseBuild > 0)
+          ? releaseBuild > localBuild && hashDiffers
+          : hashDiffers;
       showDebugSnackbar(
         '版本检查',
         '本地构建号 $localBuild，最新构建号 $releaseBuild',
       );
-      if (isNewer &&
-          !kDebugMode &&
-          localBuildNumber != latestBuildNumber &&
-          localBuildNumber != rLatestBuildNumber) {
+      if (isNewer && !kDebugMode) {
         // 有新版本可用
         _showReleaseUpdateDialog(latestRelease, latestBuild);
       } else {
@@ -1187,6 +1213,9 @@ class UpdController extends GetxController {
           isUpdating.value = false;
         },
       );
+    } on _MissingChecksumException catch (e) {
+      isUpdating.value = false;
+      await _offerOpenReleasePage(e.pageUrl);
     } catch (e) {
       debugPrint('下载 Release 失败: $e');
       showErrorSnackbar('下载失败', e.toString());
@@ -1198,9 +1227,57 @@ class UpdController extends GetxController {
     final digest = asset.digest?.trim() ?? '';
     final match = RegExp(r'^sha256:[0-9a-fA-F]{64}$').firstMatch(digest);
     if (match == null) {
-      throw const FormatException('更新包缺少有效的 SHA-256 校验值');
+      throw _MissingChecksumException(_releasePageUrl(asset));
     }
     return digest.substring('sha256:'.length).toLowerCase();
+  }
+
+  static const String _releasesPageUrl =
+      'https://github.com/HBWuChang/listen1_xuan/releases';
+
+  /// Release 页面地址：从安装包地址 `.../releases/download/{tag}/{name}`
+  /// 推出 `.../releases/tag/{tag}`，推不出时退回 Releases 列表页。
+  static String _releasePageUrl(ReleaseAsset asset) {
+    final uri = Uri.tryParse(asset.browserDownloadUrl);
+    final segments = uri?.pathSegments ?? const <String>[];
+    final index = segments.indexOf('download');
+    if (uri != null &&
+        uri.scheme == 'https' &&
+        uri.host == 'github.com' &&
+        index > 0 &&
+        segments[index - 1] == 'releases' &&
+        index + 1 < segments.length) {
+      return '$_releasesPageUrl/tag/${Uri.encodeComponent(segments[index + 1])}';
+    }
+    return _releasesPageUrl;
+  }
+
+  /// 构建产物对应的 Actions 运行页面，拿不到运行 id 时退回 Releases 列表页。
+  static String _artifactPageUrl(dynamic artifact) {
+    final run = artifact is Map ? artifact['workflow_run'] : null;
+    final runId = int.tryParse(
+      (run is Map ? run['id'] : null)?.toString() ?? '',
+    );
+    if (runId == null) return _releasesPageUrl;
+    return 'https://github.com/HBWuChang/listen1_xuan/actions/runs/$runId';
+  }
+
+  /// 发布文件没有 SHA-256 校验值时不在应用内安装（无法确认文件完整、未被篡改），
+  /// 说明原因并让用户选择打开发布页面手动下载。
+  Future<void> _offerOpenReleasePage(String pageUrl) async {
+    final open = await showConfirmDialog(
+      '这个版本的发布文件没有提供 SHA-256 校验值，无法确认下载的文件完整且未被篡改，'
+          '因此不会在应用内自动更新。\n\n可以打开发布页面手动下载安装。',
+      '发布文件缺少校验值',
+      confirmText: '打开发布页面',
+      cancelText: '关闭',
+    );
+    if (!open) return;
+    try {
+      await launchUrl(Uri.parse(pageUrl), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      showErrorSnackbar('无法打开发布页面', e.toString());
+    }
   }
 
   String _validatedReleaseDownloadUrl(ReleaseAsset asset) {
@@ -1755,4 +1832,14 @@ class UpdController extends GetxController {
       showErrorSnackbar('处理文件更新失败', e.toString());
     }
   }
+}
+
+/// 发布文件缺少（或格式无效的）SHA-256 校验值。
+class _MissingChecksumException implements Exception {
+  const _MissingChecksumException(this.pageUrl);
+
+  final String pageUrl;
+
+  @override
+  String toString() => '发布文件缺少 SHA-256 校验值';
 }

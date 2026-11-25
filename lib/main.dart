@@ -401,12 +401,16 @@ class MyApp extends StatelessWidget {
 
               // 然后应用 MediaQuery 设置
               return MediaQuery(
-                // Desktop chrome keeps a stable density; mobile retains the
-                // user's accessibility text scale.
+                // Desktop chrome keeps a stable density. Mobile follows the
+                // user's text scale but clamped to 1.0–1.3: the ScreenUtil
+                // fixed-size layouts (play bar, list rows) overflow beyond it.
                 data: mediaQuery.copyWith(
                   textScaler: isDesktop
                       ? const TextScaler.linear(1.0)
-                      : mediaQuery.textScaler,
+                      : mediaQuery.textScaler.clamp(
+                          minScaleFactor: 1.0,
+                          maxScaleFactor: 1.3,
+                        ),
                   padding: mediaQuery.padding.copyWith(top: safeTop),
                 ),
                 child: widget,
@@ -713,7 +717,8 @@ class _MyHomePageState extends State<MyHomePage>
 
                   /// The desktop workspace uses the rail/topbar action instead
                   /// of a mobile FAB, which otherwise floats over the player.
-                  if (!globalHorizon)
+                  /// Mobile keeps the FAB in both orientations (upstream offsets).
+                  if (!isDesktop)
                     Positioned.fill(
                       child: SafeArea(
                         top: false,
@@ -721,7 +726,10 @@ class _MyHomePageState extends State<MyHomePage>
                         child: Align(
                           alignment: Alignment.bottomRight,
                           child: Padding(
-                            padding: EdgeInsets.only(bottom: 300.w, right: 40.w),
+                            padding: EdgeInsets.only(
+                              bottom: globalHorizon ? 76 : 300.w,
+                              right: globalHorizon ? 16 : 40.w,
+                            ),
                             child: WebSocketClientControlPanel.floatingActionButton,
                           ),
                         ),

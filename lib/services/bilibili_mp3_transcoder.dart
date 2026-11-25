@@ -17,8 +17,12 @@ typedef BilibiliTranscodeProgress =
 class BilibiliMp3Transcoder {
   const BilibiliMp3Transcoder();
 
-  static const int _maxOutputBytes = 64 * 1024 * 1024;
-  static const Duration _maxDuration = Duration(minutes: 10);
+  /// Sanity cap only: ~1 GiB of MP3 at -q:a 2 is well over 10 hours of audio.
+  static const int _maxOutputBytes = 1024 * 1024 * 1024;
+
+  /// Abort only when neither the download nor FFmpeg has made progress for
+  /// this long; long videos on slow networks keep running while bytes flow.
+  static const Duration _stallTimeout = Duration(minutes: 2);
   static const _maxErrorLength = 2000;
   Future<void> transcode({
     required Dio dio,
@@ -30,32 +34,50 @@ class BilibiliMp3Transcoder {
     BilibiliDownloadProgress? onDownloadProgress,
     BilibiliTranscodeProgress? onTranscodeProgress,
   }) async {
+    final completedSession = Completer<FFmpegSession>();
+    // A stall error may land before anything awaits the future.
+    completedSession.future.ignore();
+    FFmpegSession? runningSession;
+    var timedOut = false;
+    Timer? stallTimer;
+
+    void onStall() {
+      timedOut = true;
+      // Cancel only this transcode. A no-argument cancel would also kill
+      // unrelated FFmpeg sessions (other caches, metadata/cover embedding).
+      final sessionId = _sessionIdOf(runningSession);
+      if (sessionId != null) FFmpegKit.cancel(sessionId);
+      if (!completedSession.isCompleted) {
+        completedSession.completeError(
+          const BilibiliTranscodeException('FFmpeg 转码超时（长时间没有进度）'),
+        );
+      }
+    }
+
+    void resetStallTimer() {
+      if (timedOut) return;
+      stallTimer?.cancel();
+      stallTimer = Timer(_stallTimeout, onStall);
+    }
+
+    var lastDownloaded = -1;
+    var lastOutput = -1;
     final proxy = await _BilibiliAudioProxy.start(
       dio: dio,
       sourceUrl: sourceUrl,
-      onProgress: onDownloadProgress,
+      idleTimeout: _stallTimeout,
+      onProgress: (received, total) {
+        if (received > lastDownloaded) {
+          lastDownloaded = received;
+          resetStallTimer();
+        }
+        onDownloadProgress?.call(received, total);
+      },
     );
 
-    final completedSession = Completer<FFmpegSession>();
-    FFmpegSession? runningSession;
-    Timer? timeoutTimer;
-    Future<FFmpegSession>? executeFuture;
     try {
-      timeoutTimer = Timer(_maxDuration, () {
-        if (runningSession != null) {
-          FFmpegKit.cancel();
-        } else {
-          // The native plugin may return its session only after completion;
-          // the no-argument cancel is the only portable emergency fallback.
-          FFmpegKit.cancel();
-        }
-        if (!completedSession.isCompleted) {
-          completedSession.completeError(
-            const BilibiliTranscodeException('FFmpeg 转码超时'),
-          );
-        }
-      });
-      executeFuture = FFmpegKit.executeWithArgumentsAsync(
+      resetStallTimer();
+      final executeFuture = FFmpegKit.executeWithArgumentsAsync(
         buildArguments(
           proxy.url.toString(),
           outputPath,
@@ -64,20 +86,27 @@ class BilibiliMp3Transcoder {
           coverPath: coverPath,
         ),
         (session) {
-          runningSession = session;
+          runningSession ??= session;
           if (!completedSession.isCompleted) completedSession.complete(session);
         },
         null,
         (statistics) {
-          onTranscodeProgress?.call(
-            statistics.getSize(),
-            statistics.getSpeed(),
-          );
+          final size = statistics.getSize();
+          if (size > lastOutput) {
+            lastOutput = size;
+            resetStallTimer();
+          }
+          onTranscodeProgress?.call(size, statistics.getSpeed());
         },
       );
-      await executeFuture;
+      // The real plugin resolves this as soon as the session is created, so
+      // the id is available for a targeted cancel while FFmpeg still runs.
+      runningSession ??= await executeFuture;
+      if (timedOut) {
+        final sessionId = _sessionIdOf(runningSession);
+        if (sessionId != null) FFmpegKit.cancel(sessionId);
+      }
       final session = await completedSession.future;
-      if (runningSession == null) runningSession = session;
 
       final returnCode = await session.getReturnCode();
       if (!ReturnCode.isSuccess(returnCode)) {
@@ -90,20 +119,24 @@ class BilibiliMp3Transcoder {
       }
       await CacheAudioMetadata.validateAudioOutput(outputPath);
     } finally {
-      timeoutTimer?.cancel();
-      if (runningSession != null) {
-        try {
-          final returnCode = await runningSession!.getReturnCode();
-          if (!ReturnCode.isSuccess(returnCode)) {
-            // The session has already terminated or was cancelled.
-          }
-        } catch (_) {}
-      }
+      stallTimer?.cancel();
       await proxy.close();
       if (await File(outputPath).exists() &&
           await File(outputPath).length() > _maxOutputBytes) {
         await File(outputPath).delete();
       }
+    }
+  }
+
+  /// Session id for a targeted cancel. Resolved dynamically because the
+  /// no-FFmpeg stub package does not expose `getSessionId`.
+  static int? _sessionIdOf(FFmpegSession? session) {
+    if (session == null) return null;
+    try {
+      final id = (session as dynamic).getSessionId();
+      return id is int ? id : null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -179,14 +212,14 @@ class BilibiliTranscodeException implements Exception {
 }
 
 class _BilibiliAudioProxy {
-  static const int _maxInputBytes = 256 * 1024 * 1024;
-  static const Duration _maxDuration = Duration(minutes: 10);
-  static const int _maxOutputBytes = 64 * 1024 * 1024;
+  /// Input sanity cap per request (hi-res/long audio can exceed 256 MiB).
+  static const int _maxInputBytes = 1024 * 1024 * 1024;
   _BilibiliAudioProxy._({
     required this.server,
     required this.url,
     required this.dio,
     required this.sourceUrl,
+    required this.idleTimeout,
     required this.onProgress,
   });
 
@@ -194,6 +227,9 @@ class _BilibiliAudioProxy {
   final Uri url;
   final Dio dio;
   final String sourceUrl;
+
+  /// Maximum gap between two upstream chunks before the request is dropped.
+  final Duration idleTimeout;
   final BilibiliDownloadProgress? onProgress;
   final Set<CancelToken> _cancelTokens = {};
   StreamSubscription<HttpRequest>? _subscription;
@@ -201,6 +237,7 @@ class _BilibiliAudioProxy {
   static Future<_BilibiliAudioProxy> start({
     required Dio dio,
     required String sourceUrl,
+    required Duration idleTimeout,
     BilibiliDownloadProgress? onProgress,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -210,6 +247,7 @@ class _BilibiliAudioProxy {
       url: Uri.parse('http://127.0.0.1:${server.port}/$token/audio'),
       dio: dio,
       sourceUrl: sourceUrl,
+      idleTimeout: idleTimeout,
       onProgress: onProgress,
     );
     proxy._subscription = server.listen(proxy._handleRequest);
@@ -273,17 +311,15 @@ class _BilibiliAudioProxy {
         contentLength,
       );
       var received = 0;
-      var outputBytes = 0;
-      final stream = body.stream.map((chunk) {
+      final stream = body.stream.timeout(idleTimeout).map((chunk) {
         received += chunk.length;
-        outputBytes += chunk.length;
-        if (received > _maxInputBytes || outputBytes > _maxOutputBytes) {
-          throw const BilibiliTranscodeException('音频传输超过大小限制');
+        if (received > _maxInputBytes) {
+          throw const BilibiliTranscodeException('输入音频超过大小限制');
         }
         onProgress?.call(rangeStart + received, total);
         return chunk;
       });
-      await response.addStream(stream).timeout(_maxDuration);
+      await response.addStream(stream);
     } catch (_) {
       if (!responseStarted) response.statusCode = HttpStatus.badGateway;
     } finally {
