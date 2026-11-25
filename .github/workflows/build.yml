@@ -16,7 +16,8 @@ on:
           - macos
   push:
     branches: [main, feat/dual-build-ffmpeg]
-    tags: ['v*', '[0-9]*']
+    # Release tags must equal the pubspec version (e.g. 2.7.5+55); no 'v' prefix.
+    tags: ['[0-9]*']
     paths:
       - '**/*.dart'
       - 'pubspec.yaml'
@@ -30,31 +31,80 @@ on:
       - 'assets/images/app_icon.ico'
       - '.github/workflows/**'
 
+# Artifact names carry no hash, so parallel runs for the same ref would
+# overwrite each other's artifacts and race the release asset delete/upload.
+# Keep only the newest run per ref.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  # Fail a tag build before any platform starts when the tag and the pubspec
+  # version disagree; the publish jobs repeat this check before uploading.
+  version_gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check release tag matches pubspec version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | tr -d '\r')
+          echo "pubspec version: $version"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match pubspec.yaml version '$version'. Bump pubspec or push tag '$version'."
+            exit 1
+          fi
+
+  # Upstream (HBWuChang/listen1_xuan) keeps its original flow: a branch push
+  # builds a platform only when the head commit message contains its keyword
+  # (apk / win / ios / macos) and then publishes to the release named after
+  # the pubspec version. Forks build everything and publish on tags only.
   android:
-    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'android'
+    needs: version_gate
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.target == 'all' || inputs.target == 'android')) ||
+      (github.event_name == 'push' && (github.ref_type == 'tag' ||
+        github.repository != 'HBWuChang/listen1_xuan' ||
+        contains(github.event.head_commit.message, 'apk')))
     permissions:
       contents: write
     uses: ./.github/workflows/dart.yml
     secrets: inherit
   windows:
-    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'windows'
+    needs: version_gate
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.target == 'all' || inputs.target == 'windows')) ||
+      (github.event_name == 'push' && (github.ref_type == 'tag' ||
+        github.repository != 'HBWuChang/listen1_xuan' ||
+        contains(github.event.head_commit.message, 'win')))
     permissions:
       contents: write
     uses: ./.github/workflows/dart_win.yml
     secrets: inherit
   ios:
-    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'ios'
+    needs: version_gate
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.target == 'all' || inputs.target == 'ios')) ||
+      (github.event_name == 'push' && (github.ref_type == 'tag' ||
+        github.repository != 'HBWuChang/listen1_xuan' ||
+        contains(github.event.head_commit.message, 'ios')))
     permissions:
       contents: write
     uses: ./.github/workflows/dart_ios.yml
     secrets: inherit
   macos:
-    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'macos'
+    needs: version_gate
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.target == 'all' || inputs.target == 'macos')) ||
+      (github.event_name == 'push' && (github.ref_type == 'tag' ||
+        github.repository != 'HBWuChang/listen1_xuan' ||
+        contains(github.event.head_commit.message, 'macos')))
     permissions:
       contents: write
     uses: ./.github/workflows/dart_macos.yml

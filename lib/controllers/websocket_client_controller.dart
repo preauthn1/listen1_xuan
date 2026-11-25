@@ -291,6 +291,9 @@ class WebSocketClientController extends GetxController {
     _isExpanded.value = !_isExpanded.value;
   }
 
+  static const String missingTokenMessage = '缺少配对令牌，请扫码配对';
+  static const String invalidTokenMessage = '令牌无效或已过期，请重新扫码';
+
   void updateServerToken(String token) {
     _serverToken.value = token.trim();
     saveWebSocketClientSettings();
@@ -536,6 +539,15 @@ class WebSocketClientController extends GetxController {
       _manualClosing = false;
       _updateStatusMessage('正在连接...');
 
+      // 服务器要求配对令牌；没有令牌时不发起必然失败的连接，也不进入重连循环。
+      if (_serverToken.value.isEmpty) {
+        _stopReconnectTimer();
+        _isReconnecting.value = false;
+        _updateStatusMessage(missingTokenMessage);
+        _showError(missingTokenMessage);
+        return;
+      }
+
       // 解析服务器地址（支持 IPv4/IPv6）
       final (parsedHost, parsedPort) = parseAddress(_serverAddress.value);
 
@@ -633,9 +645,20 @@ class WebSocketClientController extends GetxController {
 
       i_isConnected.value = false;
       _serverUrl.value = '';
+      _logger.e('$_tag 连接失败', error: e);
+
+      if (e is WebSocketException &&
+          e.httpStatusCode == HttpStatus.unauthorized) {
+        // 令牌错误时重连只会不断失败，停止自动重连并提示重新配对。
+        _stopReconnectTimer();
+        _isReconnecting.value = false;
+        _updateStatusMessage(invalidTokenMessage);
+        _showError(invalidTokenMessage);
+        return;
+      }
+
       _updateStatusMessage('连接失败');
       _showError('连接失败: $e');
-      _logger.e('$_tag 连接失败', error: e);
 
       // 如果启用了自动重连，开始重连
       if (_autoReconnect.value && !_isReconnecting.value) {
@@ -1045,7 +1068,11 @@ class WebSocketClientController extends GetxController {
           }
           break;
         case WebSocketMessageType.error:
-          // 处理错误消息
+          // 服务器拒绝了请求（例如消息过大），提示用户
+          final error = message.parseContentAsMap()?['error'];
+          if (error is String && error.isNotEmpty) {
+            _showError(error);
+          }
           break;
         case WebSocketMessageType.pong:
           // 处理 pong 消息

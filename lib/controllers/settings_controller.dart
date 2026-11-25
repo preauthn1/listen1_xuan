@@ -454,6 +454,17 @@ class SettingsController extends GetxController {
     settings[getPreReleaseKey] = value;
   }
 
+  /// 更新包下载先走 h3.040905.xyz 镜像，失败再直连 GitHub。默认关闭；
+  /// 开启后仍对下载结果做 SHA-256 校验。
+  static const String useDownloadMirrorKey = 'useDownloadMirror';
+  bool get useDownloadMirror {
+    return settings[useDownloadMirrorKey] as bool? ?? false;
+  }
+
+  set useDownloadMirror(bool value) {
+    settings[useDownloadMirrorKey] = value;
+  }
+
   static const String stopOnPlayListEndKey = 'stopOnPlayListEnd';
   bool get stopOnPlayListEnd {
     return settings[stopOnPlayListEndKey] ?? false;
@@ -1135,8 +1146,12 @@ class SettingsController extends GetxController {
         provider.getUser(),
       Future.microtask(() async {
         loginDataLoading.add(PlantformCodes.github);
-        loginData[PlantformCodes.github] = await Github.updateStatus();
-        loginDataLoading.remove(PlantformCodes.github);
+        try {
+          loginData[PlantformCodes.github] = await Github.updateStatus();
+        } finally {
+          // 设置页据此显示加载圈，失败时也必须移除。
+          loginDataLoading.remove(PlantformCodes.github);
+        }
       }),
     ]);
     await tasks;

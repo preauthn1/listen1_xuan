@@ -1291,11 +1291,13 @@ class _BilibiliLoginFormState extends State<_BilibiliLoginForm> {
   final _focusNode = FocusNode();
   late final bool _hotKeysEnabled;
   bool _saving = false;
+  late String _savedText;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.provider.token);
+    _savedText = _controller.text.trim();
     _hotKeysEnabled = enable_inapp_hotkey;
     _focusNode.addListener(_updateHotKeys);
   }
@@ -1304,8 +1306,36 @@ class _BilibiliLoginFormState extends State<_BilibiliLoginForm> {
     setInAppHotKeyEnable(_focusNode.hasFocus ? false : _hotKeysEnabled);
   }
 
+  /// 与独立的 Cookie 导入一致：校验 SESSDATA 并过滤到 B 站域名。
+  /// 成功返回 true；失败时提示原因（例如缺少 SESSDATA）。
+  Future<bool> _save(String value) async {
+    final text = value.trim();
+    if (_saving || text.isEmpty) return false;
+    _saving = true;
+    try {
+      await widget.provider.importCookies(text);
+      _savedText = text;
+      showSuccessSnackbar('设置成功', null);
+      return true;
+    } catch (e) {
+      showErrorSnackbar('保存Cookie时出错', '$e');
+      return false;
+    } finally {
+      _saving = false;
+    }
+  }
+
+  Future<void> _saveAndClose(String value) async {
+    if (await _save(value) && mounted) Navigator.of(context).pop();
+  }
+
   @override
   void dispose() {
+    // 粘贴后直接关闭对话框（移动端常见）也要保存，避免 Cookie 丢失。
+    final pending = _controller.text.trim();
+    if (pending.isNotEmpty && pending != _savedText) {
+      unawaited(_save(pending));
+    }
     _focusNode.removeListener(_updateHotKeys);
     _focusNode.dispose();
     _controller.dispose();
@@ -1351,22 +1381,16 @@ class _BilibiliLoginFormState extends State<_BilibiliLoginForm> {
               focusNode: _focusNode,
               decoration: const InputDecoration(
                 labelText: '请输入 B 站 Cookie',
-                hintText: '粘贴后按回车保存',
+                hintText: '粘贴后按回车或点击保存',
               ),
-              onSubmitted: (value) async {
-                if (_saving) return;
-                _saving = true;
-                try {
-                  // 与独立的 Cookie 导入一致：校验 SESSDATA 并过滤到 B 站域名。
-                  await widget.provider.importCookies(value);
-                  showSuccessSnackbar('设置成功', null);
-                  if (context.mounted) Navigator.of(context).pop();
-                } catch (e) {
-                  showErrorSnackbar('保存Cookie时出错', '$e');
-                } finally {
-                  _saving = false;
-                }
-              },
+              onSubmitted: _saveAndClose,
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                onPressed: () => _saveAndClose(_controller.text),
+                child: const Text('保存'),
+              ),
             ),
           ],
         ),

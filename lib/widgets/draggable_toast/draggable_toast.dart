@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:motor/motor.dart';
 import 'draggable_toast_controller.dart';
 
@@ -341,8 +343,28 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
     _startAutoPeekTimer();
   }
 
-  Size _getAvailableArea(BoxConstraints constraints) {
+  /// 手机端播放栏高度：竖屏与 main.dart 的 KeyboardPlayerSpacer（256.w）一致，
+  /// 横屏为 60。
+  static double _mobilePlayBarHeight(BuildContext context) =>
+      MediaQuery.orientationOf(context) == Orientation.portrait ? 256.w : 60.0;
+
+  /// Toast 是全屏根 Overlay，没有 SafeArea。手机上底边至少让出系统手势条/导航栏
+  /// 和播放栏，避免卡片压住播放控制；桌面端保持调用方给的内边距。
+  EdgeInsets _effectiveAreaPadding(BuildContext context) {
     final padding = widget.config.areaPadding;
+    final isMobile = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+    if (!isMobile) return padding;
+    final minBottom = MediaQuery.viewPaddingOf(context).bottom +
+        _mobilePlayBarHeight(context) +
+        8;
+    return padding.bottom >= minBottom
+        ? padding
+        : padding.copyWith(bottom: minBottom);
+  }
+
+  Size _getAvailableArea(BoxConstraints constraints, EdgeInsets padding) {
     return Size(
       constraints.maxWidth - padding.left - padding.right,
       constraints.maxHeight - padding.top - padding.bottom,
@@ -470,7 +492,8 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final areaSize = _getAvailableArea(constraints);
+        final areaPadding = _effectiveAreaPadding(context);
+        final areaSize = _getAvailableArea(constraints, areaPadding);
         _cachedAreaSize = areaSize;
 
         // 首次布局时居中定位
@@ -490,7 +513,7 @@ class _DraggableMotorToastState extends State<DraggableMotorToast>
         }
 
         return Padding(
-          padding: config.areaPadding,
+          padding: areaPadding,
           child: SizedBox(
             width: areaSize.width,
             height: areaSize.height,
