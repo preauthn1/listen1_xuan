@@ -1146,8 +1146,12 @@ class SettingsController extends GetxController {
         provider.getUser(),
       Future.microtask(() async {
         loginDataLoading.add(PlantformCodes.github);
-        loginData[PlantformCodes.github] = await Github.updateStatus();
-        loginDataLoading.remove(PlantformCodes.github);
+        try {
+          loginData[PlantformCodes.github] = await Github.updateStatus();
+        } finally {
+          // 设置页据此显示加载圈，失败时也必须移除。
+          loginDataLoading.remove(PlantformCodes.github);
+        }
       }),
     ]);
     await tasks;
