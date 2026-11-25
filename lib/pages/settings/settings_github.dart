@@ -295,7 +295,7 @@ class Github {
     if (backup is! Map) throw const FormatException('Gist 备份文件缺失');
     if (backup['truncated'] != true) {
       final jsonString = backup['content'];
-      if (jsonString is! String || jsonString.length > 4 * 1024 * 1024) {
+      if (jsonString is! String || jsonString.length > maxImportedSettingsBytes) {
         throw const FormatException('Gist 备份内容无效或过大');
       }
       return json.decode(jsonString);
@@ -335,7 +335,7 @@ class Github {
       final raw = response.data is String
           ? response.data as String
           : utf8.decode(response.data as List<int>);
-      if (raw.length > 4 * 1024 * 1024) {
+      if (raw.length > maxImportedSettingsBytes) {
         throw const FormatException('Gist 备份超过大小限制');
       }
       return json.decode(raw);

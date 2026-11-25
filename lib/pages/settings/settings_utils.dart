@@ -79,6 +79,11 @@ Future<Map<String, dynamic>> outputAllSettingsToFile([
   return {};
 }
 
+/// 设置导入上限（文件、Gist、Supabase 歌单同步共用）。
+const int maxImportedSettingKeys = 10000;
+const int maxImportedEntryBytes = 32 * 1024 * 1024;
+const int maxImportedSettingsBytes = 128 * 1024 * 1024;
+
 Future<void> importSettingsFromFile(
 // [bool fromjson = false, String jsonString = '']) async {
 [bool fromjson = false, Map<String, dynamic> jsonString = const {}]) async {
@@ -88,8 +93,9 @@ Future<void> importSettingsFromFile(
 
     // logger.d('2');
 
-    final maxImportedKeys = 100;
-    if (settings.length > maxImportedKeys) {
+    // 每个歌单是一个顶层键，歌单多的用户很容易超过 100，所以总数上限放宽到
+    // 10000；单项 32MB、合计 128MB（与导入文件大小上限一致）。
+    if (settings.length > maxImportedSettingKeys) {
       throw const FormatException('配置项数量超过限制');
     }
     final activeKeys = <String>{
@@ -118,9 +124,15 @@ Future<void> importSettingsFromFile(
           key.toLowerCase().contains('token') ||
           key.toLowerCase().contains('password') ||
           key.toLowerCase().contains('secret'));
+    var totalBytes = 0;
     for (final entry in sanitized.entries) {
-      if (utf8.encode(jsonEncode(entry.value)).length > 1024 * 1024) {
+      final size = utf8.encode(jsonEncode(entry.value)).length;
+      if (size > maxImportedEntryBytes) {
         throw FormatException('配置项过大: ${entry.key}');
+      }
+      totalBytes += size;
+      if (totalBytes > maxImportedSettingsBytes) {
+        throw const FormatException('配置内容超过大小限制');
       }
     }
     await Future.wait(
@@ -209,7 +221,7 @@ Future<void> importSettingsFromFile(
 
     if (result != null) {
       final content = await result.readAsBytes();
-      if (content.length > 4 * 1024 * 1024) {
+      if (content.length > maxImportedSettingsBytes) {
         throw const FormatException('配置文件超过大小限制');
       }
       final settings = jsonDecode(utf8.decode(content)) as Map<String, dynamic>;
