@@ -278,13 +278,9 @@ class _WebSocketControlContentState extends State<WebSocketControlContent> {
                   border: Border.all(color: Colors.grey.shade300, width: 2),
                 ),
                 child: Obx(() {
-                  // 本机绑定时只展示回环地址；局域网绑定时展示实际监听地址。
-                  final advertisedHost = controller.host == '127.0.0.1' ||
-                          controller.host == '::1'
-                      ? controller.host
-                      : controller.selectBestAvailableAddress.value;
+                  // 未开启局域网时只展示回环地址；开启后展示选中的局域网地址。
                   final payload = '${WebSocketAddress(
-                    advertisedHost,
+                    controller.advertisedHost,
                     controller.port,
                   ).address}|${controller.accessToken}';
                   return QrImageView(
@@ -340,7 +336,7 @@ class _WebSocketControlContentState extends State<WebSocketControlContent> {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         final address = WebSocketAddress(
-                          controller.selectBestAvailableAddress.value,
+                          controller.advertisedHost,
                           controller.port,
                         ).address;
                         final payload = '$address|${controller.accessToken}';
@@ -516,6 +512,29 @@ class _WebSocketControlContentState extends State<WebSocketControlContent> {
               ),
 
             _buildConfigSection('网络配置', [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('允许局域网设备连接', style: TextStyle(fontSize: 16)),
+                  ),
+                  Switch(
+                    value: ctrl.allowLan,
+                    onChanged: ctrl.isServerRunning
+                        ? null
+                        : ctrl.updateAllowLan,
+                  ),
+                ],
+              ),
+              Text(
+                ctrl.allowLan
+                    ? '⚠ 局域网连接为明文传输，仅凭配对令牌鉴权，请只在可信网络中开启'
+                    : '仅允许本机连接；开启后同一局域网的设备可扫码配对',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ctrl.allowLan ? Colors.orange : Colors.grey,
+                ),
+              ),
+              16.sbh,
               _buildTextField(
                 controller: portController,
                 label: '端口号',
