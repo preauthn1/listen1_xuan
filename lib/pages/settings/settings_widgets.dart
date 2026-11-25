@@ -408,12 +408,14 @@ Widget _buildThirdPartyLoginPanel(BuildContext context) {
     );
   }
 
+  // 设置页本身已限制最大宽度（ContentMaxWidth），这里不再额外收窄，
+  // 登录按钮与分组右侧的刷新/展开图标对齐，不留大片空白。
   return Material(
     type: MaterialType.transparency,
     child: Align(
       alignment: AlignmentDirectional.centerStart,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+      child: SizedBox(
+        width: double.infinity,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
