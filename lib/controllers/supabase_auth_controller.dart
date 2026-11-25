@@ -799,6 +799,50 @@ class SupabaseAuthController extends GetxController {
 
   // ==================== Token 管理相关方法 ====================
 
+  /// 上游 tokens 表一定存在的列；其余（如后加的 kg）在旧表里可能缺失。
+  static const _baseTokenColumns = {'bl', 'ne', 'qq', 'github'};
+
+  /// PostgREST 报告某列不存在：写入为 PGRST204（schema cache 中找不到列），
+  /// 显式 select 为 42703（column does not exist）。
+  static bool _isMissingColumnError(Object e, String column) {
+    if (e is! PostgrestException) return false;
+    if (e.code != 'PGRST204' && e.code != '42703') return false;
+    return e.message.contains(column);
+  }
+
+  /// 写入 tokens；若因可选列缺失被拒绝，去掉这些列重试一次，
+  /// 保证 bl/ne/qq/github 仍能像上游一样同步。
+  Future<void> _writeTokensTolerant(
+    Map<String, String?> row, {
+    required bool insert,
+  }) async {
+    Future<void> write(Map<String, String?> data) async {
+      if (insert) {
+        await _supabase.from('tokens').insert(data);
+      } else {
+        await _supabase
+            .from('tokens')
+            .update(data)
+            .eq('user_id', currentUser.value!.id);
+      }
+    }
+
+    try {
+      await write(row);
+    } catch (e) {
+      final missing = row.keys
+          .where((k) => k != 'user_id' && !_baseTokenColumns.contains(k))
+          .where((k) => _isMissingColumnError(e, k))
+          .toSet();
+      if (missing.isEmpty) rethrow;
+      final reduced = Map<String, String?>.from(row)
+        ..removeWhere((k, _) => missing.contains(k));
+      logger.w('云端 tokens 表缺少列 $missing，跳过这些平台');
+      if (reduced.keys.every((k) => k == 'user_id') && !insert) return;
+      await write(reduced);
+    }
+  }
+
   /// 上传指定平台的 token 到云端
   /// [platform] 平台代码 (bl, ne, qq, github)
   /// [token] token 值
@@ -837,7 +881,9 @@ class SupabaseAuthController extends GetxController {
       return true;
     } catch (e) {
       isLoading.value = false;
-      errorMessage.value = '上传 token 失败: ${e.toString()}';
+      errorMessage.value = _isMissingColumnError(e, platform)
+          ? '云端 tokens 表缺少 $platform 列，请先在 Supabase 中添加该列'
+          : '上传 token 失败: ${e.toString()}';
       logger.e('上传 token 失败: $e');
       return false;
     }
@@ -871,6 +917,11 @@ class SupabaseAuthController extends GetxController {
       return response[platform] as String?;
     } catch (e) {
       isLoading.value = false;
+      if (_isMissingColumnError(e, platform)) {
+        // 旧版 tokens 表没有该平台的列，等同于云端没有此 token
+        logger.w('云端 tokens 表缺少列 $platform');
+        return null;
+      }
       errorMessage.value = '下载 token 失败: ${e.toString()}';
       logger.e('下载 token 失败: $e');
       return null;
@@ -969,13 +1020,10 @@ class SupabaseAuthController extends GetxController {
       if (existing == null) {
         // 创建新记录
         tokens['user_id'] = currentUser.value!.id;
-        await _supabase.from('tokens').insert(tokens);
+        await _writeTokensTolerant(tokens, insert: true);
       } else {
         // 更新现有记录
-        await _supabase
-            .from('tokens')
-            .update(tokens)
-            .eq('user_id', currentUser.value!.id);
+        await _writeTokensTolerant(tokens, insert: false);
       }
 
       isLoading.value = false;
