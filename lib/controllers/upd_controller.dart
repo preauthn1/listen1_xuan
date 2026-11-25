@@ -938,20 +938,25 @@ class UpdController extends GetxController {
         await delReleasesCache(releases.skip(1).toList(), latestBuildNumber);
       }
 
-      // 只按版本号判断：本仓库（fork）自己构建的包，提交号永远不会等于上游
-      // Release 安装包里的提交号，用提交号比较会导致每次启动都提示「新版本」。
-      // 构建号（tag 里 + 后面的数字）更大才算新版本；相同构建号视为已是最新。
+      // 优先按构建号（tag 里 + 后面的数字）判断：本仓库（fork）自己构建的包，
+      // 提交号永远不会等于上游 Release 安装包里的提交号，单纯比较提交号会导致
+      // 每次启动都提示「新版本」。
+      // - 两边构建号都能解析：只有 Release 构建号更大才提示；相同构建号视为
+      //   已是最新（同一 tag 下重新上传的包不再提示），更小（fork 领先）不提示。
+      // - 任一构建号无法解析（tag 没有 +N，或本地拿不到构建号）：回退到上游
+      //   的提交号比较，避免永远不提示更新。
       final localBuild = await _localBuildNumber();
       final releaseBuild = _releaseBuildNumber(latestRelease);
-      final isNewer = localBuild > 0 && releaseBuild > localBuild;
+      final hashDiffers = localBuildNumber != latestBuildNumber &&
+          localBuildNumber != rLatestBuildNumber;
+      final isNewer = (localBuild > 0 && releaseBuild > 0)
+          ? releaseBuild > localBuild && hashDiffers
+          : hashDiffers;
       showDebugSnackbar(
         '版本检查',
         '本地构建号 $localBuild，最新构建号 $releaseBuild',
       );
-      if (isNewer &&
-          !kDebugMode &&
-          localBuildNumber != latestBuildNumber &&
-          localBuildNumber != rLatestBuildNumber) {
+      if (isNewer && !kDebugMode) {
         // 有新版本可用
         _showReleaseUpdateDialog(latestRelease, latestBuild);
       } else {
