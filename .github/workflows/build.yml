@@ -30,6 +30,12 @@ on:
       - 'assets/images/app_icon.ico'
       - '.github/workflows/**'
 
+# Artifact names carry no hash, so parallel runs for the same ref would
+# overwrite each other's artifacts and race the release asset delete/upload.
+# Keep only the newest run per ref.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
