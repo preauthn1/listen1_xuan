@@ -26,6 +26,8 @@ enum QQPlaylistType {
   playlist('qqplaylist'),
   album('qqalbum'),
   artist('qqartist'),
+  radar('qqradar'),
+  radio('qqradio'),
   toplist('qqtoplist');
 
   final String prefix;
@@ -105,9 +107,13 @@ class QQ extends BaseProvider {
   static String get sourceName => PlatformSource.qq.name;
 
   Future<Response<dynamic>> dioGetWithCookieAndCsrf(String url) async {
-    final uri = Uri.parse(url);
-    // 兼容旧版本只向 u.y.qq.com 写入 Cookie 的登录信息。
-    // 直接补齐当前 Dio 使用的 CookieJar，避免重载拦截器或改变登录状态。
+    await _syncCookieJar(Uri.parse(url));
+    return _getWithQQHeaders(url);
+  }
+
+  /// 兼容旧版本只向 u.y.qq.com 写入 Cookie 的登录信息。
+  /// 直接补齐当前 Dio 使用的 CookieJar，避免重载拦截器或改变登录状态。
+  Future<void> _syncCookieJar(Uri uri) async {
     if (cookieUrls.contains(uri.origin) && token.isNotEmpty) {
       final cookies = CookieUtils.parseCookieString(token)
           .where((cookie) => cookie.value.isNotEmpty)
@@ -124,7 +130,10 @@ class QQ extends BaseProvider {
         }
       }
     }
-    return await dioWithCookieManager.get(
+  }
+
+  Future<Response<dynamic>> _getWithQQHeaders(String url) {
+    return dioWithCookieManager.get(
       url,
       options: Options(
         headers: {
@@ -280,6 +289,8 @@ class QQ extends BaseProvider {
     if (prefix == QQPlaylistType.album.prefix) return _getAlbum(listId);
     if (prefix == QQPlaylistType.artist.prefix) return _getArtist(listId);
     if (prefix == QQPlaylistType.toplist.prefix) return _getToplist(listId);
+    if (prefix == QQPlaylistType.radar.prefix) return qqRadarRecommend();
+    if (prefix == QQPlaylistType.radio.prefix) return qqPersonalRadio();
     throw Exception('不支持的QQ音乐歌单类型: $listId');
   }
 
@@ -637,6 +648,168 @@ class QQ extends BaseProvider {
     final lrc = data['lyric'] as String? ?? '';
     final tlrc = (data['trans'] as String? ?? '').replaceAll('//', '');
     return (lrc, tlrc.isNotEmpty ? tlrc : null);
+  }
+
+  // #endregion
+
+  // #region 为你推荐（雷达推荐 / 个性电台）
+  //
+  // 接口名与参数参考 L-1124/QQMusicApi 的 modules/recommend.py（只参考协议，
+  // 未复制代码）：雷达推荐 music.recommend.TrackRelationServer.GetRadarSong，
+  // 个性电台 music.radioProxy.MbTrackRadioSvr.get_radio_track（id 99，需要登录）。
+
+  String? _cookieValue(String name) {
+    final cookies = CookieUtils.parseCookieString(token);
+    final v = CookieUtils.getCookieValue(cookies, name);
+    return v == null || v.isEmpty ? null : v;
+  }
+
+  /// QQ 音乐网页端的 g_tk：对 qqmusic_key 做 hash33（初值 5381）。
+  static int qqGtk(String? musicKey) {
+    if (musicKey == null || musicKey.isEmpty) return 5381;
+    var h = 5381;
+    for (final c in musicKey.codeUnits) {
+      h = ((h << 5) + h + c) & 0x7fffffff;
+    }
+    return h;
+  }
+
+  Future<Map<String, dynamic>> _musicu(Map<String, dynamic> req) async {
+    var uin = _cookieValue('uin') ?? '0';
+    uin = uin.replaceFirst(RegExp(r'^o0*'), '');
+    final key = _cookieValue('qqmusic_key') ?? _cookieValue('qm_keyst');
+    final gtk = qqGtk(key);
+    final body = {
+      'comm': {
+        'ct': 24,
+        'cv': 4747474,
+        'platform': 'yqq.json',
+        'chid': '0',
+        'uin': uin,
+        'g_tk': gtk,
+        'g_tk_new_20200303': gtk,
+        'format': 'json',
+        'inCharset': 'utf-8',
+        'outCharset': 'utf-8',
+        'notice': 0,
+        'need_new_code': 1,
+      },
+      'req': req,
+    };
+    await _syncCookieJar(Uri.parse('https://u.y.qq.com/cgi-bin/musicu.fcg'));
+    final response = await dioWithCookieManager.post(
+      'https://u.y.qq.com/cgi-bin/musicu.fcg',
+      data: jsonEncode(body),
+      options: Options(headers: {
+        'referer': 'https://y.qq.com/',
+        'origin': 'https://y.qq.com',
+        'content-type': 'application/json',
+      }),
+    );
+    final data = decodeResponseData(response.data);
+    final result = data is Map ? data['req'] : null;
+    if (result is! Map) throw const FormatException('QQ 音乐返回了无效数据');
+    final code = result['code'];
+    if (code != 0) {
+      throw FormatException(code == 1000 ? '需要先登录 QQ 音乐' : 'QQ 音乐推荐获取失败（$code）');
+    }
+    return Map<String, dynamic>.from(result['data'] as Map? ?? const {});
+  }
+
+  Map<String, dynamic>? _recommendTrack(dynamic song) {
+    if (song is! Map) return null;
+    final m = Map<String, dynamic>.from(song);
+    final singers = m['singer'];
+    final album = m['album'];
+    if (m['mid'] == null || singers is! List || singers.isEmpty || album is! Map) {
+      return null;
+    }
+    try {
+      return _convertSong2(m);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _requireQQLogin() async {
+    if (await getUser() == null) throw const FormatException('需要先登录 QQ 音乐');
+  }
+
+  /// 雷达推荐：按口味推荐的歌曲，每页约 10 首，这里取前 3 页。
+  Future<PlayList> qqRadarRecommend() async {
+    await _requireQQLogin();
+    final seen = <String>{};
+    final tracks = <Map<String, dynamic>>[];
+    for (var page = 1; page <= 3; page++) {
+      final data = await _musicu({
+        'module': 'music.recommend.TrackRelationServer',
+        'method': 'GetRadarSong',
+        'param': {'Page': page, 'ReqType': 0, 'FavSongs': [], 'EntranceSongs': []},
+      });
+      for (final item in (data['VecSongs'] as List?) ?? const []) {
+        final t = _recommendTrack(item is Map ? item['Track'] : null);
+        if (t != null && seen.add(t['id'] as String)) tracks.add(t);
+      }
+      if (data['HasMore'] == false) break;
+    }
+    return PlayList.fromJson({
+      'info': {
+        'id': '${QQPlaylistType.radar.prefix}_today',
+        'title': '雷达推荐',
+        'cover_img_url': tracks.isEmpty ? null : tracks.first['img_url'],
+        'source_url': 'https://y.qq.com/',
+      },
+      'tracks': tracks,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> _radioBatch() async {
+    final data = await _musicu({
+      'module': 'music.radioProxy.MbTrackRadioSvr',
+      'method': 'get_radio_track',
+      'param': {'id': 99, 'num': 5, 'from': 0, 'scene': 0, 'song_ids': []},
+    });
+    return ((data['tracks'] as List?) ?? const [])
+        .map(_recommendTrack)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
+  /// 个性电台（猜你喜欢）：每次约 5 首；播放时由 play.dart 续播。
+  Future<PlayList> qqPersonalRadio() async {
+    await _requireQQLogin();
+    final seen = <String>{};
+    final tracks = <Map<String, dynamic>>[];
+    for (var i = 0; i < 4; i++) {
+      final batch = await _radioBatch();
+      if (batch.isEmpty) break;
+      for (final t in batch) {
+        if (seen.add(t['id'] as String)) tracks.add(t);
+      }
+    }
+    return PlayList.fromJson({
+      'info': {
+        'id': '${QQPlaylistType.radio.prefix}_personal',
+        'title': '个性电台',
+        'cover_img_url': tracks.isEmpty ? null : tracks.first['img_url'],
+        'source_url': 'https://y.qq.com/',
+      },
+      'tracks': tracks,
+    });
+  }
+
+  /// 续播：取下一批电台歌曲，跳过已在队列里的。
+  Future<List<Track>> qqPersonalRadioMore(Set<String> exclude, {int want = 5}) async {
+    final out = <Track>[];
+    final seen = {...exclude};
+    for (var i = 0; i < 4 && out.length < want; i++) {
+      final batch = await _radioBatch();
+      if (batch.isEmpty) break;
+      for (final t in batch) {
+        if (seen.add(t['id'] as String)) out.add(Track.fromJson(t));
+      }
+    }
+    return out;
   }
 
   // #endregion

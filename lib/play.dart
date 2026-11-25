@@ -9,6 +9,8 @@ import 'package:flutter/material.dart'
     hide CircularProgressIndicator, LinearProgressIndicator;
 import 'package:listen1_xuan/bodys.dart';
 import 'package:listen1_xuan/provider/netease.dart';
+import 'package:listen1_xuan/provider/kugou.dart';
+import 'package:listen1_xuan/provider/qq.dart';
 import 'package:listen1_xuan/controllers/controllers.dart';
 import 'package:listen1_xuan/controllers/theme.dart';
 import 'package:listen1_xuan/main.dart';
@@ -210,9 +212,27 @@ void add_current_playing(List<Track> tracks) {
   _playController.add_current_playing(tracks);
 }
 
-/// 当前播放队列是否来自网易云私人 FM。换成别的歌单播放时自动关闭。
+/// 当前播放队列是否来自电台类列表（网易云私人 FM、酷狗私人 FM、QQ 个性电台）。
+/// 换成别的歌单播放时自动关闭。
 final personalFmActive = false.obs;
+
+/// 电台列表 id（如 nefm_personal / kgfm_personal / qqradio_personal），决定续播来源。
+String personalFmListId = '';
 bool _fmRefilling = false;
+
+/// 这些列表是电台：播放时队列快到末尾会自动续上。
+bool isRadioListId(String listId) =>
+    listId.startsWith('nefm_') || listId.startsWith('kgfm_') || listId.startsWith('qqradio_');
+
+Future<List<Track>> _radioMore(Set<String> exclude) {
+  if (personalFmListId.startsWith('kgfm_')) {
+    return Get.find<Kugou>().kgPersonalFmMore(exclude);
+  }
+  if (personalFmListId.startsWith('qqradio_')) {
+    return Get.find<QQ>().qqPersonalRadioMore(exclude);
+  }
+  return Get.find<Netease>().nePersonalFmMore(exclude);
+}
 
 /// 私人 FM：离队列末尾不足 2 首时补一批，让电台一直播下去。
 Future<void> _refillPersonalFmIfNeeded(List<Track> queue, int index) async {
@@ -220,9 +240,7 @@ Future<void> _refillPersonalFmIfNeeded(List<Track> queue, int index) async {
   if (index < queue.length - 2) return;
   _fmRefilling = true;
   try {
-    final more = await Get.find<Netease>().nePersonalFmMore(
-      queue.map((t) => t.id).toSet(),
-    );
+    final more = await _radioMore(queue.map((t) => t.id).toSet());
     // 直接走控制器追加，避免公共 add_current_playing 把 FM 状态关掉
     if (more.isNotEmpty) _playController.add_current_playing(more);
   } catch (e) {

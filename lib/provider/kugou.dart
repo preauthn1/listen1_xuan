@@ -240,6 +240,23 @@ class Kugou extends BaseProvider {
     }, 'tracks': tracks});
   }
 
+  /// 私人 FM 续播：取下一批，跳过已在队列里的。
+  Future<List<Track>> kgPersonalFmMore(Set<String> exclude, {int want = 5}) async {
+    final out = <Track>[];
+    final seen = {...exclude};
+    for (var i = 0; i < 3 && out.length < want; i++) {
+      final batch = (await _gateway.personalFm(_session))
+          .map(_gatewayTrack)
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      if (batch.isEmpty) break;
+      for (final t in batch) {
+        if (seen.add(t['id'] as String)) out.add(Track.fromJson(t));
+      }
+    }
+    return out;
+  }
+
   Future<PlayList> _userPlaylist(String listId) async {
     await _requireKugouLogin();
     final rawId = listId.substring('${KgPlaylistType.user.prefix}_'.length);
