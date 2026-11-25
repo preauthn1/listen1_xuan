@@ -12,6 +12,7 @@ import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 import 'package:extended_image/extended_image.dart';
 import 'package:listen1_xuan/pages/qr_scanner_page.dart';
 import 'package:listen1_xuan/models/Track.dart';
+import 'package:listen1_xuan/utils/websocket_address.dart';
 import '../widgets/progress_indicator_xuan.dart';
 
 import '../bodys.dart';
@@ -1143,10 +1144,22 @@ class _WebSocketClientControlContentState
     final controller = Get.find<WebSocketClientController>();
     final textController = TextEditingController();
     void checkAndRet() {
-      final address = textController.text.trim();
-      if (address.isNotEmpty) {
+      final input = textController.text.trim();
+      if (input.isNotEmpty) {
         try {
+          // 支持粘贴“复制地址”得到的 address|token：地址与令牌分别保存。
+          final parts = input.split('|');
+          final address = parts.first.trim();
+          if (parts.length > 2 || address.isEmpty) {
+            throw '格式应为 主机:端口 或 主机:端口|配对令牌';
+          }
+          WebSocketAddress.parse(address);
+          final token = parts.length > 1 ? parts[1].trim() : '';
           controller.addHistoryAddress(address);
+          if (token.isNotEmpty) {
+            _tokenController.text = token;
+            controller.updateServerToken(token);
+          }
         } catch (e) {
           showErrorSnackbar('添加地址失败', e.toString());
           return;
@@ -1396,10 +1409,11 @@ class _WebSocketClientControlContentState
 
         // 配对二维码格式为 address|token；旧二维码没有 token，仍允许录入地址但连接会提示缺少令牌。
         final parts = result.split('|');
-        final address = parts.first;
-        if (parts.length > 1 && parts[1].isNotEmpty) {
-          _tokenController.text = parts[1];
-          controller.updateServerToken(parts[1]);
+        final address = parts.first.trim();
+        final token = parts.length > 1 ? parts[1].trim() : '';
+        if (token.isNotEmpty) {
+          _tokenController.text = token;
+          controller.updateServerToken(token);
         }
 
         if (controller.historyAddresses.contains(address)) {
