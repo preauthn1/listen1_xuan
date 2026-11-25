@@ -401,12 +401,16 @@ class MyApp extends StatelessWidget {
 
               // 然后应用 MediaQuery 设置
               return MediaQuery(
-                // Desktop chrome keeps a stable density; mobile retains the
-                // user's accessibility text scale.
+                // Desktop chrome keeps a stable density. Mobile follows the
+                // user's text scale but clamped to 1.0–1.3: the ScreenUtil
+                // fixed-size layouts (play bar, list rows) overflow beyond it.
                 data: mediaQuery.copyWith(
                   textScaler: isDesktop
                       ? const TextScaler.linear(1.0)
-                      : mediaQuery.textScaler,
+                      : mediaQuery.textScaler.clamp(
+                          minScaleFactor: 1.0,
+                          maxScaleFactor: 1.3,
+                        ),
                   padding: mediaQuery.padding.copyWith(top: safeTop),
                 ),
                 child: widget,
