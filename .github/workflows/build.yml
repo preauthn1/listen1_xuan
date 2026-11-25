@@ -16,7 +16,8 @@ on:
           - macos
   push:
     branches: [main, feat/dual-build-ffmpeg]
-    tags: ['v*', '[0-9]*']
+    # Release tags must equal the pubspec version (e.g. 2.7.5+55); no 'v' prefix.
+    tags: ['[0-9]*']
     paths:
       - '**/*.dart'
       - 'pubspec.yaml'
@@ -41,25 +42,48 @@ permissions:
   contents: read
 
 jobs:
+  # Fail a tag build before any platform starts when the tag and the pubspec
+  # version disagree; the publish jobs repeat this check before uploading.
+  version_gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check release tag matches pubspec version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | tr -d '\r')
+          echo "pubspec version: $version"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match pubspec.yaml version '$version'. Bump pubspec or push tag '$version'."
+            exit 1
+          fi
+
   android:
+    needs: version_gate
     if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'android'
     permissions:
       contents: write
     uses: ./.github/workflows/dart.yml
     secrets: inherit
   windows:
+    needs: version_gate
     if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'windows'
     permissions:
       contents: write
     uses: ./.github/workflows/dart_win.yml
     secrets: inherit
   ios:
+    needs: version_gate
     if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'ios'
     permissions:
       contents: write
     uses: ./.github/workflows/dart_ios.yml
     secrets: inherit
   macos:
+    needs: version_gate
     if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'macos'
     permissions:
       contents: write
