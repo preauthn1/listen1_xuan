@@ -12,15 +12,19 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # 全部在 Intel 镜像（macos-15-intel）上编译：GitHub 的 macOS arm64 托管机
+    # 容量紧张（官方注释 "capacity constraints"），作业常排队 20 分钟后被取消，
+    # Intel 池几秒内即可分到。Xcode 可在 Intel 上交叉编译 arm64，产物的架构
+    # 由下面的单架构校验（lipo -archs）逐个 Mach-O 文件检查。
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { arch: arm64,  tag: apple-silicon, ffmpeg: with,    variant: ffmpeg, artifact: macos-app-artifact-ffmpeg }
-          - { arch: x86_64, tag: intel,         ffmpeg: with,    variant: ffmpeg, artifact: macos-app-artifact-ffmpeg }
-          - { arch: arm64,  tag: apple-silicon, ffmpeg: without, variant: lite,   artifact: macos-app-artifact }
-          - { arch: x86_64, tag: intel,         ffmpeg: without, variant: lite,   artifact: macos-app-artifact }
+          - { arch: arm64,  tag: apple-silicon, runner: macos-15-intel, ffmpeg: with,    variant: ffmpeg, artifact: macos-app-artifact-ffmpeg }
+          - { arch: x86_64, tag: intel,         runner: macos-15-intel, ffmpeg: with,    variant: ffmpeg, artifact: macos-app-artifact-ffmpeg }
+          - { arch: arm64,  tag: apple-silicon, runner: macos-15-intel, ffmpeg: without, variant: lite,   artifact: macos-app-artifact }
+          - { arch: x86_64, tag: intel,         runner: macos-15-intel, ffmpeg: without, variant: lite,   artifact: macos-app-artifact }
     steps:
       - name: Output Commit Information
         env:
