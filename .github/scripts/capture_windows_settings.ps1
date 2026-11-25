@@ -45,7 +45,7 @@ function Home(){ for($k=0;$k -lt 4;$k++){ Esc }; Click 600 300 1 }
 # 侧栏底部按钮居中排列：有「发现新版本」时 4 个（齿轮 x≈178），没有时 3 个（齿轮 x≈157）。
 $global:GearX = 157
 function Settings(){ Home; Click $global:GearX 599 3 }
-Step toast {Snap '00-update-toast'; Click 600 300 1; Snap '00b-update-reopen'}
+Step toast {Snap '00-update-toast'}
 Step home {Snap '01-home'}
 Step created {Click 90 135 4; Snap '02-my-created'}
 Step bili {Click 90 225 5; Snap '04-bili'}
@@ -70,6 +70,7 @@ Start-Sleep 14
 Step darkhome { Snap '32-dark-home' }
 Step darkqueue { Home; Click 743 661 3; Snap '33-dark-queue'; Esc; Esc }
 Step darkset { Settings; Snap '30-dark-settings'; Click 500 117 2; Snap '31-dark-thirdparty'; Click 500 117 2 }
+Step darkupdate { Settings; Wheel 600 300 -60; Click 500 353 3; Snap '34-dark-update'; Wheel 600 300 3; Snap '34b-dark-update'; Wheel 600 300 -60; Click 500 353 2 }
 Step wide { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1500,850,0x40)|Out-Null; Start-Sleep 3; Snap '40-wide-dark-home' }
 Step wideinfo { Click 20 20 2; Esc; Click 90 135 3; Click 150 190 5; Snap '41-wide-dark-playlist-info' }
 Step widesettings { Settings; Snap '42-wide-dark-settings'; Click 750 117 2; Snap '43-wide-dark-thirdparty'; Click 750 117 2 }
