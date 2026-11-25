@@ -46,7 +46,7 @@ class PlaylistInfoPage extends StatelessWidget {
                 ).copyWith(scrollbars: false),
                 slivers: [
                   SliverAppBar(
-                    expandedHeight: 280.0,
+                    expandedHeight: 280.0 + kToolbarHeight - 24,
                     pinned: true,
                     leading: IconButton(
                       icon: Icon(Icons.arrow_back),
@@ -69,7 +69,12 @@ class PlaylistInfoPage extends StatelessWidget {
                     titleSpacing: 0,
                     flexibleSpace: FlexibleSpaceBar(
                       collapseMode: CollapseMode.parallax,
-                      background: Column(
+                      // 封面和按钮放在标题栏下方，不再与固定的标题和操作按钮重叠。
+                      background: Padding(
+                        padding: EdgeInsets.only(
+                          top: MediaQuery.paddingOf(context).top + kToolbarHeight,
+                        ),
+                        child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Obx(
@@ -160,6 +165,7 @@ class PlaylistInfoPage extends StatelessWidget {
                             ),
                           ),
                         ],
+                      ),
                       ),
                     ),
                     actions: _buildActions(context, controller),
