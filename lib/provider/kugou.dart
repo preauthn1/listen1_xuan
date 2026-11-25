@@ -467,6 +467,8 @@ class Kugou extends BaseProvider {
 
   // #region 播放地址
 
+  static const _signedUrlTimeout = Duration(seconds: 6);
+
   @override
   Future<void> bootStrapTrack(
     Track track,
@@ -478,8 +480,18 @@ class Kugou extends BaseProvider {
     try {
       // 已登录时优先走官方已签名接口，会员/受限曲目才有机会取得播放地址。
       // 服务端要求额外验证或没有可播 URL 时，再维持原有公开接口的兼容路径。
+      // 签名接口单独限时并吞掉任何异常：网关挂起、返回非 JSON 或要求验证时，
+      // 都必须回退到公开接口，不能让原本可播的免费曲目变成播放失败。
       if (_session.loggedIn) {
-        final signed = await _gateway.songUrl(_session, trackId, albumId: albumId);
+        (String, int)? signed;
+        try {
+          signed = await _gateway
+              .songUrl(_session, trackId, albumId: albumId)
+              .timeout(_signedUrlTimeout);
+        } catch (e) {
+          debugPrint('酷狗签名播放地址获取失败，回退公开接口: $e');
+          signed = null;
+        }
         if (signed != null) {
           success(
             BootSuccessRes(url: signed.$1, platform: name, bitrate: '${signed.$2 ~/ 1000}kbps'),
