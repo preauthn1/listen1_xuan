@@ -76,6 +76,15 @@ jobs:
         run: >-
           flutter build windows --dart-define=gitHash=${{ env.GITHASH }}
           --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
+      # Upload the portable build first: the canary updater extracts this
+      # Actions archive directly, and an Inno Setup/choco failure must not
+      # drop it.
+      - name: Upload portable application
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.build_artifact }}
+          path: build/windows/x64/runner/Release/**
+          if-no-files-found: error
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress --yes
@@ -95,13 +104,6 @@ jobs:
         with:
           name: ${{ matrix.installer_artifact }}
           path: release_artifacts/${{ matrix.installer }}-${{ env.GITHASH }}.exe
-          if-no-files-found: error
-      # Canary updater extracts the Actions archive directly (no nested ZIP).
-      - name: Upload portable application
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ${{ matrix.build_artifact }}
-          path: build/windows/x64/runner/Release/**
           if-no-files-found: error
 
 
