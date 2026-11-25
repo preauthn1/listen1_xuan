@@ -380,7 +380,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
         : provider.userFavoritePlaylistSectionLeading;
   }
 
-  Widget _buildSectionError(String error, VoidCallback onRetry) {
+  Widget _buildSectionError(String error, VoidCallback? onRetry) {
     final theme = Theme.of(context);
     // 与分组标题文字左缘对齐（12 + 24 图标 + 12 间距），不再居中打断列表节奏。
     return Padding(
@@ -398,6 +398,19 @@ class _MyPlaylistState extends State<MyPlaylist> {
               ),
             ),
           ),
+          // 窄侧栏会隐藏分组标题的刷新按钮，这里保留一个就地重试入口。
+          if (onRetry != null)
+            TextButton(
+              onPressed: onRetry,
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                textStyle: theme.textTheme.bodySmall,
+              ),
+              child: const Text('重试'),
+            ),
         ],
       ),
     );

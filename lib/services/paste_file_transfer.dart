@@ -5,14 +5,26 @@ import 'dart:io';
 import 'package:mime/mime.dart';
 import 'package:path/path.dart' as p;
 
+/// Thrown when a paste transfer exceeds a size or file-count limit, so the
+/// server can answer 413 and the client can say '文件过大'.
+class PasteTransferLimitException extends FormatException {
+  const PasteTransferLimitException(super.message);
+}
+
 /// Disk-backed clipboard transfers. A batch is published only after reception
 /// and parsing succeed; staging files and partially published batches roll back.
 class PasteFileTransfer {
   static const stagingDirectoryName = '.listen1-paste-transfers';
   static final _active = <String>{};
-  static const int defaultMaxTotalBytes = 64 * 1024 * 1024;
-  static const int defaultMaxPartBytes = 32 * 1024 * 1024;
-  static const int defaultMaxFiles = 100;
+  static const int defaultMaxTotalBytes = 1024 * 1024 * 1024; // 1 GiB
+  static const int defaultMaxPartBytes = 512 * 1024 * 1024; // 512 MiB
+  static const int defaultMaxFiles = 1000;
+
+  /// Room for multipart boundaries and part headers on top of the payload.
+  static const int multipartOverheadBytes = 4 * 1024 * 1024;
+
+  /// Largest acceptable HTTP body for a paste upload/download.
+  static const int maxBodyBytes = defaultMaxTotalBytes + multipartOverheadBytes;
 
   /// Recover staging directories left by an app/process crash. Never touch an
   /// active transfer, user source files, or successfully published downloads.
@@ -87,7 +99,7 @@ class PasteFileTransfer {
         _checkCancelled(isCancelled);
         final nextLength = length + chunk.length;
         if (nextLength > maxBytes || currentTotal + nextLength > maxTotalBytes) {
-          throw const FormatException('Transfer exceeds size limit');
+          throw const PasteTransferLimitException('Transfer exceeds size limit');
         }
         await output.writeFrom(chunk);
         length = nextLength;
@@ -129,12 +141,16 @@ class PasteFileTransfer {
     final published = <String>[];
     try {
       final body = File(p.join(staging.path, 'body'));
+      // Multipart bodies carry boundaries/headers in addition to the payload.
+      final maxBodyBytes = boundary == null
+          ? (maxPartBytes < maxTotalBytes ? maxPartBytes : maxTotalBytes)
+          : maxTotalBytes + multipartOverheadBytes;
       final length = await _write(
         stream,
         body,
         isCancelled,
-        maxBytes: maxTotalBytes,
-        maxTotalBytes: maxTotalBytes,
+        maxBytes: maxBodyBytes,
+        maxTotalBytes: maxBodyBytes,
         currentTotal: 0,
       );
       if (expectedLength != null &&
@@ -143,15 +159,13 @@ class PasteFileTransfer {
         throw const FormatException('Incomplete transfer');
       }
       final files = <(File, String)>[];
-      final rawLength = length;
-      if (rawLength > maxTotalBytes) {
-        throw const FormatException('Transfer exceeds size limit');
-      }
       if (boundary == null) {
         if (length == 0) throw const FormatException('Empty image');
         files.add((body, _safeName(fileName!)));
         if (length > maxPartBytes) {
-          throw const FormatException('Transfer exceeds per-file limit');
+          throw const PasteTransferLimitException(
+            'Transfer exceeds per-file limit',
+          );
         }
       } else {
         // Own the underlying subscription explicitly: MIME cancellation can
@@ -163,7 +177,7 @@ class PasteFileTransfer {
             source,
           ).transform(MimeMultipartTransformer(boundary))) {
             if (files.length >= maxFiles) {
-              throw const FormatException('Too many files');
+              throw const PasteTransferLimitException('Too many files');
             }
             final name = fileNameFromDisposition(
               part.headers['content-disposition'] ?? '',
@@ -184,7 +198,9 @@ class PasteFileTransfer {
             );
             totalPartBytes += partLength;
             if (totalPartBytes > maxTotalBytes) {
-              throw const FormatException('Transfer exceeds size limit');
+              throw const PasteTransferLimitException(
+                'Transfer exceeds size limit',
+              );
             }
             final declaredLength = part.headers['content-length'];
             if (declaredLength != null &&

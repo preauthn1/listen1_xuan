@@ -138,7 +138,13 @@ jobs:
 
 
   publish:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_call') && github.ref_type == 'tag'
+    # Tags publish everywhere. On the upstream repository a push to main or
+    # feat/dual-build-ffmpeg also publishes to the release named after the
+    # pubspec version (upstream behaviour); forks stay tag-only.
+    if: >-
+      (github.ref_type == 'tag' && (github.event_name == 'push' || github.event_name == 'workflow_call')) ||
+      (github.repository == 'HBWuChang/listen1_xuan' && github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/dual-build-ffmpeg'))
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -164,10 +170,19 @@ jobs:
           echo "--- after ---"
           ls -l dist-assets/*.zip
 
+      # Single source of truth: the release is always named after the pubspec
+      # version; a tag build must push exactly that tag.
       - name: Extract Version from pubspec.yaml
+        id: extract_version
+        shell: bash
         run: |
-          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//')
-          echo "VERSION=$version" >> $GITHUB_ENV
+          set -euo pipefail
+          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | tr -d '\r')
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match pubspec.yaml version '$version'."
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
           echo "VERSION=$version"
 
       - name: Delete Old macOS Assets from Release
@@ -185,7 +200,7 @@ jobs:
       - name: Upload New Assets to Release
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ env.VERSION }}
           files: dist-assets/*.zip
           fail_on_unmatched_files: true
           prerelease: ${{ !contains(github.event.head_commit.message, 'sta') }}

@@ -291,6 +291,7 @@ Widget _loginRow({
   VoidCallback? onImportCookie,
   bool loggedIn = false,
   VoidCallback? onLogout,
+  bool loading = false,
 }) {
   final theme = Theme.of(context);
   final identity = Row(
@@ -324,7 +325,19 @@ Widget _loginRow({
   );
   // 统一宽度，让各行按钮左右边缘对齐。已登录时改为「退出」，
   // 换账号可用左侧的 Cookie 导入或退出后重新登录。
-  final Widget action = loggedIn && onLogout != null
+  final Widget action = loading
+      // 登录状态检查中：不显示「登录」，避免已登录用户误点重新登录。
+      ? const SizedBox(
+          width: 128,
+          height: 40,
+          child: Center(
+            child: SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        )
+      : loggedIn && onLogout != null
       ? OutlinedButton(
           onPressed: onLogout,
           style: OutlinedButton.styleFrom(
@@ -446,14 +459,19 @@ Widget _buildThirdPartyLoginPanel(BuildContext context) {
                     }
                   },
                 )),
-              Obx(() => _loginRow(
+              Obx(() {
+                final githubLoading = Get.find<SettingsController>()
+                    .loginDataLoading
+                    .contains(PlantformCodes.github);
+                return _loginRow(
                 context: context,
                 icon: Iconify(Mdi.github, size: 20, color: theme.colorScheme.onSurface),
                 name: 'GitHub',
-                status: Text(Github.getStatusText()),
+                status: Text(githubLoading ? '正在检查登录状态…' : Github.getStatusText()),
                 label: '登录',
                 onPressed: () => Github.openAuthUrl(),
                 loggedIn: Github.status.value == 2,
+                loading: githubLoading,
                 onLogout: () async {
                   if (await showConfirmDialog(
                     '退出后将无法同步 Gist 歌单和下载测试版。',
@@ -464,7 +482,8 @@ Widget _buildThirdPartyLoginPanel(BuildContext context) {
                     await Github.logout();
                   }
                 },
-              )),
+              );
+              }),
               // 行自带 6px 垂直内边距，补到上下各 14px。
               const Padding(
                 padding: EdgeInsets.only(top: 8, bottom: 14),

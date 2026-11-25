@@ -76,6 +76,15 @@ jobs:
         run: >-
           flutter build windows --dart-define=gitHash=${{ env.GITHASH }}
           --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
+      # Upload the portable build first: the canary updater extracts this
+      # Actions archive directly, and an Inno Setup/choco failure must not
+      # drop it.
+      - name: Upload portable application
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.build_artifact }}
+          path: build/windows/x64/runner/Release/**
+          if-no-files-found: error
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress --yes
@@ -96,17 +105,16 @@ jobs:
           name: ${{ matrix.installer_artifact }}
           path: release_artifacts/${{ matrix.installer }}-${{ env.GITHASH }}.exe
           if-no-files-found: error
-      # Canary updater extracts the Actions archive directly (no nested ZIP).
-      - name: Upload portable application
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ${{ matrix.build_artifact }}
-          path: build/windows/x64/runner/Release/**
-          if-no-files-found: error
 
 
   publish:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_call') && github.ref_type == 'tag'
+    # Tags publish everywhere. On the upstream repository a push to main or
+    # feat/dual-build-ffmpeg also publishes to the release named after the
+    # pubspec version (upstream behaviour); forks stay tag-only.
+    if: >-
+      (github.ref_type == 'tag' && (github.event_name == 'push' || github.event_name == 'workflow_call')) ||
+      (github.repository == 'HBWuChang/listen1_xuan' && github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/dual-build-ffmpeg'))
     needs: build
     runs-on: windows-latest
     permissions:
@@ -126,10 +134,16 @@ jobs:
           foreach ($name in 'windows-build-artifact', 'windows-build-artifact-ffmpeg') {
             Compress-Archive -Path "bundles/$name/*" -DestinationPath "release_artifacts/$name-$hash.zip" -Force
           }
+      # Single source of truth: the release is always named after the pubspec
+      # version; a tag build must push exactly that tag.
       - name: Extract Version from pubspec.yaml
         id: extract_version
         run: |
           $version = (Select-String -Path pubspec.yaml -Pattern '^version:' | ForEach-Object { $_.Line -replace 'version:\s*', '' }).Trim()
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne $version) {
+            Write-Output "::error::Tag '$env:GITHUB_REF_NAME' does not match pubspec.yaml version '$version'."
+            exit 1
+          }
           echo "VERSION=$version" >> $env:GITHUB_ENV
         shell: pwsh
       # 删除该 Release 下所有旧的 Windows 构建文件
@@ -149,7 +163,7 @@ jobs:
       - name: Upload New Asset to Release
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ env.VERSION }}
           files: |
             release_artifacts/windows-build-artifact-ffmpeg-${{ env.GITHASH }}.zip
             release_artifacts/windows-build-artifact-${{ env.GITHASH }}.zip

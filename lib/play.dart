@@ -203,7 +203,10 @@ Future<void> clean_local_cache([bool all = false, String id = '']) async {
   await Get.find<CacheController>().cleanLocalCache(all, id);
 }
 
+/// 用户主动往队列里加歌（"加入播放列表"、搜索结果点播等）意味着队列
+/// 不再只是私人 FM，关闭 FM 续播，恢复按播放模式（随机/循环）切歌。
 void add_current_playing(List<Track> tracks) {
+  personalFmActive.value = false;
   _playController.add_current_playing(tracks);
 }
 
@@ -220,7 +223,8 @@ Future<void> _refillPersonalFmIfNeeded(List<Track> queue, int index) async {
     final more = await Get.find<Netease>().nePersonalFmMore(
       queue.map((t) => t.id).toSet(),
     );
-    if (more.isNotEmpty) add_current_playing(more);
+    // 直接走控制器追加，避免公共 add_current_playing 把 FM 状态关掉
+    if (more.isNotEmpty) _playController.add_current_playing(more);
   } catch (e) {
     debugPrint('私人 FM 续播失败: $e');
   } finally {
@@ -422,6 +426,13 @@ Future<void> playsong(
   bool onBootstrapTrackSuccessCallback = false,
   bool isByClick = false,
 }) async {
+  // 点播一首不在当前队列里的歌会把它追加进队列，同样视为离开私人 FM
+  // （选替换歌曲时的点击不会入队，不算）
+  if (personalFmActive.value &&
+      !(isByClick && _playController.songReplaceAdding.value) &&
+      !_playController.playingIds.contains(track.id)) {
+    personalFmActive.value = false;
+  }
   await _playController.playsong(
     track,
     start: start,

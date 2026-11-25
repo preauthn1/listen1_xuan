@@ -295,7 +295,7 @@ class Kugou extends BaseProvider {
   Future<PlayList> _getAlbum(String listId) async {
     final albumId = listId.split('_').last;
     final infoResponse = await dioWithCookieManager.get(
-      'https://mobilecdnbj.kugou.com/api/v3/album/info?albumid=$albumId',
+      'http://mobilecdnbj.kugou.com/api/v3/album/info?albumid=$albumId',
     );
     final infoData = decodeResponseData(infoResponse.data)['data'];
     final info = {
@@ -305,7 +305,7 @@ class Kugou extends BaseProvider {
       'source_url': 'https://www.kugou.com/album/${infoData['albumid']}.html',
     };
     final songResponse = await dioWithCookieManager.get(
-      'https://mobilecdnbj.kugou.com/api/v3/album/song?albumid=$albumId&page=1&pagesize=100',
+      'http://mobilecdnbj.kugou.com/api/v3/album/song?albumid=$albumId&page=1&pagesize=100',
     );
     final songs = decodeResponseData(songResponse.data)['data']['info'] as List;
     final tracks = await _convertAll(
@@ -319,7 +319,7 @@ class Kugou extends BaseProvider {
   Future<PlayList> _getArtist(String listId) async {
     final artistId = listId.split('_').last;
     final infoResponse = await dioWithCookieManager.get(
-      'https://mobilecdnbj.kugou.com/api/v3/singer/info?singerid=$artistId',
+      'http://mobilecdnbj.kugou.com/api/v3/singer/info?singerid=$artistId',
     );
     final infoData = decodeResponseData(infoResponse.data)['data'];
     final info = {
@@ -329,7 +329,7 @@ class Kugou extends BaseProvider {
       'source_url': 'https://www.kugou.com/singer/$artistId.html',
     };
     final songResponse = await dioWithCookieManager.get(
-      'https://mobilecdnbj.kugou.com/api/v3/singer/song?singerid=$artistId&page=1&pagesize=30',
+      'http://mobilecdnbj.kugou.com/api/v3/singer/song?singerid=$artistId&page=1&pagesize=30',
     );
     final songs = decodeResponseData(songResponse.data)['data']['info'] as List;
     final tracks = await _convertAll(
@@ -416,7 +416,7 @@ class Kugou extends BaseProvider {
       return SearchPlayListRes.empty();
     }
     final targetUrl =
-        'https://mobilecdnbj.kugou.com/api/v3/search/special?keyword=${Uri.encodeComponent(keywords)}&pagesize=20&filter=0&page=$curpage';
+        'http://mobilecdnbj.kugou.com/api/v3/search/special?keyword=${Uri.encodeComponent(keywords)}&pagesize=20&filter=0&page=$curpage';
     try {
       final response = await dioWithCookieManager.get(targetUrl);
       final data = decodeResponseData(response.data);
@@ -467,6 +467,8 @@ class Kugou extends BaseProvider {
 
   // #region 播放地址
 
+  static const _signedUrlTimeout = Duration(seconds: 6);
+
   @override
   Future<void> bootStrapTrack(
     Track track,
@@ -478,8 +480,18 @@ class Kugou extends BaseProvider {
     try {
       // 已登录时优先走官方已签名接口，会员/受限曲目才有机会取得播放地址。
       // 服务端要求额外验证或没有可播 URL 时，再维持原有公开接口的兼容路径。
+      // 签名接口单独限时并吞掉任何异常：网关挂起、返回非 JSON 或要求验证时，
+      // 都必须回退到公开接口，不能让原本可播的免费曲目变成播放失败。
       if (_session.loggedIn) {
-        final signed = await _gateway.songUrl(_session, trackId, albumId: albumId);
+        (String, int)? signed;
+        try {
+          signed = await _gateway
+              .songUrl(_session, trackId, albumId: albumId)
+              .timeout(_signedUrlTimeout);
+        } catch (e) {
+          debugPrint('酷狗签名播放地址获取失败，回退公开接口: $e');
+          signed = null;
+        }
         if (signed != null) {
           success(
             BootSuccessRes(url: signed.$1, platform: name, bitrate: '${signed.$2 ~/ 1000}kbps'),
@@ -619,7 +631,7 @@ class Kugou extends BaseProvider {
         track.img_url = _replaceSize(data['album_img']);
       }
       final albumResponse = await dioWithCookieManager.get(
-        'https://mobilecdnbj.kugou.com/api/v3/album/info?albumid=${item['album_id']}',
+        'http://mobilecdnbj.kugou.com/api/v3/album/info?albumid=${item['album_id']}',
       );
       final albumData = decodeResponseData(albumResponse.data);
       track.album = (albumData['status'] != 0 && albumData['data'] != null)
@@ -684,7 +696,7 @@ class Kugou extends BaseProvider {
 
     try {
       final albumResponse = await dioWithCookieManager.get(
-        'https://mobilecdnbj.kugou.com/api/v3/album/info?albumid=${item['album_id']}',
+        'http://mobilecdnbj.kugou.com/api/v3/album/info?albumid=${item['album_id']}',
       );
       final albumData = decodeResponseData(albumResponse.data);
       track.album = (albumData['status'] != 0 && albumData['data'] != null)

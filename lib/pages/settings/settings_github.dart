@@ -295,13 +295,18 @@ class Github {
     if (backup is! Map) throw const FormatException('Gist 备份文件缺失');
     if (backup['truncated'] != true) {
       final jsonString = backup['content'];
-      if (jsonString is! String || jsonString.length > 4 * 1024 * 1024) {
+      if (jsonString is! String || jsonString.length > maxImportedSettingsBytes) {
         throw const FormatException('Gist 备份内容无效或过大');
       }
       return json.decode(jsonString);
     } else {
       final url = backup['raw_url'];
-      final uri = Uri.tryParse(url);
+      final uri = url is String ? Uri.tryParse(url) : null;
+      // Gist raw 地址形如 https://gist.githubusercontent.com/{owner}/{id}/raw/...，
+      // owner 必须是当前登录的 GitHub 用户（GitHub 用户名不区分大小写）。
+      final owner = uri == null || uri.pathSegments.isEmpty
+          ? ''
+          : uri.pathSegments.first.toLowerCase();
       if (uri == null ||
           uri.scheme != 'https' ||
           uri.host != 'raw.githubusercontent.com' &&
@@ -310,7 +315,8 @@ class Github {
           uri.hasPort ||
           uri.hasQuery ||
           uri.hasFragment ||
-          !uri.path.startsWith('/HBWuChang/')) {
+          username.isEmpty ||
+          owner != username.toLowerCase()) {
         throw const FormatException('备份文件地址不受信任');
       }
       final response = await (usedefault ? Dio() : dioWithProxyAdapter).get(
@@ -329,7 +335,7 @@ class Github {
       final raw = response.data is String
           ? response.data as String
           : utf8.decode(response.data as List<int>);
-      if (raw.length > 4 * 1024 * 1024) {
+      if (raw.length > maxImportedSettingsBytes) {
         throw const FormatException('Gist 备份超过大小限制');
       }
       return json.decode(raw);
