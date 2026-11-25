@@ -4,7 +4,9 @@ on:
   workflow_run:
     workflows: [build]
     types: [completed]
-    branches: [main]
+    # No branch filter: for tag-triggered builds workflow_run.head_branch is
+    # the tag name, and those are the runs that publish release assets.
+    # The resolve job still requires a same-repository push run.
   workflow_dispatch:
     inputs:
       tag:

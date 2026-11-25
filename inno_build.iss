@@ -12,7 +12,7 @@
 #define InstallerName GetEnv("INSTALLER_NAME")
 
 [Setup]
-AppId={{FEE5E46C-B97D-4D00-9DEF-C5AD957614E}
+AppId={{FEE5E46C-B97D-4D00-9DEF-C5AD957614E3}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}

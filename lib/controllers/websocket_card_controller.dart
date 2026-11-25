@@ -46,7 +46,18 @@ class WebSocketCardController extends GetxController {
   final RxBool _wsServerBtnShow = true.obs;
 
   /// Server defaults to loopback. LAN sharing must be explicitly enabled.
+  /// [_host] is the persisted address choice (advertised in the QR code when
+  /// LAN is enabled); the actual bind address is [bindHost].
   final RxString _host = '127.0.0.1'.obs;
+
+  /// Settings key for the explicit LAN opt-in (default off).
+  static const String allowLanSettingKey = 'wsServerAllowLan';
+
+  /// Settings key holding the persisted server pairing token.
+  static const String serverTokenSettingKey = 'wsServerToken';
+
+  /// 是否允许局域网设备连接（默认关闭，仅本机回环）
+  final RxBool _allowLan = false.obs;
   final RxInt _port = 25917.obs;
   final RxInt _pingInterval = 30.obs; // 秒
   final RxInt _pongTimeout = 5.obs; // 秒
@@ -68,6 +79,7 @@ class WebSocketCardController extends GetxController {
   RxString get serverUrlRx => _serverUrl;
   RxBool get wsServerAutoStartRx => _wsServerAutoStart;
   RxBool get wsServerBtnShowRx => _wsServerBtnShow;
+  RxBool get allowLanRx => _allowLan;
 
   // 保留原有的getter用于非响应式访问
   bool get isExpanded => _isExpanded.value;
@@ -85,7 +97,30 @@ class WebSocketCardController extends GetxController {
   String get accessToken => _accessToken.value;
   bool get wsServerAutoStart => _wsServerAutoStart.value;
   bool get wsServerBtnShow => _wsServerBtnShow.value;
+  bool get allowLan => _allowLan.value;
 
+  static bool _isLoopback(String host) =>
+      InternetAddress.tryParse(host)?.isLoopback ?? false;
+
+  /// The address the server actually listens on. Loopback unless the user
+  /// explicitly enabled LAN access, in which case it listens dual-stack.
+  String get bindHost {
+    if (_allowLan.value) return '::';
+    return _isLoopback(_host.value) ? _host.value : '127.0.0.1';
+  }
+
+  /// The address put into the QR code / copied pairing string.
+  String get advertisedHost {
+    if (!_allowLan.value) return bindHost;
+    final selected = selectBestAvailableAddress.value;
+    final parsed = InternetAddress.tryParse(selected);
+    if (parsed != null && !_isWildcard(parsed)) return selected;
+    return '127.0.0.1';
+  }
+
+  static bool _isWildcard(InternetAddress address) =>
+      address.address == InternetAddress.anyIPv4.address ||
+      address.address == InternetAddress.anyIPv6.address;
   /// 从设置控制器加载WebSocket配置
   void loadWebSocketSettings() {
     try {
@@ -99,22 +134,38 @@ class WebSocketCardController extends GetxController {
           : false;
       final serverPort = settings['wsServerPort'] as int?;
 
-      // Loopback is the safe default; persisted legacy wildcard values are not trusted.
+      _allowLan.value = settings[allowLanSettingKey] == true;
+
+      // 配对令牌只生成一次并持久化，服务器重启后已配对的客户端仍可重连。
+      final savedToken = settings[serverTokenSettingKey];
+      if (savedToken is String && savedToken.isNotEmpty) {
+        _accessToken.value = savedToken;
+      } else {
+        _accessToken.value = WebSocketServerController.generateAccessToken();
+        settings[serverTokenSettingKey] = _accessToken.value;
+      }
+
+      // Keep the saved address even while LAN is off so turning LAN back on
+      // restores it; [bindHost] still forces loopback while the opt-in is off.
       final configuredHost = settings['wsServerHost'] as String?;
       final parsedHost = configuredHost == null
           ? null
           : InternetAddress.tryParse(configuredHost);
-      if (parsedHost != null && parsedHost.isLoopback) {
+      if (parsedHost != null && !_isWildcard(parsedHost)) {
         _host.value = configuredHost!;
       } else {
         _host.value = '127.0.0.1';
       }
-      selectBestAvailableAddress.value = _host.value;
+      selectBestAvailableAddress.value = _allowLan.value
+          ? _host.value
+          : bindHost;
       if (serverPort != null && serverPort >= 1024 && serverPort <= 65535) {
         _port.value = serverPort;
       }
 
-      _logger.i('$_tag 配置加载完成: 自动启动=$wsServerAutoStart, 地址=$host:$port');
+      _logger.i(
+        '$_tag 配置加载完成: 自动启动=$wsServerAutoStart, 局域网=$allowLan, 地址=$host:$port',
+      );
     } catch (e) {
       _logger.w('$_tag 配置加载失败: $e');
     }
@@ -131,6 +182,10 @@ class WebSocketCardController extends GetxController {
       settings['wsServerBtnShow'] = _wsServerBtnShow.value;
       settings['wsServerPort'] = _port.value;
       settings['wsServerHost'] = _host.value;
+      settings[allowLanSettingKey] = _allowLan.value;
+      if (_accessToken.value.isNotEmpty) {
+        settings[serverTokenSettingKey] = _accessToken.value;
+      }
 
       // 触发设置保存
       settingsController.setSettings(settings);
@@ -145,6 +200,31 @@ class WebSocketCardController extends GetxController {
   void updateAutoStart(bool enabled) {
     _wsServerAutoStart.value = enabled;
     saveWebSocketSettings();
+  }
+
+  /// 切换“允许局域网设备连接”。需要在服务器停止时修改。
+  void updateAllowLan(bool enabled) {
+    if (isServerRunning) {
+      _showError('服务器运行时不能更改监听地址');
+      return;
+    }
+    _allowLan.value = enabled;
+    selectBestAvailableAddress.value = enabled ? _host.value : bindHost;
+    saveWebSocketSettings();
+    unawaited(refreshIpAddresses());
+  }
+
+  /// 重新生成配对令牌：旧令牌立即失效，已连接的客户端会被断开，需要重新扫码。
+  Future<void> regenerateAccessToken() async {
+    final token = WebSocketServerController.generateAccessToken();
+    _accessToken.value = token;
+    saveWebSocketSettings();
+    final server = wsServerController;
+    if (server != null) {
+      await server.rotateAccessToken(token);
+      i_clientCount.value = 0;
+    }
+    _showSuccess('配对令牌已重新生成，旧客户端需要重新扫码配对');
   }
 
   /// 更新服务器按钮显示设置
@@ -225,20 +305,21 @@ class WebSocketCardController extends GetxController {
       ipList.addAll(otherIps);
       ipList.addAll(loopbackIps);
 
-      // 仅展示可绑定的回环地址；LAN 传输尚未提供 TLS，不能误导用户选择明文地址。
-      final bindableIps = ipList.where((ip) {
-        final parsed = InternetAddress.tryParse(ip);
-        return parsed?.isLoopback ?? false;
-      }).toList();
+      // 未开启局域网访问时只展示回环地址，避免给出不可达的配对地址。
+      final bindableIps = _allowLan.value
+          ? ipList
+          : ipList.where(_isLoopback).toList();
       availableIpAddresses.value = bindableIps.isEmpty
           ? <String>['127.0.0.1']
           : bindableIps;
 
-      // 检查当前选中的地址是否在列表中，如果不在则自动选择最优地址
-      if (!bindableIps.contains(selectBestAvailableAddress.value)) {
-        selectBestAvailableAddress.value = bindableIps.isEmpty
-            ? '127.0.0.1'
-            : bindableIps.first;
+      // 当前选中的地址不在列表中时临时选择最优地址；不覆盖已保存的地址，
+      // 以免网卡暂时不可用时丢失用户的选择。
+      final selected = selectBestAvailableAddress.value;
+      if (!availableIpAddresses.contains(selected) ||
+          (_allowLan.value && _isLoopback(selected))) {
+        // 开启局域网后，回环地址对其他设备没有意义，优先展示局域网地址。
+        selectBestAvailableAddress.value = availableIpAddresses.first;
       }
     } catch (e) {
       _logger.e('$_tag 获取IP地址失败', error: e);
@@ -261,7 +342,7 @@ class WebSocketCardController extends GetxController {
 
       // 创建新的服务器实例
       wsServerController = WebSocketServerController(
-        host: _host.value,
+        host: bindHost,
         port: _port.value,
         accessToken: _accessToken.value.isEmpty ? null : _accessToken.value,
         pingInterval: Duration(seconds: _pingInterval.value),
@@ -274,7 +355,10 @@ class WebSocketCardController extends GetxController {
       if (success) {
         _isServerRunning.value = true;
         _serverUrl.value = wsServerController!.serverUrl;
-        _accessToken.value = wsServerController!.accessToken;
+        if (_accessToken.value != wsServerController!.accessToken) {
+          _accessToken.value = wsServerController!.accessToken;
+          saveWebSocketSettings();
+        }
         _updateStatusMessage('运行中');
         _logger.i('$_tag WebSocket服务器启动成功: $serverUrl');
 
@@ -285,7 +369,6 @@ class WebSocketCardController extends GetxController {
         wsServerController = null;
         _isServerRunning.value = false;
         _serverUrl.value = '';
-        _accessToken.value = '';
         _updateStatusMessage('启动失败');
         _showError('服务器启动失败，请检查端口 $_port 是否被占用或其他资源冲突');
         _logger.e('$_tag 启动服务器失败: 服务器返回 false');
@@ -295,7 +378,6 @@ class WebSocketCardController extends GetxController {
       wsServerController = null;
       _isServerRunning.value = false;
       _serverUrl.value = '';
-      _accessToken.value = '';
       i_clientCount.value = 0;
       _updateStatusMessage('启动失败');
       final errorMsg = '启动服务器异常: $e';
@@ -328,22 +410,28 @@ class WebSocketCardController extends GetxController {
     _isExpanded.value = !_isExpanded.value;
   }
 
-  /// LAN sharing is explicit; selecting a LAN address binds the server to it.
+  /// Select the address to listen on (LAN off) or to advertise (LAN on).
   void updateBindAddress(String address) {
-    if (isServerRunning) {
-      _showError('服务器运行时不能更改监听地址');
-      return;
-    }
     final value = address.trim();
     final parsed = InternetAddress.tryParse(value);
-    if (parsed == null || !parsed.isLoopback) {
-      _showError('当前仅支持本机回环地址；局域网传输需要 WSS/TLS 后再开放');
+    if (parsed == null || _isWildcard(parsed)) {
+      _showError('地址无效');
+      return;
+    }
+    if (!_allowLan.value && !parsed.isLoopback) {
+      _showError('请先开启“允许局域网设备连接”');
+      return;
+    }
+    // LAN 模式下服务器监听所有网卡，选择的地址只影响二维码，可随时修改。
+    if (isServerRunning && !_allowLan.value) {
+      _showError('服务器运行时不能更改监听地址');
       return;
     }
     _host.value = value;
     selectBestAvailableAddress.value = value;
     saveWebSocketSettings();
   }
+
   /// 更新端口
   void updatePort(int newPort) {
     if (isServerRunning) {
@@ -406,7 +494,6 @@ class WebSocketCardController extends GetxController {
 
       _isServerRunning.value = false;
       _serverUrl.value = '';
-      _accessToken.value = '';
       i_clientCount.value = 0;
       _updateStatusMessage('已停止');
       _showSuccess('WebSocket 服务器已停止');

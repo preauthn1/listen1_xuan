@@ -219,12 +219,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
   void _handleScanResult(String result) {
     if (isScanned) return;
     try {
-      final envelopeParts = result.split('|');
-      if (envelopeParts.length > 2 || envelopeParts.any((part) => part.isEmpty)) {
-        throw const FormatException('二维码内容无效');
-      }
-      final address = envelopeParts.first;
-      _isValidServerAddress(address);
+      _validatePairingString(result, invalidMessage: '二维码内容无效');
       isScanned = true;
       Get.back(result: result);
     } catch (error) {
@@ -246,13 +241,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
               controller: inputController,
               decoration: const InputDecoration(
                 labelText: '服务器地址',
-                hintText: '例如: 192.168.1.100:8080',
+                hintText: '例如: 192.168.1.100:25917|配对令牌',
                 border: OutlineInputBorder(),
               ),
             ),
             8.sbh,
             const Text(
-              '格式: IP地址:端口号',
+              '格式: IP地址:端口号|配对令牌（可直接粘贴“复制地址”的内容）',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
@@ -261,11 +256,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
           TextButton(onPressed: () => Get.back(), child: const Text('取消')),
           ElevatedButton(
             onPressed: () {
-              final address = inputController.text.trim();
+              final input = inputController.text.trim();
               try {
-                _isValidServerAddress(address);
+                // 返回完整的 address|token，由调用方拆分并分别保存地址与令牌。
+                _validatePairingString(input, invalidMessage: '输入内容无效');
                 Get.back();
-                Get.back(result: address);
+                Get.back(result: input);
               } catch (error) {
                 showWarningSnackbar('服务器地址无效', error.toString());
               }
@@ -275,6 +271,15 @@ class _QRScannerPageState extends State<QRScannerPage> {
         ],
       ),
     );
+  }
+
+  /// 验证 `host:port` 或 `host:port|token` 格式的配对字符串
+  void _validatePairingString(String value, {required String invalidMessage}) {
+    final parts = value.split('|');
+    if (parts.length > 2 || parts.any((part) => part.trim().isEmpty)) {
+      throw FormatException(invalidMessage);
+    }
+    _isValidServerAddress(parts.first.trim());
   }
 
   /// 验证服务器地址格式
