@@ -575,7 +575,13 @@ class _SongReplacePageState extends State<SongReplacePage> {
 
     // 创建新的设置对象并添加映射
     final newSettings = _playController.songReplaceSettings.value.copyWith();
-    newSettings.setMapping(sourceTrack.id, targetTrack.id, track: targetTrack);
+    try {
+      newSettings.setMapping(sourceTrack.id, targetTrack.id, track: targetTrack);
+    } on ArgumentError catch (e) {
+      // 自身映射或形成循环会被拒绝，提示用户而不是让确认按钮无反应
+      showWarningSnackbar('无法添加替换设置', '${e.message}');
+      return;
+    }
 
     // 如果源歌曲信息也需要保存
     if (newSettings.getTrackDetails(sourceTrack.id) == null) {
