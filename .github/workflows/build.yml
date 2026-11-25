@@ -61,30 +61,50 @@ jobs:
             exit 1
           fi
 
+  # Upstream (HBWuChang/listen1_xuan) keeps its original flow: a branch push
+  # builds a platform only when the head commit message contains its keyword
+  # (apk / win / ios / macos) and then publishes to the release named after
+  # the pubspec version. Forks build everything and publish on tags only.
   android:
     needs: version_gate
-    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'android'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.target == 'all' || inputs.target == 'android')) ||
+      (github.event_name == 'push' && (github.ref_type == 'tag' ||
+        github.repository != 'HBWuChang/listen1_xuan' ||
+        contains(github.event.head_commit.message, 'apk')))
     permissions:
       contents: write
     uses: ./.github/workflows/dart.yml
     secrets: inherit
   windows:
     needs: version_gate
-    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'windows'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.target == 'all' || inputs.target == 'windows')) ||
+      (github.event_name == 'push' && (github.ref_type == 'tag' ||
+        github.repository != 'HBWuChang/listen1_xuan' ||
+        contains(github.event.head_commit.message, 'win')))
     permissions:
       contents: write
     uses: ./.github/workflows/dart_win.yml
     secrets: inherit
   ios:
     needs: version_gate
-    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'ios'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.target == 'all' || inputs.target == 'ios')) ||
+      (github.event_name == 'push' && (github.ref_type == 'tag' ||
+        github.repository != 'HBWuChang/listen1_xuan' ||
+        contains(github.event.head_commit.message, 'ios')))
     permissions:
       contents: write
     uses: ./.github/workflows/dart_ios.yml
     secrets: inherit
   macos:
     needs: version_gate
-    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'macos'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.target == 'all' || inputs.target == 'macos')) ||
+      (github.event_name == 'push' && (github.ref_type == 'tag' ||
+        github.repository != 'HBWuChang/listen1_xuan' ||
+        contains(github.event.head_commit.message, 'macos')))
     permissions:
       contents: write
     uses: ./.github/workflows/dart_macos.yml
