@@ -1068,7 +1068,11 @@ class WebSocketClientController extends GetxController {
           }
           break;
         case WebSocketMessageType.error:
-          // 处理错误消息
+          // 服务器拒绝了请求（例如消息过大），提示用户
+          final error = message.parseContentAsMap()?['error'];
+          if (error is String && error.isNotEmpty) {
+            _showError(error);
+          }
           break;
         case WebSocketMessageType.pong:
           // 处理 pong 消息
