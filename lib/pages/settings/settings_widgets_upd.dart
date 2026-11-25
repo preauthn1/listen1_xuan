@@ -87,6 +87,16 @@ Widget updSettingsTile(BuildContext context) {
             },
           ),
         ),
+        Obx(
+          () => SwitchListTile(
+            title: const Text('使用下载镜像（h3.040905.xyz）'),
+            subtitle: const Text('更新包先经第三方镜像下载，失败再直连 GitHub；下载后仍校验 SHA-256'),
+            value: Get.find<SettingsController>().useDownloadMirror,
+            onChanged: (value) {
+              Get.find<SettingsController>().useDownloadMirror = value;
+            },
+          ),
+        ),
       ].map((e) => e is Obx
           ? SizedBox(width: double.infinity, child: e)
           : Padding(padding: const EdgeInsets.fromLTRB(16, 8, 0, 8), child: e)),
