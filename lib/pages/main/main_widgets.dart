@@ -38,10 +38,13 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
       final routeName =
           top_routeWithName.isEmpty ? null : top_routeWithName.last.name;
       final settingsRoute = routeName == RouteName.settingsPage;
-      // 其它子页面自带 AppBar（返回 + 标题），标题栏不再重复显示。
-      final canGoBack = settingsRoute;
+      // 内层导航能返回时就显示返回键：歌词页、正在播放等页面没有自己的返回入口。
+      // 标题只在设置页显示，其它子页面自带标题。
+      final canGoBack = top_routeWithName.isNotEmpty;
       final title = settingsRoute ? '设置' : '';
       final settings = Get.find<SettingsController>();
+      // 关闭键不是「隐藏到托盘」时，单独提供隐藏到托盘按钮（与上游一致）。
+      final closeHidesToTray = settings.windowsCloseBtnCloseOrHideApp == false;
       return Material(
         color: Theme.of(context).colorScheme.surface,
         child: SizedBox(
@@ -94,6 +97,17 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
                 onPressed: _togglePinned,
                 icon: Icon(_isPinned ? LucideIcons.pinOff : LucideIcons.pin),
               ),
+              if (!closeHidesToTray)
+                IconButton(
+                  tooltip: '隐藏到托盘',
+                  padding: EdgeInsets.zero,
+                  iconSize: 15,
+                  onPressed: () async {
+                    await windowManager.hide();
+                    await windowManager.setSkipTaskbar(true);
+                  },
+                  icon: const Icon(LucideIcons.minimize2),
+                ),
               IconButton(
                 tooltip: '最小化',
                 padding: EdgeInsets.zero,
@@ -125,7 +139,7 @@ class _WindowsTitleBarState extends State<_WindowsTitleBar> {
                 },
               ),
               IconButton(
-                tooltip: settings.windowsCloseBtnCloseOrHideApp != false ? '关闭' : '隐藏到托盘',
+                tooltip: closeHidesToTray ? '隐藏到托盘' : '关闭',
                 padding: EdgeInsets.zero,
                 iconSize: 15,
                 onPressed: _clickCloseBtn,
