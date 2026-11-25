@@ -1,0 +1,12 @@
+name: macos runner probe
+on: push
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, macos-14, macos-15, macos-26, macos-15-intel, macos-13, macos-14-large, macos-15-xlarge]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - run: sw_vers; uname -m; sysctl -n hw.ncpu hw.memsize machdep.cpu.brand_string; xcodebuild -version | head -1; ls /Applications | grep -i xcode | head
