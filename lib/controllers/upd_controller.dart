@@ -171,6 +171,28 @@ class UpdController extends GetxController {
     return matches.first.group(0)!.toLowerCase();
   }
 
+  /// Query keys GitHub puts on Azure Blob SAS redirects. Actions artifact
+  /// downloads use user-delegation SAS URLs, which add the `sk*` and `spr`
+  /// keys (verified on a live productionresultssa*.blob.core.windows.net
+  /// redirect). `sig` is still required by the callers.
+  static const Set<String> _allowedBlobSasQueryKeys = {
+    'sv',
+    'st',
+    'se',
+    'sr',
+    'sp',
+    'spr',
+    'sig',
+    'rscd',
+    'rsct',
+    'skoid',
+    'sktid',
+    'skt',
+    'ske',
+    'sks',
+    'skv',
+  };
+
   bool _isTrustedGithubReleaseUrl(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null ||
@@ -195,16 +217,7 @@ class UpdController extends GetxController {
           (uri.host == 'objects.githubusercontent.com' ||
               (uri.queryParameters.containsKey('sig') &&
                   uri.queryParameters.keys.every(
-                    (key) => const {
-                      'sv',
-                      'st',
-                      'se',
-                      'sr',
-                      'sp',
-                      'sig',
-                      'rscd',
-                      'rsct',
-                    }.contains(key),
+                    _allowedBlobSasQueryKeys.contains,
                   )));
     }
     if (uri.host == 'api.github.com') {
@@ -248,11 +261,9 @@ class UpdController extends GetxController {
         throw const FormatException('GitHub 重定向地址不受信任');
       }
       if (target.host.endsWith('.blob.core.windows.net')) {
-        const allowed = {
-          'sv', 'st', 'se', 'sr', 'sp', 'sig', 'rscd', 'rsct'
-        };
         if (!target.queryParameters.containsKey('sig') ||
-            target.queryParameters.keys.any((key) => !allowed.contains(key))) {
+            target.queryParameters.keys
+                .any((key) => !_allowedBlobSasQueryKeys.contains(key))) {
           throw const FormatException('GitHub 签名地址参数不受信任');
         }
       }
