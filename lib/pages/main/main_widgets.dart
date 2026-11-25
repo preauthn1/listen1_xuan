@@ -245,7 +245,20 @@ Widget get _leftBar => Scaffold(
           );
         },
       ).sbh(64),
-      Expanded(child: MyPlaylist()),
+      // 列表底部淡出并加一条分隔线：滚动到边缘的行不再像被硬切掉一半。
+      Expanded(
+        child: ShaderMask(
+          blendMode: BlendMode.dstIn,
+          shaderCallback: (rect) => const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.black, Colors.black, Colors.transparent],
+            stops: [0, 0.92, 1],
+          ).createShader(rect),
+          child: MyPlaylist(),
+        ),
+      ),
+      const Divider(height: 1, indent: 12, endIndent: 12),
 
       // SizedBox(),
       Padding(
