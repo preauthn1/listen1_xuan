@@ -130,7 +130,10 @@ class WebSocketServerController extends GetxController {
 
       _isRunning.value = true;
       _serverStartedAt = DateTime.now();
-      Get.find<BroadcastWsController>().startBroadcast(_port);
+      // 仅在用户开启局域网访问（非回环监听）时广播，广播内容不含配对令牌。
+      if (!_server!.address.isLoopback) {
+        unawaited(Get.find<BroadcastWsController>().startBroadcast(_port));
+      }
       // 监听请求
       _server!.listen((HttpRequest request) async {
         final authorized = _isAuthorizedRequest(request);
