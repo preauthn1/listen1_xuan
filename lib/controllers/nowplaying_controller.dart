@@ -69,10 +69,12 @@ class NowPlayingPageController extends GetxController {
   void removeTrackFromList(Track track) {
     final currentList = playController.current_playing;
     currentList.removeWhere((t) => t.id == track.id);
+    personalFmActive.value = false;
     playController.set_current_playing(currentList);
   }
 
   void clearPlaylist() {
+    personalFmActive.value = false;
     playController.set_current_playing([playController.currentTrack]);
   }
 
@@ -82,6 +84,7 @@ class NowPlayingPageController extends GetxController {
     final track = currentList.removeAt(oldIndex);
     currentList.insert(newIndex, track);
 
+    personalFmActive.value = false;
     playController.set_current_playing(currentList);
   }
 
