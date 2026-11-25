@@ -93,9 +93,22 @@ class WebSocketServerCard extends StatelessWidget {
                     ),
                     if (ctrl.isServerRunning) ...[
                       4.sbh,
-                      SelectableText(
-                        '配对令牌: ${ctrl.accessToken}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SelectableText(
+                              '配对令牌: ${ctrl.accessToken}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => _confirmRegenerateToken(ctrl),
+                            child: const Text('重新生成令牌'),
+                          ),
+                        ],
                       ),
                       4.sbh,
                       Text(
@@ -534,6 +547,15 @@ class _WebSocketControlContentState extends State<WebSocketControlContent> {
                   color: ctrl.allowLan ? Colors.orange : Colors.grey,
                 ),
               ),
+              8.sbh,
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => _confirmRegenerateToken(ctrl),
+                  icon: const Icon(Icons.key, size: 16),
+                  label: const Text('重新生成令牌'),
+                ),
+              ),
               16.sbh,
               _buildTextField(
                 controller: portController,
@@ -866,4 +888,25 @@ class WebSocketHelper {
       );
     });
   }
+}
+
+/// 确认后重新生成配对令牌（旧客户端会失效）
+Future<void> _confirmRegenerateToken(WebSocketCardController ctrl) async {
+  final confirmed = await Get.dialog<bool>(
+    AlertDialog(
+      title: const Text('重新生成令牌'),
+      content: const Text('旧令牌将立即失效，已配对的设备需要重新扫码配对。是否继续？'),
+      actions: [
+        TextButton(
+          onPressed: () => Get.back(result: false),
+          child: const Text('取消'),
+        ),
+        ElevatedButton(
+          onPressed: () => Get.back(result: true),
+          child: const Text('重新生成'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) await ctrl.regenerateAccessToken();
 }
