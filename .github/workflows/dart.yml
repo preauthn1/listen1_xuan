@@ -131,7 +131,8 @@ jobs:
         run: |
           set -eu
           umask 077
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/xuan.jks
+          # Secrets pasted from Windows/certutil may contain CR/LF or spaces.
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > android/app/xuan.jks
           test -s android/app/xuan.jks
           chmod 600 android/app/xuan.jks
           keytool -exportcert -alias "$KEY_ALIAS" -keystore android/app/xuan.jks \
@@ -232,7 +233,13 @@ jobs:
 
   publish:
     # Manual CI checks produce artifacts without replacing published releases.
-    if: (github.event_name == 'push' || github.event_name == 'workflow_call') && github.ref_type == 'tag'
+    # Tags publish everywhere. On the upstream repository a push to main or
+    # feat/dual-build-ffmpeg also publishes to the release named after the
+    # pubspec version (upstream behaviour); forks stay tag-only.
+    if: >-
+      (github.ref_type == 'tag' && (github.event_name == 'push' || github.event_name == 'workflow_call')) ||
+      (github.repository == 'HBWuChang/listen1_xuan' && github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/dual-build-ffmpeg'))
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -267,11 +274,18 @@ jobs:
                   archive.write(apk, apk.name)
           PYZIP
 
-      # 从 pubspec.yaml 提取版本号
+      # Single source of truth: the release is always named after the pubspec
+      # version; a tag build must push exactly that tag.
       - name: Extract Version from pubspec.yaml
         id: extract_version
+        shell: bash
         run: |
-          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//')
+          set -euo pipefail
+          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | tr -d '\r')
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match pubspec.yaml version '$version'."
+            exit 1
+          fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
           echo "VERSION=$version"
 
@@ -292,7 +306,7 @@ jobs:
       - name: Upload New Asset to Release
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ env.VERSION }}
           prerelease: ${{ !contains(github.event.head_commit.message, 'sta') }}
           fail_on_unmatched_files: true
           files: |

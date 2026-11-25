@@ -26,16 +26,39 @@ import '../services/paste_file_transfer.dart';
 /// 支持 IPv4/IPv6 配置，包含 ping/pong 心跳机制和资源释放
 class WebSocketServerController extends GetxController {
   /// 将本地粘贴图片限制为和网络传输相同的预算。
-  static const int maxPasteImageBytes = 32 * 1024 * 1024;
+  static const int maxPasteImageBytes = PasteFileTransfer.defaultMaxPartBytes;
+
+  /// Largest WebSocket text message accepted or sent (clipboard text etc.).
+  static const int maxMessageBytes = 8 * 1024 * 1024;
+
+  static const String _tooLargeMessage = 'File too large';
 
   static const String _tag = 'WebSocketServerController';
   static const int _maxConnections = 8;
-  static const int _maxMessageBytes = 256 * 1024;
-  static const int _maxHttpBodyBytes = 64 * 1024 * 1024;
+  static const int _maxMessageBytes = maxMessageBytes;
+  static const int _maxHttpBodyBytes = PasteFileTransfer.maxBodyBytes;
   final Logger _logger = createAppLogger();
   HttpServer? _server;
 
-  final String accessToken;
+  String _accessToken;
+
+  /// Current pairing token required in the `x-listen1-pairing-token` header.
+  String get accessToken => _accessToken;
+
+  /// Generate a random 256-bit pairing token.
+  static String generateAccessToken() => base64UrlEncode(
+    List<int>.generate(32, (_) => Random.secure().nextInt(256)),
+  );
+
+  /// Replace the pairing token and drop every client paired with the old one.
+  /// HTTP routes check the token per request, so they are invalidated at once.
+  Future<void> rotateAccessToken(String token) async {
+    if (token.isEmpty) throw ArgumentError('token must not be empty');
+    _accessToken = token;
+    await _closeAllConnections();
+    _clientCount.value = 0;
+  }
+
   /// 所有活跃的 WebSocket 连接
   final List<WebSocketConnection> _connections = <WebSocketConnection>[];
   int _pendingConnections = 0;
@@ -101,10 +124,9 @@ class WebSocketServerController extends GetxController {
     Duration pongTimeout = const Duration(seconds: 5),
   }) : _host = host,
        _port = port,
-       accessToken = accessToken ??
-           base64UrlEncode(
-             List<int>.generate(32, (_) => Random.secure().nextInt(256)),
-           ),
+       _accessToken = (accessToken == null || accessToken.isEmpty)
+           ? generateAccessToken()
+           : accessToken,
        _pingInterval = pingInterval,
        _pongTimeout = pongTimeout;
 
@@ -130,7 +152,10 @@ class WebSocketServerController extends GetxController {
 
       _isRunning.value = true;
       _serverStartedAt = DateTime.now();
-      Get.find<BroadcastWsController>().startBroadcast(_port);
+      // 仅在用户开启局域网访问（非回环监听）时广播，广播内容不含配对令牌。
+      if (!_server!.address.isLoopback) {
+        unawaited(Get.find<BroadcastWsController>().startBroadcast(_port));
+      }
       // 监听请求
       _server!.listen((HttpRequest request) async {
         final authorized = _isAuthorizedRequest(request);
@@ -238,7 +263,14 @@ class WebSocketServerController extends GetxController {
     final raw = data is String ? data : data.toString();
     final rawBytes = utf8.encode(raw);
     if (rawBytes.length > _maxMessageBytes) {
-      await connection.webSocket.close(WebSocketStatus.messageTooBig, 'Message too large');
+      // 只拒绝这条消息并告知发送方，不断开整个连接（避免客户端重连循环）。
+      _logger.w('$_tag 拒绝超大消息: ${rawBytes.length} bytes from ${connection.id}');
+      _sendMessage(
+        connection,
+        WebSocketMessageBuilder.createErrorMessage(
+          '消息过大（超过 ${_maxMessageBytes ~/ (1024 * 1024)} MiB），未处理',
+        ),
+      );
       return;
     }
     try {
@@ -699,8 +731,8 @@ class WebSocketServerController extends GetxController {
     }
   }
 
-  /// 广播消息给所有客户端
-  void _broadcastMessage(dynamic message, {String? excludeClient}) {
+  /// 广播消息给所有客户端；消息超过大小限制时返回 false。
+  bool _broadcastMessage(dynamic message, {String? excludeClient}) {
     String messageJson;
     if (message is WebSocketMessage) {
       messageJson = message.toJsonString();
@@ -714,7 +746,7 @@ class WebSocketServerController extends GetxController {
 
     if (utf8.encode(messageJson).length > _maxMessageBytes) {
       _logger.w('$_tag 拒绝广播超大消息');
-      return;
+      return false;
     }
 
     final connectionsToRemove = <WebSocketConnection>[];
@@ -740,16 +772,15 @@ class WebSocketServerController extends GetxController {
     if (connectionsToRemove.isNotEmpty) {
       _clientCount.value = _connections.length;
     }
+    return true;
   }
 
-  /// 公开的广播方法
-  void broadcastMessage(dynamic message) {
+  /// 公开的广播方法；消息超过大小限制时返回 false（未发送）。
+  bool broadcastMessage(dynamic message) {
     if (message is Map<String, dynamic>) {
       message['timestamp'] = DateTime.now().millisecondsSinceEpoch;
-      _broadcastMessage(message);
-    } else {
-      _broadcastMessage(message);
     }
+    return _broadcastMessage(message);
   }
 
   /// 关闭所有连接
@@ -796,6 +827,14 @@ class WebSocketServerController extends GetxController {
 
   static String _safeExternalError(String fallback) => fallback;
 
+  Future<void> _rejectTooLarge(HttpRequest request) async {
+    request.response
+      ..statusCode = HttpStatus.requestEntityTooLarge
+      ..headers.contentType = ContentType.json
+      ..write(json.encode({'error': _tooLargeMessage}));
+    await request.response.close();
+  }
+
   /// 处理 HTTP 请求（根路径）
   void _handleHttpRequest(HttpRequest request) async {
     if (!_isAuthorizedRequest(request)) {
@@ -804,10 +843,7 @@ class WebSocketServerController extends GetxController {
     }
     final body = request.contentLength;
     if (body > _maxHttpBodyBytes) {
-      request.response
-        ..statusCode = HttpStatus.requestEntityTooLarge
-        ..write('Request too large');
-      await request.response.close();
+      await _rejectTooLarge(request);
       return;
     }
     final uri = request.uri.path;
@@ -913,11 +949,15 @@ class WebSocketServerController extends GetxController {
         return;
       }
       final body = request.contentLength;
-      if (body < 0 || body > _maxHttpBodyBytes) {
+      if (body < 0) {
         request.response
-          ..statusCode = HttpStatus.requestEntityTooLarge
-          ..write('Request too large');
+          ..statusCode = HttpStatus.lengthRequired
+          ..write('Length Required');
         await request.response.close();
+        return;
+      }
+      if (body > _maxHttpBodyBytes) {
+        await _rejectTooLarge(request);
         return;
       }
       final contentType = request.headers.contentType;
@@ -961,6 +1001,11 @@ class WebSocketServerController extends GetxController {
           ShareParams(files: savedFiles.map((f) => XFile(f)).toList()),
         );
       }
+    } on PasteTransferLimitException catch (e) {
+      _logger.w('$_tag /onPasteFile 超过大小限制: ${e.message}');
+      try {
+        await _rejectTooLarge(request);
+      } catch (_) {}
     } catch (e) {
       _logger.e('$_tag 处理 /onPasteFile 请求失败', error: e);
       try {
@@ -972,9 +1017,8 @@ class WebSocketServerController extends GetxController {
     }
   }
 
-  /// 处理 /getPasteFile GET 请求 - 将 nowPasteFiles 中的文件以 multipart/mixed 方式返回
+  /// 处理 /getPasteFile GET 请求 - 将 nowPasteFiles 中的文件以 multipart/mixed 方式流式返回
   Future<void> _handleGetPasteFile(HttpRequest request) async {
-    const maxFiles = 100;
     if (request.method != 'GET') {
       request.response
         ..statusCode = HttpStatus.methodNotAllowed
@@ -984,37 +1028,29 @@ class WebSocketServerController extends GetxController {
     }
     var responseStarted = false;
     try {
-      final prevalidated = <(String, List<int>)>[];
+      // 先只检查文件数量和大小（不读入内存），超限时在发送前返回 413。
+      final files = <(File, String, int)>[];
       var totalBytes = 0;
       for (final filePath in List<String>.of(nowPasteFiles)) {
-        if (prevalidated.length >= maxFiles) {
-          throw const FormatException('粘贴文件数量超过限制');
-        }
         final file = File(filePath);
         if (!await file.exists()) continue;
-        final bytes = await file.readAsBytes();
-        if (bytes.length > PasteFileTransfer.defaultMaxPartBytes ||
-            totalBytes + bytes.length > PasteFileTransfer.defaultMaxTotalBytes) {
-          throw const FormatException('粘贴文件总大小超过限制');
+        if (files.length >= PasteFileTransfer.defaultMaxFiles) {
+          throw const PasteTransferLimitException('粘贴文件数量超过限制');
         }
-        totalBytes += bytes.length;
-        prevalidated.add((p.basename(filePath), bytes));
+        final size = await file.length();
+        if (size > PasteFileTransfer.defaultMaxPartBytes ||
+            totalBytes + size > PasteFileTransfer.defaultMaxTotalBytes) {
+          throw const PasteTransferLimitException('粘贴文件总大小超过限制');
+        }
+        totalBytes += size;
+        files.add((file, p.basename(filePath), size));
       }
-      if (prevalidated.isEmpty) {
-        request.response
-          ..statusCode = HttpStatus.notFound
-          ..headers.contentType = ContentType.json
-          ..write(json.encode({'error': 'No paste files available'}));
-        await request.response.close();
-        return;
-      }
-      final files = prevalidated;
       if (files.isEmpty) {
         request.response
           ..statusCode = HttpStatus.notFound
           ..headers.contentType = ContentType.json
           ..write(json.encode({'error': 'No paste files available'}));
-        request.response.close();
+        await request.response.close();
         return;
       }
 
@@ -1026,15 +1062,8 @@ class WebSocketServerController extends GetxController {
         'multipart/mixed; boundary=$boundary',
       );
 
-      var sentBytes = 0;
-      for (final file in files) {
-        final fileName = file.$1;
+      for (final (file, fileName, fileSize) in files) {
         final encodedFileName = Uri.encodeComponent(fileName);
-        final fileSize = file.$2.length;
-        if (sentBytes + fileSize > PasteFileTransfer.defaultMaxTotalBytes) {
-          throw const FormatException('粘贴文件总大小超过限制');
-        }
-        sentBytes += fileSize;
         request.response.write('--$boundary\r\n');
         request.response.write(
           'Content-Disposition: attachment; filename*=UTF-8\'\'$encodedFileName\r\n',
@@ -1042,8 +1071,8 @@ class WebSocketServerController extends GetxController {
         request.response.write('Content-Type: application/octet-stream\r\n');
         request.response.write('Content-Length: $fileSize\r\n');
         request.response.write('\r\n');
-
-        await request.response.addStream(Stream<List<int>>.value(file.$2));
+        // 只发送校验过的长度；文件若在此期间变短，客户端会按 Content-Length 判定不完整。
+        await request.response.addStream(file.openRead(0, fileSize));
         request.response.write('\r\n');
       }
 
@@ -1051,7 +1080,12 @@ class WebSocketServerController extends GetxController {
       request.response.write('--$boundary--\r\n');
       await request.response.close();
 
-      _logger.i('$_tag 返回 ${nowPasteFiles.length} 个粘贴文件');
+      _logger.i('$_tag 返回 ${files.length} 个粘贴文件');
+    } on PasteTransferLimitException catch (e) {
+      _logger.w('$_tag /getPasteFile 超过大小限制: ${e.message}');
+      try {
+        await _rejectTooLarge(request);
+      } catch (_) {}
     } catch (e) {
       _logger.e('$_tag 处理 /getPasteFile 请求失败', error: e);
       if (responseStarted) {
@@ -1081,11 +1115,15 @@ class WebSocketServerController extends GetxController {
         return;
       }
       final body = request.contentLength;
-      if (body < 0 || body > _maxHttpBodyBytes) {
+      if (body < 0) {
         request.response
-          ..statusCode = HttpStatus.requestEntityTooLarge
-          ..write('Request too large');
+          ..statusCode = HttpStatus.lengthRequired
+          ..write('Length Required');
         await request.response.close();
+        return;
+      }
+      if (body > PasteFileTransfer.defaultMaxPartBytes) {
+        await _rejectTooLarge(request);
         return;
       }
 
@@ -1112,6 +1150,11 @@ class WebSocketServerController extends GetxController {
 
       showSuccessSnackbar('收到粘贴图片', '已保存到 ${p.basename(savePath)}');
       _logger.i('$_tag 保存粘贴图片: $savePath');
+    } on PasteTransferLimitException catch (e) {
+      _logger.w('$_tag /onPasteImage 超过大小限制: ${e.message}');
+      try {
+        await _rejectTooLarge(request);
+      } catch (_) {}
     } catch (e) {
       _logger.e('$_tag 处理 /onPasteImage 请求失败', error: e);
       try {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart' as dio_pkg;
@@ -35,6 +36,13 @@ class PasteController extends GetxController {
 
   /// 是否正在处理粘贴
   final isProcessing = false.obs;
+
+  static bool _isTooLarge(Object error) =>
+      error is PasteTransferLimitException ||
+      (error is dio_pkg.DioException &&
+          error.response?.statusCode == HttpStatus.requestEntityTooLarge);
+
+  static const String _tooLargeDetail = '文件过大（单个文件最大 512 MiB，总计最大 1 GiB，最多 1000 个）';
   @override
   void onInit() {
     super.onInit();
@@ -173,6 +181,21 @@ class PasteController extends GetxController {
       ).uri(scheme: 'http', path: '/onPasteFile').toString();
       final formData = dio_pkg.FormData();
 
+      var totalBytes = 0;
+      var count = 0;
+      for (final filePath in files) {
+        final file = File(filePath);
+        if (!await file.exists()) continue;
+        final size = await file.length();
+        totalBytes += size;
+        count++;
+        if (size > PasteFileTransfer.defaultMaxPartBytes ||
+            totalBytes > PasteFileTransfer.defaultMaxTotalBytes ||
+            count > PasteFileTransfer.defaultMaxFiles) {
+          throw const PasteTransferLimitException('Transfer exceeds size limit');
+        }
+      }
+
       for (final filePath in files) {
         final file = File(filePath);
         if (await file.exists()) {
@@ -202,7 +225,10 @@ class PasteController extends GetxController {
     } catch (e) {
       if (token.isCancelled) return;
       debugPrint('[PasteController] POST文件到服务器失败: $e');
-      showErrorSnackbar('发送文件失败', '传输失败，请检查连接和令牌');
+      showErrorSnackbar(
+        '发送文件失败',
+        _isTooLarge(e) ? _tooLargeDetail : '传输失败，请检查连接和令牌',
+      );
     } finally {
       _transfers.remove(token);
     }
@@ -263,7 +289,10 @@ class PasteController extends GetxController {
     } catch (e) {
       if (token.isCancelled) return;
       debugPrint('[PasteController] 下载粘贴文件失败: $e');
-      showErrorSnackbar('下载粘贴文件失败', '传输失败，请检查连接和令牌');
+      showErrorSnackbar(
+        '下载粘贴文件失败',
+        _isTooLarge(e) ? _tooLargeDetail : '传输失败，请检查连接和令牌',
+      );
     } finally {
       _transfers.remove(token);
     }
@@ -347,6 +376,9 @@ class PasteController extends GetxController {
     final token = dio_pkg.CancelToken();
     _transfers.add(token);
     try {
+      if (imageData.length > PasteFileTransfer.defaultMaxPartBytes) {
+        throw const PasteTransferLimitException('Transfer exceeds size limit');
+      }
       final uri = WebSocketAddress.parse(
         serverAddress,
       ).uri(scheme: 'http', path: '/onPasteImage').toString();
@@ -374,7 +406,7 @@ class PasteController extends GetxController {
     } catch (e) {
       if (token.isCancelled) return;
       debugPrint('[PasteController] POST图片到服务器失败: $e');
-      showErrorSnackbar('发送图片失败', e.toString());
+      showErrorSnackbar('发送图片失败', _isTooLarge(e) ? '文件过大' : e.toString());
     } finally {
       _transfers.remove(token);
     }
@@ -431,7 +463,7 @@ class PasteController extends GetxController {
     } catch (e) {
       if (token.isCancelled) return;
       debugPrint('[PasteController] 下载粘贴图片失败: $e');
-      showErrorSnackbar('下载粘贴图片失败', e.toString());
+      showErrorSnackbar('下载粘贴图片失败', _isTooLarge(e) ? '文件过大' : e.toString());
     } finally {
       _transfers.remove(token);
     }
@@ -445,19 +477,28 @@ class PasteController extends GetxController {
     final wss = Get.isRegistered<WebSocketCardController>()
         ? Get.find<WebSocketCardController>()
         : null;
+    final message = WebSocketMessageBuilder.createSendPasteTextMessage(text);
+    if (utf8.encode(message.toJsonString()).length >
+        WebSocketServerController.maxMessageBytes) {
+      showErrorSnackbar(
+        '剪切板文本过大',
+        '超过 ${WebSocketServerController.maxMessageBytes ~/ (1024 * 1024)} MiB，未发送',
+      );
+      return;
+    }
     if (wsc != null && wsc.isConnected) {
-      if (wsc.sendMessage(
-        WebSocketMessageBuilder.createSendPasteTextMessage(text),
-      )) {
+      if (wsc.sendMessage(message)) {
         showSuccessSnackbar('已发送剪切板到WS服务器', null);
         return;
       }
     }
     if (wss != null && wss.clientCount == 1) {
-      wss.wsServerController?.broadcastMessage(
-        WebSocketMessageBuilder.createSendPasteTextMessage(text),
-      );
-      showInfoSnackbar('尝试发送剪切板到WS客户端', null);
+      final sent = wss.wsServerController?.broadcastMessage(message) ?? false;
+      if (sent) {
+        showInfoSnackbar('尝试发送剪切板到WS客户端', null);
+      } else {
+        showErrorSnackbar('发送剪切板到WS客户端失败', null);
+      }
     }
   }
 
