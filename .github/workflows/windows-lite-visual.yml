@@ -22,7 +22,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
-          $url = 'https://api.github.com/repos/preauthn1/listen1_xuan/actions/artifacts/15030497420/zip'
+          $url = 'https://api.github.com/repos/preauthn1/listen1_xuan/actions/artifacts/15125015255/zip'
           Invoke-WebRequest -Headers $headers -Uri $url -OutFile artifact.zip
           New-Item -ItemType Directory -Force app | Out-Null
           Expand-Archive -Path artifact.zip -DestinationPath app -Force
