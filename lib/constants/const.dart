@@ -39,13 +39,13 @@ extension PlatformSourceExt on PlatformSource {
   String? get shortDisplayName {
     switch (this) {
       case PlatformSource.bilibili:
-        return 'B站';
+        return 'B 站';
       case PlatformSource.qq:
         return 'QQ';
       case PlatformSource.kugou:
         return '酷狗';
       case PlatformSource.netease:
-        return '网易';
+        return '网易云';
       case PlatformSource.unknow:
         return null;
     }

@@ -192,7 +192,7 @@ class Github {
   static String getStatusText() {
     switch (status.value) {
       case 0:
-        return '未连接';
+        return '未登录';
       case 1:
         return '连接中';
       case 2:

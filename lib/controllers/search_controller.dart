@@ -76,6 +76,8 @@ class XSearchController extends GetxController {
     // 兼容历史设置中保存的旧显示名
     const legacyAliases = {
       '网易云': 'netease',
+      '网易': 'netease',
+      'B站': 'bilibili',
       'BiliBili': 'bilibili',
       'QQ': 'qq',
       '酷狗': 'kugou',

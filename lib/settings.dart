@@ -307,7 +307,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                   ),
                                   title: Text(
                                     isDesktop
-                                        ? '桌面端：热键、代理与窗口'
+                                        ? '桌面端：快捷键、代理与窗口'
                                         : isAndroid
                                         ? "安卓通知设置"
                                         : "未知平台设置",
@@ -426,6 +426,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                               Obx(
                                 () => SwitchListTile(
+                                  secondary: const Icon(Icons.graphic_eq),
                                   title: const Text('响度均衡'),
                                   subtitle: const Text(
                                     '会降低整体音量；哔哩哔哩按响度均衡，其他平台使用固定音量补偿',
@@ -465,6 +466,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                               Obx(
                                 () => SwitchListTile(
+                                  secondary: const Icon(Icons.volume_up_outlined),
                                   title: const Text('音量跟随系统'),
                                   value: Get.find<SettingsController>()
                                       .volumnFollowSystem,
@@ -492,14 +494,15 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                               Obx(
                                 () => SwitchListTile(
-                                  title: const Text('下一首播放模式'),
+                                  secondary: const Icon(Icons.queue_play_next),
+                                  title: const Text('「下一首播放」按添加顺序排队'),
                                   subtitle: Obx(
                                     () => setSubTitleTextAniSwi(
                                       Text(
                                         Get.find<SettingsController>()
                                                 .nextTrackQueueOrStackMethod
-                                            ? '队列：先添加的曲目将先播放'
-                                            : '栈：后添加的曲目将先播放',
+                                            ? '开启：先添加的歌曲先播放'
+                                            : '关闭：最后添加的歌曲最先播放',
                                         key: ValueKey<bool>(
                                           Get.find<SettingsController>()
                                               .nextTrackQueueOrStackMethod,
@@ -518,7 +521,8 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                               Obx(
                                 () => SwitchListTile(
-                                  title: const Text('在“循环播放”模式下列表播放完成时停止播放'),
+                                  secondary: const Icon(Icons.stop_circle_outlined),
+                                  title: const Text('列表循环播完一遍后停止'),
 
                                   value: Get.find<SettingsController>()
                                       .stopOnPlayListEnd,

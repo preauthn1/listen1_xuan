@@ -77,7 +77,7 @@ class Netease extends BaseProvider {
   );
 
   @override
-  String get shortDisplayName => "网易";
+  String get shortDisplayName => "网易云";
   @override
   String get name => "netease";
   @override

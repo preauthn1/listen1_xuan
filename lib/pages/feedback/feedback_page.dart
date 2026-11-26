@@ -725,7 +725,7 @@ class _IssueEditorState extends State<_IssueEditor> {
                 DropdownButtonFormField<String>(
                   initialValue: status,
                   items: const [
-                    DropdownMenuItem(value: 'open', child: Text('开启')),
+                    DropdownMenuItem(value: 'open', child: Text('待处理')),
                     DropdownMenuItem(value: 'declined', child: Text('不予处理')),
                     DropdownMenuItem(value: 'completed', child: Text('已完成')),
                   ],
