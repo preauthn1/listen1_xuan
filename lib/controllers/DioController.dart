@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:logger/logger.dart';
 import 'package:listen1_xuan/services/app_logger.dart';
+import 'package:listen1_xuan/services/network_logging.dart';
 import 'package:native_dio_adapter/native_dio_adapter.dart';
 import 'package:path_provider/path_provider.dart';
 import '../global_settings_animations.dart';
@@ -64,6 +65,13 @@ class DioController extends GetxController {
   final dioWithCookieManager = Dio();
   final dioWithProxyAdapter = Dio();
 
+  /// 当前 CookieManager 使用的 Cookie 存储；需要单独写入某个 Cookie
+  /// （不清掉同站其它 Cookie）时用它，例如 B 站匿名 buvid。
+  PersistCookieJar? cookieJar;
+
+  /// B 站返回风控（412 / -352）时调用，用来换一组 buvid。由 Bilibili 提供者注册。
+  static Future<void> Function()? onBilibiliRiskControl;
+
   Future<void> loadConfig() async {
     _applyDefaultHeaders();
     await reloadCookie();
@@ -74,6 +82,12 @@ class DioController extends GetxController {
     dioWithCookieManager.options.headers['user-agent'] =
         kGlobalDefaultUserAgent;
     dioWithProxyAdapter.options.headers['user-agent'] = kGlobalDefaultUserAgent;
+    // 之前没有任何默认超时：网络卡住时请求会一直挂着，界面一直转圈。
+    applyNetworkTimeouts(dioWithCookieManager);
+    applyNetworkTimeouts(dioWithProxyAdapter);
+    if (!dioWithProxyAdapter.interceptors.any((i) => i is NetworkLogInterceptor)) {
+      dioWithProxyAdapter.interceptors.add(NetworkLogInterceptor());
+    }
   }
 
   void loadProxy() {
@@ -112,18 +126,22 @@ class DioController extends GetxController {
   }
 
   Future<void> reloadCookie() async {
-    dioWithCookieManager.interceptors.clear();
-    dioWithCookieManager.interceptors.add(
-      CookieManager(
-        PersistCookieJar(
-          ignoreExpires: true,
-          storage: FileStorage(
-            cookiePath(await getApplicationDocumentsDirectory()),
-          ),
-        ),
-        ignoreInvalidCookies: true,
+    final jar = PersistCookieJar(
+      ignoreExpires: true,
+      storage: FileStorage(
+        cookiePath(await getApplicationDocumentsDirectory()),
       ),
     );
+    cookieJar = jar;
+    dioWithCookieManager.interceptors.clear();
+    dioWithCookieManager.interceptors.addAll([
+      CookieManager(jar, ignoreInvalidCookies: true),
+      NetworkLogInterceptor(),
+      BilibiliRiskRetryInterceptor(
+        dioWithCookieManager,
+        onRiskControl: () async => onBilibiliRiskControl?.call(),
+      ),
+    ]);
   }
 
   Future<void> test() async {
