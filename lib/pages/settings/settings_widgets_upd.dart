@@ -8,7 +8,7 @@ Widget updSettingsTile(BuildContext context) {
       ...[
         ElevatedButton(
           onPressed: updController.downloadArtifact,
-          child: const Text('下载最新测试版'),
+          child: const Text('下载最新开发版'),
         ),
         ElevatedButton(
           onPressed: () {
@@ -21,7 +21,7 @@ Widget updSettingsTile(BuildContext context) {
         if (!kDebugMode && (isAndroid || isWindows || isMacOS))
           ElevatedButton(
             onPressed: updController.switchFfmpegVariant,
-            child: Text(isFfmpegEnabled ? '切换到无 FFmpeg 版' : '切换到有 FFmpeg 版'),
+            child: Text(isFfmpegEnabled ? '切换到不含 FFmpeg 版' : '切换到含 FFmpeg 版'),
           ),
         ElevatedButton(
           onPressed: () => Get.toNamed(RouteName.settingsChangelogPage, id: 1),
