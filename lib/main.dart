@@ -45,6 +45,7 @@ import 'pages/feedback/feedback_routes.dart';
 import 'pages/feedback/feedback_route_observer.dart';
 import 'pages/startup_page.dart';
 import 'services/startup_tips_service.dart';
+import 'services/app_log_file.dart';
 import 'pages/settings/settings_supabase_login_page.dart';
 import 'pages/settings/settings_supabase_password_login_page.dart';
 import 'pages/settings/cache_naming_page.dart';
@@ -283,9 +284,26 @@ Future<void> _initializeAppForHome(SettingsController settingsController) async 
   initDeepLinks();
 }
 
-void main() async {
+void main() {
+  // 所有 print / 未捕获的异步异常都经过这个 Zone，写入 logs/app.log。
+  runZonedGuarded(
+    _main,
+    (error, stack) => AppLogFile.instance.write('FATAL', '未捕获异常: $error\n$stack'),
+    zoneSpecification: ZoneSpecification(
+      print: (self, parent, zone, line) {
+        AppLogFile.instance.write('PRINT', line);
+        parent.print(zone, line);
+      },
+    ),
+  );
+}
+
+Future<void> _main() async {
   // Supabase 的初始化被移到了读取设置之后，见下方 settingsController.init()
   await WidgetsFlutterBinding.ensureInitialized(); // 确保 Flutter框架已初始化
+  await AppLogFile.instance.init();
+  _installErrorLogging();
+  AppLogFile.instance.write('I', '启动 ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       systemNavigationBarColor: Colors.transparent, // 设置导航栏背景色为透明
@@ -330,6 +348,7 @@ void main() async {
   }
   runApp(MyApp());
   if (!isHeadlessEngine) {
+    unawaited(UiHangWatchdog.start());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_initializeOptionalServices());
       unawaited(startupTipsService.refreshIfDue(dioWithProxyAdapter));
@@ -337,6 +356,28 @@ void main() async {
   } else {
     unawaited(_initializeOptionalServices());
   }
+}
+
+/// 把 Flutter 框架错误、平台异常和 debugPrint 都写入日志文件。
+void _installErrorLogging() {
+  final previousOnError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    AppLogFile.instance.write(
+      'E',
+      'Flutter 错误: ${details.exceptionAsString()}\n${details.stack ?? ''}',
+    );
+    previousOnError?.call(details);
+  };
+  final previousPlatformError = PlatformDispatcher.instance.onError;
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLogFile.instance.write('FATAL', '平台异常: $error\n$stack');
+    return previousPlatformError?.call(error, stack) ?? false;
+  };
+  final previousDebugPrint = debugPrint;
+  debugPrint = (String? message, {int? wrapWidth}) {
+    if (message != null) AppLogFile.instance.write('DEBUG', message);
+    previousDebugPrint(message, wrapWidth: wrapWidth);
+  };
 }
 
 /// 修复「系统先无界面拉起引擎、Activity 之后才挂上」时安卓返回手势失效的问题，

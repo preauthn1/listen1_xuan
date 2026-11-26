@@ -29,6 +29,8 @@ import 'package:listen1_xuan/models/bootStrapTrackRes.dart';
 import 'package:listen1_xuan/settings.dart';
 
 import 'base.dart';
+import '../constants/network_defaults.dart';
+import '../services/network_logging.dart';
 import '../models/audio_metadata.dart';
 
 enum BLPlaylistType {
@@ -116,6 +118,63 @@ class Bilibili extends BaseProvider {
       '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" class="zhuzhan-icon"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.73252 2.67094C3.33229 2.28484 3.33229 1.64373 3.73252 1.25764C4.11291 0.890684 4.71552 0.890684 5.09591 1.25764L7.21723 3.30403C7.27749 3.36218 7.32869 3.4261 7.37081 3.49407H10.5789C10.6211 3.4261 10.6723 3.36218 10.7325 3.30403L12.8538 1.25764C13.2342 0.890684 13.8368 0.890684 14.2172 1.25764C14.6175 1.64373 14.6175 2.28484 14.2172 2.67094L13.364 3.49407H14C16.2091 3.49407 18 5.28493 18 7.49407V12.9996C18 15.2087 16.2091 16.9996 14 16.9996H4C1.79086 16.9996 0 15.2087 0 12.9996V7.49406C0 5.28492 1.79086 3.49407 4 3.49407H4.58579L3.73252 2.67094ZM4 5.42343C2.89543 5.42343 2 6.31886 2 7.42343V13.0702C2 14.1748 2.89543 15.0702 4 15.0702H14C15.1046 15.0702 16 14.1748 16 13.0702V7.42343C16 6.31886 15.1046 5.42343 14 5.42343H4ZM5 9.31747C5 8.76519 5.44772 8.31747 6 8.31747C6.55228 8.31747 7 8.76519 7 9.31747V10.2115C7 10.7638 6.55228 11.2115 6 11.2115C5.44772 11.2115 5 10.7638 5 10.2115V9.31747ZM12 8.31747C11.4477 8.31747 11 8.76519 11 9.31747V10.2115C11 10.7638 11.4477 11.2115 12 11.2115C12.5523 11.2115 13 10.7638 13 10.2115V9.31747C13 8.76519 12.5523 8.31747 12 8.31747Z" fill="#FB7299"></path></svg>';
 
   static Map<String, String>? _wbiKey;
+
+  // #region 匿名 buvid
+  //
+  // 没有 buvid3/buvid4 的请求会被 B 站随机拦截（HTTP 412 或业务码 -352），
+  // 搜索接口尤其明显（实测匿名 15 次失败 9 次，带上 buvid 和 Referer 后 25 次全部成功）。
+  // 网页端从 /x/frontend/finger/spi 领取这两个值，这里做同样的事。
+
+  static Future<void>? _buvidTask;
+  static DateTime? _buvidAt;
+
+  static Future<void> ensureBuvid({bool force = false}) {
+    final fresh = _buvidAt != null &&
+        DateTime.now().difference(_buvidAt!) < const Duration(seconds: 20);
+    if (force && fresh) return _buvidTask ?? Future.value();
+    if (!force && _buvidTask != null) return _buvidTask!;
+    return _buvidTask = _fetchBuvid(force: force).catchError((Object e) {
+      _buvidTask = null;
+      logger.w('获取 B 站 buvid 失败', error: e);
+    });
+  }
+
+  static Future<void> _fetchBuvid({required bool force}) async {
+    final jar = Get.find<DioController>().cookieJar;
+    if (jar == null) return;
+    final site = Uri.parse('https://www.bilibili.com/');
+    if (!force) {
+      final existing = await jar.loadForRequest(site);
+      if (existing.any((c) => c.name == 'buvid3' && c.value.isNotEmpty)) {
+        _buvidAt = DateTime.now();
+        return;
+      }
+    }
+    // 用不带拦截器的 Dio，避免被风控重试逻辑递归调用。
+    final response = await Dio(
+      BaseOptions(
+        connectTimeout: kConnectTimeout,
+        receiveTimeout: kReceiveTimeout,
+        headers: {'user-agent': kGlobalDefaultUserAgent},
+      ),
+    ).get('https://api.bilibili.com/x/frontend/finger/spi');
+    final data = response.data is Map ? response.data['data'] : null;
+    final b3 = data is Map ? data['b_3'] as String? : null;
+    final b4 = data is Map ? data['b_4'] as String? : null;
+    if (b3 == null || b3.isEmpty) throw const FormatException('buvid 为空');
+    Cookie make(String name, String value) => Cookie(name, value)
+      ..domain = '.bilibili.com'
+      ..path = '/'
+      ..expires = DateTime.now().add(const Duration(days: 365));
+    await jar.saveFromResponse(site, [
+      make('buvid3', b3),
+      if (b4 != null && b4.isNotEmpty) make('buvid4', b4),
+    ]);
+    _buvidAt = DateTime.now();
+    logger.i('已${force ? '更换' : '获取'} B 站 buvid');
+  }
+
+  // #endregion
 
   // #region WBI 签名
 
@@ -706,8 +765,24 @@ class Bilibili extends BaseProvider {
   ) async {
     final targetUrl =
         'https://api.bilibili.com/x/web-interface/search/type?__refresh__=true&_extra=&context=&page=$curpage&page_size=42&platform=pc&highlight=1&single_column=0&keyword=${Uri.encodeComponent(keywords)}&category_id=&search_type=video&dynamic_offset=0&preload=true&com2co=true';
-    final response = await dioWithCookieManager.get(targetUrl);
-    return response.data['data'] as Map<String, dynamic>;
+    await ensureBuvid();
+    final response = await dioWithCookieManager.get(
+      targetUrl,
+      options: Options(
+        headers: {
+          'referer': 'https://search.bilibili.com/',
+          'origin': 'https://search.bilibili.com',
+        },
+      ),
+    );
+    final body = response.data;
+    if (body is! Map || body['data'] is! Map) {
+      final code = body is Map ? body['code'] : null;
+      throw FormatException(
+        code == -352 || code == -412 ? '请求被 B 站风控拦截，请稍后再试' : '搜索返回了无效数据（$code）',
+      );
+    }
+    return Map<String, dynamic>.from(body['data'] as Map);
   }
 
   @override
@@ -721,7 +796,7 @@ class Bilibili extends BaseProvider {
       return SearchRes(result: tracks, total: data['numResults'] as int? ?? 0);
     } catch (e) {
       logger.e('Bilibili 搜索失败', error: e);
-      return SearchRes.error('Bilibili 搜索失败: $e');
+      return SearchRes.error('B 站搜索失败：${describeNetworkError(e)}');
     }
   }
 
@@ -746,7 +821,7 @@ class Bilibili extends BaseProvider {
       );
     } catch (e) {
       logger.e('Bilibili 搜索失败', error: e);
-      return SearchPlayListRes.error('Bilibili 搜索失败: $e');
+      return SearchPlayListRes.error('B 站搜索失败：${describeNetworkError(e)}');
     }
   }
 

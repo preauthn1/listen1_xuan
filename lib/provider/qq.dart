@@ -1,3 +1,4 @@
+import 'package:listen1_xuan/services/network_logging.dart';
 import 'dart:convert';
 import 'dart:math';
 
@@ -555,7 +556,7 @@ class QQ extends BaseProvider {
       );
     } catch (e) {
       logger.e('QQ音乐搜索失败', error: e);
-      return SearchRes.error('QQ音乐搜索失败: $e');
+      return SearchRes.error('QQ 音乐搜索失败：${describeNetworkError(e)}');
     }
   }
 
@@ -581,7 +582,7 @@ class QQ extends BaseProvider {
       );
     } catch (e) {
       logger.e('QQ音乐搜索失败', error: e);
-      return SearchPlayListRes.error('QQ音乐搜索失败: $e');
+      return SearchPlayListRes.error('QQ 音乐搜索失败：${describeNetworkError(e)}');
     }
   }
 
