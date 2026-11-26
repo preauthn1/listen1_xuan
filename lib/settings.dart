@@ -417,7 +417,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 title: const Text('均衡器设置'),
                                 trailing: Icon(Icons.chevron_right),
                                 onTap: () =>
-                                    Get.toNamed(RouteName.equalizerPage, id: 1),
+                                    openInnerPage(RouteName.equalizerPage),
                               ),
                               ListTile(
                                 leading: Icon(Icons.audiotrack),
@@ -732,7 +732,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         title: const Text('在线反馈'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () =>
-                            Get.toNamed(RouteName.onlineFeedbackPage, id: 1),
+                            openInnerPage(RouteName.onlineFeedbackPage),
                       ),
                       if (Get.isRegistered<FeedbackPushController>() && Get.find<FeedbackPushController>().supported)
                         GetBuilder<FeedbackPushController>(
@@ -752,7 +752,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         title: const Text('使用技巧'),
                         trailing: Icon(Icons.chevron_right),
                         onTap: () {
-                          Get.toNamed(RouteName.settingsTipsPage, id: 1);
+                          openInnerPage(RouteName.settingsTipsPage);
                         },
                       ),
                       ListTile(
@@ -760,7 +760,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         title: const Text('说明文档'),
                         trailing: Icon(Icons.chevron_right),
                         onTap: () {
-                          Get.toNamed(RouteName.settingsReadmePage, id: 1);
+                          openInnerPage(RouteName.settingsReadmePage);
                         },
                       ),
                       ],

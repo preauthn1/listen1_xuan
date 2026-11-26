@@ -24,7 +24,7 @@ Widget updSettingsTile(BuildContext context) {
             child: Text(isFfmpegEnabled ? '切换到不含 FFmpeg 版' : '切换到含 FFmpeg 版'),
           ),
         ElevatedButton(
-          onPressed: () => Get.toNamed(RouteName.settingsChangelogPage, id: 1),
+          onPressed: () => openInnerPage(RouteName.settingsChangelogPage),
           child: const Text('查看更新日志'),
         ),
         if (isAndroid)

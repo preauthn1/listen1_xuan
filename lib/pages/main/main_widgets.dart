@@ -308,7 +308,7 @@ Widget get _leftBar => Scaffold(
             tooltip: "设置",
             icon: const FeedbackUnreadBadge(child: Icon(Icons.settings)),
             onPressed: () {
-              Get.toNamed(RouteName.settingsPage, id: 1);
+              openInnerPage(RouteName.settingsPage);
             },
           ),
         ],
@@ -527,7 +527,7 @@ Listener _mainContent() => Listener(
                                 tooltip: "设置",
                                 icon: const FeedbackUnreadBadge(child: Icon(Icons.settings)),
                                 onPressed: () {
-                                  Get.toNamed(RouteName.settingsPage, id: 1);
+                                  openInnerPage(RouteName.settingsPage);
                                 },
                               ),
                             ],

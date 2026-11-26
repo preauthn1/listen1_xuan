@@ -185,7 +185,7 @@ void _showSponsorDialog(BuildContext context) {
         TextButton.icon(
           onPressed: () {
             Get.back();
-            Get.toNamed(RouteName.settingsReadmePage, id: 1);
+            openInnerPage(RouteName.settingsReadmePage);
           },
           icon: Icon(Icons.book),
           label: Text('查看 README'),
