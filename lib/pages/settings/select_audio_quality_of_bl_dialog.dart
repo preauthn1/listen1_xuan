@@ -61,8 +61,8 @@ class DefaultQualitySettingsSheet {
           delegate: SliverChildListDelegate([
             ListTile(
               leading: const Icon(Icons.tv),
-              title: const Text('B站'),
-              subtitle: const Text('选择B站默认音频质量'),
+              title: const Text('B 站'),
+              subtitle: const Text('选择 B 站默认音频质量'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => ctrl.pageIndex = 1,
             ),
@@ -87,7 +87,7 @@ class DefaultQualitySettingsSheet {
         SliverToBoxAdapter(
           child: _buildHeader(
             context,
-            title: '选择B站默认音频质量',
+            title: '选择 B 站默认音频质量',
             showBack: showBack,
             onBack: () => ctrl.pageIndex = 0,
             onClose: () => Get.back(),

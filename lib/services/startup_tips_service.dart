@@ -46,7 +46,9 @@ class StartupTipsService {
       if (!trimmed.startsWith('- ')) {
         throw const FormatException('技巧文件包含无效行');
       }
-      final tip = trimmed.substring(2).trim();
+      // 远端文件来自上游仓库，会带 Markdown 反引号（`W`/`↑`）；
+      // 这里只显示纯文本，去掉反引号。
+      final tip = trimmed.substring(2).replaceAll('`', '').trim();
       if (tip.isEmpty || tip.contains(RegExp(r'[\x00-\x1f]'))) {
         throw const FormatException('技巧内容无效');
       }

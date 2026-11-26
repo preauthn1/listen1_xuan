@@ -302,7 +302,7 @@ List<Widget> create_hotkey_btns(context) {
     {"name": "播放/暂停", "hotkey": "play_pause"},
     {"name": "下一首", "hotkey": "next"},
     {"name": "上一首", "hotkey": "previous"},
-    {"name": "显示", "hotkey": "show"},
+    {"name": "显示窗口", "hotkey": "show"},
     {"name": "复制一次性验证码", "hotkey": "copy_totp"},
   ];
   return <Widget>[
@@ -310,7 +310,7 @@ List<Widget> create_hotkey_btns(context) {
       builder: (BuildContext context, StateSetter setState) {
         enable_hotkey_setstate = setState;
         return SwitchListTile(
-          title: const Text('启用热键'),
+          title: const Text('启用快捷键'),
           value: enable_hotkey,
           onChanged: (bool value) async {
             enable_hotkey = value;
@@ -359,7 +359,7 @@ List<Widget> create_hotkey_btns(context) {
                     onPressed: () async {
                       if (hotkey == null) {
                         // _msg('请设置热键', 1.0);
-                        showWarningSnackbar('请设置热键', null);
+                        showWarningSnackbar('请先按下要设置的快捷键', null);
                         return;
                       }
                       hotkeys[_hotkey['hotkey']] = hotkey!.toJson();
