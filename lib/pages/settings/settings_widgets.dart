@@ -204,6 +204,7 @@ Widget _buildSupabasePanel() {
       return Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               '使用 Supabase 账号可以同步您的数据',
@@ -434,14 +435,14 @@ Widget _buildThirdPartyLoginPanel(BuildContext context) {
                           child: LinearProgressIndicator(),
                         );
                       case LoginStatus.loggedIn:
-                        return Text(provider.currentUser.value?.name ?? '已连接');
+                        return Text(provider.currentUser.value?.name ?? '已登录');
                       case LoginStatus.failed:
                         return Tooltip(
                           message: provider.loginError.value,
                           child: const Text('登录状态获取失败'),
                         );
                       case LoginStatus.noLogin:
-                        return const Text('未连接');
+                        return const Text('未登录');
                     }
                   }),
                   label: provider.loginActionText,
