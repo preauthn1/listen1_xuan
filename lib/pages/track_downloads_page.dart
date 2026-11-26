@@ -231,12 +231,12 @@ class TrackDownloadMenuTile extends StatelessWidget {
         title: Text(task != null ? '下载中…' : done ? '重新下载' : '下载'),
         subtitle: Text(done && task == null ? '已保存到 ${c.locationHint}' : c.includeLyricRx ? '歌曲和歌词' : '仅歌曲'),
         onTap: task != null
-            ? () => Get.toNamed(RouteName.trackDownloadsPage, id: 1)
+            ? () => openInnerPage(RouteName.trackDownloadsPage)
             : () async {
                 Navigator.of(context).pop();
                 final n = await c.enqueue([track]);
                 if (n > 0) {
-                  showInfoSnackbar('已加入下载', track.title, onTap: () => Get.toNamed(RouteName.trackDownloadsPage, id: 1));
+                  showInfoSnackbar('已加入下载', track.title, onTap: () => openInnerPage(RouteName.trackDownloadsPage));
                 }
               },
       );

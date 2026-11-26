@@ -217,7 +217,7 @@ Widget _buildSupabasePanel() {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      Get.toNamed(RouteName.supabasePasswordLoginPage, id: 1);
+                      openInnerPage(RouteName.supabasePasswordLoginPage);
                     },
                     icon: Icon(Icons.email),
                     label: Text('邮箱登录'),
@@ -228,7 +228,7 @@ Widget _buildSupabasePanel() {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      Get.toNamed(RouteName.supabaseLoginPage, id: 1);
+                      openInnerPage(RouteName.supabaseLoginPage);
                     },
                     icon: Icon(Icons.verified_user),
                     label: Text('验证码登录'),
@@ -654,7 +654,7 @@ List<Widget> get cacheSettingsTiles {
       title: const Text('下载管理'),
       subtitle: Text('下载到本地的歌曲和歌词 · ${Get.find<TrackDownloadController>().locationHint}'),
       trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () => Get.toNamed(RouteName.trackDownloadsPage, id: 1),
+      onTap: () => openInnerPage(RouteName.trackDownloadsPage),
     ),
     Obx(() {
       WebSocketClientController wscc = Get.find<WebSocketClientController>();
@@ -662,7 +662,7 @@ List<Widget> get cacheSettingsTiles {
         onPressed: !wscc.isConnected
             ? null
             : () {
-                Get.toNamed(RouteName.downloadPage, id: 1);
+                openInnerPage(RouteName.downloadPage);
               },
         child: Text('从 WebSocket 服务器获取缓存文件'),
       );
@@ -745,7 +745,7 @@ List<Widget> get cacheSettingsTiles {
         );
       }),
       trailing: Icon(Icons.chevron_right),
-      onTap: () => Get.toNamed(RouteName.cacheNamingPage, id: 1),
+      onTap: () => openInnerPage(RouteName.cacheNamingPage),
     ),
     const _CacheDirectoryTile(),
   ]);

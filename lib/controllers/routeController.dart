@@ -87,6 +87,25 @@ class ListenPopMiddleware extends GetMiddleware {
 }
 
 int last_pop_time = 0;
+/// 打开一个内层页面；它已经在最上层时什么都不做。
+///
+/// 连点「设置」等按钮时，每次 toNamed 都会新建同名路由并移除旧的一个
+/// （见 [addAndCleanReapeatRoute]），页面反复重新播放 500 ms 的进场动画，看起来就在闪。
+/// 进场动画还没结束时的重复点击也一并忽略。
+Future<T?>? openInnerPage<T>(String name, {dynamic arguments}) {
+  if (top_routeWithName.isNotEmpty && top_routeWithName.last.name == name) {
+    return null;
+  }
+  final now = DateTime.now().millisecondsSinceEpoch;
+  if (_lastInnerPageName == name && now - _lastInnerPageAt < 600) return null;
+  _lastInnerPageName = name;
+  _lastInnerPageAt = now;
+  return Get.toNamed<T>(name, id: 1, arguments: arguments);
+}
+
+String? _lastInnerPageName;
+int _lastInnerPageAt = 0;
+
 void routerPop() {
   debugPrint("didPop: didPop,");
   if (Get.find<PlayController>().tryCollapseSheet()) return;
