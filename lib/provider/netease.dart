@@ -1,3 +1,4 @@
+import 'package:listen1_xuan/services/network_logging.dart';
 import 'package:get/get.dart' hide FormData;
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
@@ -849,8 +850,8 @@ class Netease extends BaseProvider {
       throw Exception('不支持的搜索类型: $type');
     } catch (e) {
       return type == SearchType.song
-          ? SearchRes.error('搜索时发生错误: $e')
-          : SearchPlayListRes.error('搜索时发生错误: $e');
+          ? SearchRes.error('网易云搜索失败：${describeNetworkError(e)}')
+          : SearchPlayListRes.error('网易云搜索失败：${describeNetworkError(e)}');
     }
   }
 
