@@ -43,7 +43,7 @@ class FeedbackIssue {
   final String id, creatorId, title, description, status;
   final bool locked;
   final DateTime createdAt, lastMessageAt;
-  String get statusLabel => const {'open': '开启', 'declined': '不予处理', 'completed': '已完成'}[status] ?? status;
+  String get statusLabel => const {'open': '待处理', 'declined': '不予处理', 'completed': '已完成'}[status] ?? status;
 }
 
 class FeedbackMessage {

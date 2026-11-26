@@ -617,7 +617,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                 controller.isSearching.value &&
                         controller.searchQuery.value.isNotEmpty
                     ? '没有找到匹配的歌曲'
-                    : '播放列表为空',
+                    : '播放队列为空',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Theme.of(
                     context,
