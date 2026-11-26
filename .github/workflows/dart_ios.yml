@@ -13,6 +13,8 @@ permissions:
 jobs:
   build:
     runs-on: macos-latest
+    # 卡住（如 pub get 挂起）时尽快失败，避免默认 6 小时占用 runner。
+    timeout-minutes: 45
     steps:
       - name: Output Commit Information
         env:
@@ -41,7 +43,19 @@ jobs:
       - run: flutter --version
       - name: Exclude Firebase SDKs from this platform
         run: python3 scripts/configure_build.py firebase stub
-      - run: flutter pub get
+      - name: flutter pub get (bounded, retried)
+        shell: bash
+        run: |
+          # macOS 镜像不一定自带 GNU timeout，退回 gtimeout 或 perl alarm。
+          if command -v timeout >/dev/null; then T="timeout 600"
+          elif command -v gtimeout >/dev/null; then T="gtimeout 600"
+          else T="perl -e 'alarm 600; exec @ARGV' --"; fi
+          for i in 1 2 3; do
+            eval "$T flutter pub get" && exit 0
+            echo "::warning::flutter pub get attempt $i failed or timed out"
+            sleep 15
+          done
+          exit 1
       - name: Verify Firebase is replaced by Dart-only stubs
         run: python3 scripts/verify_firebase_dependencies.py stub
 
@@ -50,7 +64,19 @@ jobs:
       - name: Switch to FFmpeg-enabled config
         run: bash scripts/build.sh with
 
-      - run: flutter pub get
+      - name: flutter pub get (bounded, retried)
+        shell: bash
+        run: |
+          # macOS 镜像不一定自带 GNU timeout，退回 gtimeout 或 perl alarm。
+          if command -v timeout >/dev/null; then T="timeout 600"
+          elif command -v gtimeout >/dev/null; then T="gtimeout 600"
+          else T="perl -e 'alarm 600; exec @ARGV' --"; fi
+          for i in 1 2 3; do
+            eval "$T flutter pub get" && exit 0
+            echo "::warning::flutter pub get attempt $i failed or timed out"
+            sleep 15
+          done
+          exit 1
       - name: Verify Firebase is replaced by Dart-only stubs
         run: python3 scripts/verify_firebase_dependencies.py stub
 
@@ -88,7 +114,19 @@ jobs:
         run: bash scripts/build.sh without
 
       - run: flutter clean
-      - run: flutter pub get
+      - name: flutter pub get (bounded, retried)
+        shell: bash
+        run: |
+          # macOS 镜像不一定自带 GNU timeout，退回 gtimeout 或 perl alarm。
+          if command -v timeout >/dev/null; then T="timeout 600"
+          elif command -v gtimeout >/dev/null; then T="gtimeout 600"
+          else T="perl -e 'alarm 600; exec @ARGV' --"; fi
+          for i in 1 2 3; do
+            eval "$T flutter pub get" && exit 0
+            echo "::warning::flutter pub get attempt $i failed or timed out"
+            sleep 15
+          done
+          exit 1
       - name: Verify Firebase is replaced by Dart-only stubs
         run: python3 scripts/verify_firebase_dependencies.py stub
 
