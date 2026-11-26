@@ -43,6 +43,8 @@ class Provider extends GetxService {
       Get.put<QQ>(QQ()),
       Get.put<Kugou>(Kugou()),
     ]);
+    // B 站返回风控（412 / -352）时先换一组匿名 buvid，再由拦截器重试。
+    DioController.onBilibiliRiskControl = () => Bilibili.ensureBuvid(force: true);
   }
 
   Bilibili get bilibili =>

@@ -1,3 +1,4 @@
+import 'package:listen1_xuan/services/network_logging.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -419,7 +420,7 @@ class Kugou extends BaseProvider {
       return SearchRes(result: tracks, total: data['data']['total'] as int);
     } catch (e) {
       logger.e('酷狗搜索失败', error: e);
-      return SearchRes.error('酷狗搜索失败: $e');
+      return SearchRes.error('酷狗搜索失败：${describeNetworkError(e)}');
     }
   }
 
@@ -456,7 +457,7 @@ class Kugou extends BaseProvider {
       );
     } catch (e) {
       logger.e('酷狗搜索失败', error: e);
-      return SearchPlayListRes.error('酷狗搜索失败: $e');
+      return SearchPlayListRes.error('酷狗搜索失败：${describeNetworkError(e)}');
     }
   }
 
