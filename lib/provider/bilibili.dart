@@ -61,7 +61,7 @@ class Bilibili extends BaseProvider {
   String get name => 'bilibili';
 
   @override
-  String get shortDisplayName => 'B站';
+  String get shortDisplayName => 'B 站';
 
   @override
   bool get searchable => true;
@@ -1374,7 +1374,7 @@ class _BilibiliLoginFormState extends State<_BilibiliLoginForm> {
               onPressed: () => g_launchURL(
                 Uri.parse('https://mashir0-bilibili-qr-login.hf.space/'),
               ),
-              child: const Text('点击打开B站cookie获取页面'),
+              child: const Text('点击打开 B 站 Cookie 获取页面'),
             ),
             TextField(
               controller: _controller,
