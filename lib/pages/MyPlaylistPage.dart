@@ -341,7 +341,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
     try {
       final user = await provider.getUser();
       if (user == null) {
-        throw const _SectionLoadError('未登录，可在设置中登录');
+        throw const _SectionLoadError('未登录', needsLogin: true);
       }
       final playlists = await _fetchUserPlaylists(provider, type, user.userId);
 
@@ -351,6 +351,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
         section.loaded = true;
         section.loading = false;
         section.error = null;
+        section.errorNeedsLogin = false;
       });
     } catch (e) {
       logger.e('${_sectionTitleOf(provider, type)}加载失败', error: e);
@@ -358,6 +359,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
       setState(() {
         section.loading = false;
         section.error = e is _SectionLoadError ? e.message : '加载失败，请稍后重试';
+        section.errorNeedsLogin = e is _SectionLoadError && e.needsLogin;
       });
     }
   }
@@ -381,7 +383,11 @@ class _MyPlaylistState extends State<MyPlaylist> {
         : provider.userFavoritePlaylistSectionLeading;
   }
 
-  Widget _buildSectionError(String error, VoidCallback? onRetry) {
+  Widget _buildSectionError(
+    String error,
+    VoidCallback? onRetry, {
+    bool needsLogin = false,
+  }) {
     final theme = Theme.of(context);
     // 与分组标题文字左缘对齐（12 + 24 图标 + 12 间距），不再居中打断列表节奏。
     return Padding(
@@ -399,10 +405,13 @@ class _MyPlaylistState extends State<MyPlaylist> {
               ),
             ),
           ),
-          // 窄侧栏会隐藏分组标题的刷新按钮，这里保留一个就地重试入口。
-          if (onRetry != null)
+          // 窄侧栏会隐藏分组标题的刷新按钮，这里保留一个就地入口：
+          // 未登录时去设置页登录（重试不能解决），其它错误就地重试。
+          if (needsLogin || onRetry != null)
             TextButton(
-              onPressed: onRetry,
+              onPressed: needsLogin
+                  ? () => Get.toNamed(RouteName.settingsPage, id: 1)
+                  : onRetry,
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -410,7 +419,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
                 minimumSize: Size.zero,
                 textStyle: theme.textTheme.bodySmall,
               ),
-              child: const Text('重试'),
+              child: Text(needsLogin ? '去登录' : '重试'),
             ),
         ],
       ),
@@ -460,6 +469,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
       return _buildSectionError(
         section.error!,
         () => _refreshProviderPlaylists(provider, type),
+        needsLogin: section.errorNeedsLogin,
       );
     }
     return Column(
@@ -810,8 +820,9 @@ class _MyPlaylistState extends State<MyPlaylist> {
 }
 
 class _SectionLoadError implements Exception {
-  const _SectionLoadError(this.message);
+  const _SectionLoadError(this.message, {this.needsLogin = false});
   final String message;
+  final bool needsLogin;
   @override
   String toString() => message;
 }
@@ -821,6 +832,7 @@ class _ProviderPlaylistSection {
   bool loaded = false;
   bool loading = false;
   String? error;
+  bool errorNeedsLogin = false;
   List<PlayList> playlists = [];
 }
 
