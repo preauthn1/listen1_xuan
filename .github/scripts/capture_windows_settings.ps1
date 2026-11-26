@@ -56,6 +56,8 @@ Step supabase { Settings; Click 610 61 3; Snap '11-supabase'; Click 610 61 2 }
 $rows=@(@('12-thirdparty',117),@('13-playlist-config',174),@('14-cache',231),@('15-desktop',289),@('16-update',353),@('17-appearance',418),@('18-playback',475),@('19-misc',532))
 foreach($r in $rows){ Step $r[0] { Settings; Wheel 600 300 -60; Click 500 $r[1] 2; Snap ($r[0]+'-a'); Wheel 600 300 4; Snap ($r[0]+'-b'); Wheel 600 300 -60; Click 500 $r[1] 2 } }
 Step bottom { Settings; Wheel 600 400 60; Snap '20-settings-bottom' }
+# 直接从未滚动的设置页展开「播放设置」（行中心 y≈475），再滚 3 格看开关列表。
+Step playback2 { Settings; Wheel 600 300 -60; Click 500 475 3; Snap '21-playback-open'; Wheel 600 300 3; Snap '21b-playback-rows'; Wheel 600 300 -60; Click 500 475 2 }
 Stop-Process $p -Force -ErrorAction SilentlyContinue
 Start-Sleep 2
 # 第二轮：系统切到深色，应用以「跟随系统」启动
