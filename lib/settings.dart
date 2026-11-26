@@ -18,6 +18,7 @@ import 'package:listen1_xuan/controllers/controllers.dart';
 import 'package:listen1_xuan/play.dart';
 import 'services/app_logger.dart';
 import 'widgets/app_log_level_tile.dart';
+import 'widgets/app_log_files_tile.dart';
 import 'controllers/search_controller.dart';
 import 'controllers/upd_controller.dart';
 import 'provider/base.dart';
@@ -557,6 +558,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                       settingsController.logLevel = level,
                                 ),
                               ),
+                              const AppLogFilesTile(),
                               ListTile(
                                 leading: const Icon(Icons.password),
                                 title: const Text('一次性验证码'),

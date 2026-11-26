@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
+import 'app_log_file.dart';
+
 enum AppLogLevel {
   trace(Level.trace, '全部'),
   debug(Level.debug, '调试'),
@@ -31,13 +33,31 @@ class _AppLogFilter extends LogFilter {
       appLogLevel != AppLogLevel.off && event.level >= appLogLevel.level;
 }
 
+/// 控制台照旧输出；同时把同一份内容写入 logs/app.log（发布版也写）。
+class _AppLogOutput extends LogOutput {
+  _AppLogOutput(this._console);
+  final LogOutput _console;
+  static final _ansi = RegExp(r'\x1B\[[0-9;]*m');
+
+  @override
+  void output(OutputEvent event) {
+    _console.output(event);
+    AppLogFile.instance.write(
+      event.level.name.toUpperCase(),
+      event.lines.map((l) => l.replaceAll(_ansi, '')).join('\n'),
+    );
+  }
+}
+
 /// Unlike DevelopmentFilter, this also emits selected levels in release builds.
 Logger createAppLogger({LogOutput? output}) => Logger(
   filter: _AppLogFilter(),
   printer: PrettyPrinter(
     colors: kDebugMode,
-    printEmojis: true,
+    printEmojis: false,
+    methodCount: 0,
+    errorMethodCount: 8,
     dateTimeFormat: DateTimeFormat.dateAndTime,
   ),
-  output: output,
+  output: _AppLogOutput(output ?? ConsoleOutput()),
 );
