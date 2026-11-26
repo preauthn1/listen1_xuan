@@ -30,7 +30,7 @@ void initializeFeedbackPush() {
         WidgetsBinding.instance.lifecycleState != AppLifecycleState.hidden,
     openLogin: () async {
       if (top_routeWithName.isNotEmpty && top_routeWithName.last.name == RouteName.supabaseLoginPage) return;
-      await Get.toNamed(RouteName.supabaseLoginPage, id: 1);
+      await openInnerPage(RouteName.supabaseLoginPage);
     },
     openIssue: (FeedbackPushTarget target) async {
       final args = _visibleArgs;

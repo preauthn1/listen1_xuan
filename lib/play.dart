@@ -487,7 +487,7 @@ void _openLyricPage() {
   if (Get.find<RouteController>().inLyricPage.value) {
     Get.back(id: 1);
   } else {
-    Get.toNamed(RouteName.lyricPage, id: 1);
+    openInnerPage(RouteName.lyricPage);
   }
 }
 
@@ -497,7 +497,7 @@ void _openNowPlayListPage() {
     if (Get.find<PlayController>().tryCollapseSheet()) return;
     Get.back(id: 1);
   } else {
-    Get.toNamed(RouteName.nowPlayingPage, id: 1);
+    openInnerPage(RouteName.nowPlayingPage);
   }
 }
 

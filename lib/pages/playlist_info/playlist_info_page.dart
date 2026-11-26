@@ -232,7 +232,7 @@ class PlaylistInfoPage extends StatelessWidget {
           final n = await dl.enqueue(pending);
           if (n > 0) {
             showInfoSnackbar('已加入下载 $n 首', '可在「下载」页查看进度',
-                onTap: () => Get.toNamed(RouteName.trackDownloadsPage, id: 1));
+                onTap: () => openInnerPage(RouteName.trackDownloadsPage));
           }
         },
       ),
