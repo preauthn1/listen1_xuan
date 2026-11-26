@@ -485,7 +485,7 @@ class TrackDownloadController extends GetxController {
       showSuccessSnackbar(
         _batchDone == 1 ? '已下载' : '已下载 $_batchDone 首',
         '保存在 $locationHint，点此查看',
-        onTap: () => Get.toNamed(RouteName.trackDownloadsPage, id: 1),
+        onTap: () => openInnerPage(RouteName.trackDownloadsPage),
       );
     }
     if (kDebugMode) debugPrint('download batch done=$_batchDone failed=$_batchFailed');

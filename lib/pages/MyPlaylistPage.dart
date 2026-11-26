@@ -410,7 +410,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
           if (needsLogin || onRetry != null)
             TextButton(
               onPressed: needsLogin
-                  ? () => Get.toNamed(RouteName.settingsPage, id: 1)
+                  ? () => openInnerPage(RouteName.settingsPage)
                   : onRetry,
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,

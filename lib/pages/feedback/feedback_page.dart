@@ -256,7 +256,7 @@ class _FeedbackRoutePageState extends State<_FeedbackRoutePage>
 
   Future<void> _login() async {
     controller.suspend();
-    await Get.toNamed(RouteName.supabaseLoginPage, id: 1);
+    await openInnerPage(RouteName.supabaseLoginPage);
     if (mounted) controller.resume();
   }
 
