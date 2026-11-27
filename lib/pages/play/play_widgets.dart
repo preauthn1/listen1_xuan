@@ -107,6 +107,7 @@ Widget buildSongInfo({
       return AnimatedSwitcher(
         duration: Duration(milliseconds: 200),
         transitionBuilder: horTitleTextTra,
+        layoutBuilder: horTitleLayout,
         child: Container(
           key: ValueKey(mediaItem?.id ?? 'no-song'),
           color: Colors.transparent,
@@ -373,6 +374,7 @@ Widget get _positionSlider => StreamBuilder<MediaState>(
                 () => AnimatedSwitcher(
                   duration: Duration(milliseconds: 200),
                   transitionBuilder: horTitleTextTra,
+                  layoutBuilder: horTitleLayout,
                   child: _playController.loading
                       ? Text(
                           key: ValueKey('slider-loading-position'),
@@ -466,6 +468,7 @@ Widget get _positionSlider => StreamBuilder<MediaState>(
                 () => AnimatedSwitcher(
                   duration: Duration(milliseconds: 200),
                   transitionBuilder: horTitleTextTra,
+                  layoutBuilder: horTitleLayout,
                   child: _playController.loading
                       ? Text(
                           key: ValueKey('slider-loading-duration'),
@@ -637,6 +640,14 @@ class _PlayPauseBtnState extends State<PlayPauseBtn>
     );
   }
 }
+
+/// 播放栏标题切换时只显示新标题：AnimatedSwitcher 默认把新旧两行叠在一起交叉淡入淡出，
+/// 两段长短不同的文字左对齐叠在一起，看起来像乱码。
+/// 对齐方式与 AnimatedSwitcher 默认一致（居中），只是不再叠放旧的一行。
+Widget horTitleLayout(Widget? current, List<Widget> previous) => Stack(
+      alignment: Alignment.center,
+      children: [if (current != null) current],
+    );
 
 Widget Function(Widget, Animation<double>) get horTitleTextTra =>
     (Widget child, Animation<double> animation) {

@@ -105,6 +105,7 @@ Widget playH() {
                         return AnimatedSwitcher(
                           duration: Duration(milliseconds: 200),
                           transitionBuilder: horTitleTextTra,
+                          layoutBuilder: horTitleLayout,
                           child: Text(
                             key: ValueKey(mediaItem?.id ?? 'no-song'),
                             mediaItem == null
@@ -131,6 +132,7 @@ Widget playH() {
                             builder: (context, snapshot) => AnimatedSwitcher(
                               duration: Duration(milliseconds: 200),
                               transitionBuilder: horTitleTextTra,
+                          layoutBuilder: horTitleLayout,
                               child: playController.loading
                                   ? Obx(
                                       () => Text(
