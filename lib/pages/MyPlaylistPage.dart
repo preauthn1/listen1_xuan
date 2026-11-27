@@ -241,8 +241,11 @@ class _MyPlaylistState extends State<MyPlaylist> {
     bool centerLeadingWhenIconOnly = false,
     Widget? trailing,
     VoidCallback? onLongPress,
+    bool? expanded,
   }) {
     final iconOnly = _isIconOnlyMode(availableWidth);
+    // 可展开的分组在标题后显示展开箭头，否则看不出平台下面还有二级内容。
+    final showChevron = expanded != null && !iconOnly;
     final compact = _isCompactMode(availableWidth);
     // 页面过窄时隐藏刷新按钮，此时可长按整条标题栏刷新。
     final showTrailing =
@@ -279,7 +282,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
               ),
               Positioned.fill(
                 left: leadingWidth + spacing,
-                right: showTrailing ? 40 : 0,
+                right: (showTrailing ? 40 : 0) + (showChevron ? 24 : 0),
                 child: IgnorePointer(
                   ignoring: iconOnly,
                   child: AnimatedOpacity(
@@ -301,6 +304,24 @@ class _MyPlaylistState extends State<MyPlaylist> {
                   ),
                 ),
               ),
+              if (showChevron)
+                Positioned(
+                  right: showTrailing ? 40 : 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: AnimatedRotation(
+                      turns: expanded ? 0.5 : 0,
+                      duration: duration,
+                      curve: Curves.easeInOut,
+                      child: Icon(
+                        Icons.expand_more_rounded,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
               if (showTrailing)
                 Positioned(
                   right: 0,
@@ -554,6 +575,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
               availableWidth: availableWidth,
               centerLeadingWhenIconOnly: true,
               trailing: trailing,
+              expanded: ExpandableController.of(context, required: true)!.expanded,
               onLongPress: onRefresh == null
                   ? null
                   : () => _handleSectionLongPress(
