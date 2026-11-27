@@ -742,7 +742,10 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ? '按问题的未读红点设置接收系统通知'
                                 : '开启后可接收关注问题的新消息通知')),
                             value: push.enabled,
-                            onChanged: push.busy ? null : push.setEnabled,
+                            // 构建里没有 Firebase 时开关不可用，显示成禁用态而不是普通的「关」。
+                            onChanged: push.busy || (!push.available && !push.enabled)
+                                ? null
+                                : push.setEnabled,
                           ),
                         ),
                       ListTile(
