@@ -126,12 +126,40 @@ void _showCustomToast({
   }
 }
 
+@visibleForTesting
+String userFacingMessage(String? message) => _userFacingMessage(message);
+
+/// 把异常文本改写成给用户看的短句：DioException 按类型 / 状态码说明，
+/// 去掉 Dart 的「Exception: / Bad state: / FormatException:」前缀，只留第一行。
 String _userFacingMessage(String? message) {
   if (message == null || message.trim().isEmpty) return '请稍后重试';
-  final value = message.trim();
-  if (value.contains('DioException') || value.contains('HttpException') || value.contains('github.com')) {
-    return '网络请求暂时不可用，请检查网络后重试';
+  var value = message.trim();
+  if (value.contains('DioException')) {
+    final code = RegExp(r'status code of (\d{3})').firstMatch(value)?.group(1);
+    if (code == '412') return '请求被平台风控拦截（412），请稍后再试';
+    if (code == '429') return '请求过于频繁（429），请稍后再试';
+    if (code == '401' || code == '403') return '没有权限（$code），请检查登录状态';
+    if (code == '404') return '内容不存在或已下架（404）';
+    if (code != null && code.startsWith('5')) return '平台服务器出错（$code），请稍后再试';
+    if (code != null) return '请求失败（HTTP $code）';
+    if (value.contains('connection timeout') || value.contains('connectionTimeout')) return '连接超时，请检查网络';
+    if (value.contains('receive timeout') || value.contains('receiveTimeout') || value.contains('send timeout')) {
+      return '服务器响应超时，请稍后重试';
+    }
+    if (value.contains('[bad certificate]') || value.contains('badCertificate')) return '证书校验失败';
+    if (value.contains('[request cancelled]') || value.contains('cancel')) return '请求已取消';
+    return '网络连接失败，请检查网络后重试';
   }
+  if (value.contains('SocketException') || value.contains('HttpException') || value.contains('HandshakeException')) {
+    return '网络连接失败，请检查网络后重试';
+  }
+  if (value.contains('TimeoutException')) return '操作超时，请稍后重试';
+  value = value.split('\n').first.trim();
+  value = value.replaceFirst(
+    RegExp(r'^(Exception|Bad state|FormatException|Invalid argument\(s\)|ArgumentError|StateError|Error)(\s*\([^)]*\))?:\s*'),
+    '',
+  );
+  if (value.isEmpty) return '请稍后重试';
   return value.length > 180 ? '${value.substring(0, 177)}…' : value;
 }
 
@@ -168,7 +196,7 @@ void showWarningSnackbar(
     icon: Icons.warning_amber_rounded,
     iconColor: Get.theme.colorScheme.secondary,
     title: title,
-    message: message,
+    message: message == null ? null : _userFacingMessage(message),
     backgroundColor: Get.theme.colorScheme.secondaryContainer,
     textColor: Get.theme.colorScheme.onSecondaryContainer,
     onTap: onTap,
