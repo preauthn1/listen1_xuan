@@ -523,6 +523,19 @@ Listener _mainContent() => Listener(
                                 tooltip: "WebSocket客户端",
                                 inMainPage: true,
                               ),
+                              // 桌面窄窗口不显示浮动按钮，歌曲替换入口放在这里。
+                              if (isDesktop)
+                                IconButton(
+                                  tooltip: '歌曲替换列表',
+                                  icon: const Icon(Icons.find_replace_rounded),
+                                  onPressed: () {
+                                    if (Get.find<RouteController>().inSongReplacePage.value) {
+                                      Get.back(id: 1);
+                                      return;
+                                    }
+                                    Get.toNamed(RouteName.songReplacePage, id: 1);
+                                  },
+                                ),
                               IconButton(
                                 tooltip: "设置",
                                 icon: const FeedbackUnreadBadge(child: Icon(Icons.settings)),
