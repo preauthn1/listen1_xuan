@@ -435,6 +435,8 @@ class _FeedbackRoutePageState extends State<_FeedbackRoutePage>
                           '${issue.statusLabel}${issue.locked ? ' · 讨论已锁定' : ''}\n${controller.name(issue.creatorId)} · 最近发言 ${_time(issue.lastMessageAt)}',
                         ),
                         isThreeLine: true,
+                        // 三行列表项的尾部图标默认贴着第一行，这里让箭头垂直居中。
+                        titleAlignment: ListTileTitleAlignment.center,
                         trailing: FeedbackUnreadBadge(
                           issueId: issue.id,
                           child: const Icon(Icons.chevron_right),

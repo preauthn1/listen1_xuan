@@ -358,6 +358,7 @@ Widget get playV2 => LayoutBuilder(
                                           titleSize: titleSize,
                                           artistSize: artistSize,
                                           isCollapsed: expandProgress < 0.5,
+                                          collapsedHeight: coverSize,
                                         ),
                                       ),
                                     ),

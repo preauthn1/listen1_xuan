@@ -656,40 +656,63 @@ List<Widget> get cacheSettingsTiles {
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => openInnerPage(RouteName.trackDownloadsPage),
     ),
-    Obx(() {
-      WebSocketClientController wscc = Get.find<WebSocketClientController>();
-      return ElevatedButton(
-        onPressed: !wscc.isConnected
-            ? null
-            : () {
-                openInnerPage(RouteName.downloadPage);
-              },
-        child: Text('从 WebSocket 服务器获取缓存文件'),
-      );
-    }),
-    ElevatedButton(
-      onPressed: () => clean_local_cache(),
-      child: const Text('清除未在配置文件中的歌曲缓存'),
-    ),
-    ElevatedButton(
-      onPressed: () async {
-        final result = await showConfirmDialog(
-          '确认清除所有歌曲缓存？此操作不可恢复',
-          '清除所有缓存',
-          confirmLevel: ConfirmLevel.danger,
+    // 操作按钮与上下带图标行的文字列对齐（16 内边距 + 24 图标 + 16 间距）。
+    Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(56, 4, 16, 4),
+      child: Obx(() {
+        final wscc = Get.find<WebSocketClientController>();
+        final connected = wscc.isConnected;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: connected ? () => openInnerPage(RouteName.downloadPage) : null,
+                  child: const Text('从 WebSocket 服务器获取缓存'),
+                ),
+                OutlinedButton(
+                  onPressed: () => clean_local_cache(),
+                  child: const Text('清除歌单外的缓存'),
+                ),
+                OutlinedButton(
+                  onPressed: () async {
+                    final result = await showConfirmDialog(
+                      '确认清除所有歌曲缓存？此操作不可恢复',
+                      '清除所有缓存',
+                      confirmLevel: ConfirmLevel.danger,
+                    );
+                    if (!result) return;
+                    clean_local_cache(true);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Get.theme.colorScheme.error,
+                  ),
+                  child: const Text('清除所有歌曲缓存'),
+                ),
+              ],
+            ),
+            if (!connected)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '获取缓存需要先连接 WebSocket 服务器（设置页右上角）',
+                  style: Get.theme.textTheme.bodySmall?.copyWith(
+                    color: Get.theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+          ],
         );
-        if (!result) return;
-        clean_local_cache(true);
-      },
-      style: ElevatedButton.styleFrom(
-        foregroundColor: Get.theme.colorScheme.error,
-      ),
-      child: const Text('清除所有歌曲缓存'),
+      }),
     ),
     Obx(
       () => SwitchListTile(
+        secondary: const Icon(Icons.music_off_outlined),
         title: const Text('不再下载歌曲缓存'),
-        subtitle: const Text('已下载的缓存仍可使用'),
+        subtitle: const Text('新歌曲不再写入缓存，已有缓存照常使用'),
         value: Get.find<SettingsController>().disableSongDownload,
         onChanged: (bool value) {
           Get.find<SettingsController>().disableSongDownload = value;
@@ -698,8 +721,9 @@ List<Widget> get cacheSettingsTiles {
     ),
     Obx(
       () => SwitchListTile(
+        secondary: const Icon(Icons.subtitles_off_outlined),
         title: const Text('不再下载歌词缓存'),
-        subtitle: const Text('已下载的缓存仍可使用'),
+        subtitle: const Text('不再保存新的歌词，已有歌词照常使用'),
         value: Get.find<SettingsController>().disableLyricDownload,
         onChanged: (bool value) {
           Get.find<SettingsController>().disableLyricDownload = value;
@@ -711,6 +735,7 @@ List<Widget> get cacheSettingsTiles {
     tiles.add(
       Obx(
         () => SwitchListTile(
+          secondary: const Icon(Icons.label_outline),
           title: const Text('缓存保留元数据'),
           subtitle: const Text('开启后将写入歌曲信息'),
           value: Get.find<SettingsController>().cacheRetainMetadata,
@@ -749,9 +774,7 @@ List<Widget> get cacheSettingsTiles {
     ),
     const _CacheDirectoryTile(),
   ]);
-  return tiles
-      .map((e) => Padding(padding: EdgeInsets.all(8.0), child: e))
-      .toList();
+  return tiles;
 }
 
 class _CacheDirectoryTile extends StatefulWidget {

@@ -10,9 +10,24 @@ class MyPlaylist extends StatefulWidget {
 class _MyPlaylistState extends State<MyPlaylist> {
   bool _isExpandedMy = true;
   bool _isExpandedFav = false;
-  bool _isExpandedRecommend = true;
-  bool _isExpandedKugouRecommend = true;
-  bool _isExpandedQQRecommend = true;
+
+  /// 平台一级分组（B 站 / 网易云 / QQ 音乐 / 酷狗音乐）的展开状态，key 为 provider.name。
+  /// 没记录时：已登录展开，未登录收起。
+  final Map<String, bool> _platformExpanded = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // 平台的登录状态原本只在展开某个分组时才去查，所以「为你推荐」要先点一下平台才出现。
+    // 有凭据的平台启动时就查一次；没有凭据的不发请求。
+    for (final p in providers) {
+      if (p.supportLogin &&
+          p.token.isNotEmpty &&
+          p.loginStatus.value == LoginStatus.noLogin) {
+        unawaited(p.getUser());
+      }
+    }
+  }
 
   /// 各平台“我的歌单”分组的加载状态，key 为 provider.name。
   final Map<String, _ProviderPlaylistSection> _providerSections = {};
@@ -226,8 +241,11 @@ class _MyPlaylistState extends State<MyPlaylist> {
     bool centerLeadingWhenIconOnly = false,
     Widget? trailing,
     VoidCallback? onLongPress,
+    bool? expanded,
   }) {
     final iconOnly = _isIconOnlyMode(availableWidth);
+    // 可展开的分组在标题后显示展开箭头，否则看不出平台下面还有二级内容。
+    final showChevron = expanded != null && !iconOnly;
     final compact = _isCompactMode(availableWidth);
     // 页面过窄时隐藏刷新按钮，此时可长按整条标题栏刷新。
     final showTrailing =
@@ -264,7 +282,8 @@ class _MyPlaylistState extends State<MyPlaylist> {
               ),
               Positioned.fill(
                 left: leadingWidth + spacing,
-                right: showTrailing ? 40 : 0,
+                right: (_hasRoomForSectionTrailing(availableWidth) ? 40 : 0) +
+                    (showChevron ? 24 : 0),
                 child: IgnorePointer(
                   ignoring: iconOnly,
                   child: AnimatedOpacity(
@@ -286,6 +305,25 @@ class _MyPlaylistState extends State<MyPlaylist> {
                   ),
                 ),
               ),
+              if (showChevron)
+                Positioned(
+                  // 所有分组的箭头放在同一列：没有刷新按钮的分组也留出按钮宽度。
+                  right: _hasRoomForSectionTrailing(availableWidth) ? 40 : 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: AnimatedRotation(
+                      turns: expanded ? 0.5 : 0,
+                      duration: duration,
+                      curve: Curves.easeInOut,
+                      child: Icon(
+                        Icons.expand_more_rounded,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
               if (showTrailing)
                 Positioned(
                   right: 0,
@@ -377,10 +415,34 @@ class _MyPlaylistState extends State<MyPlaylist> {
         : provider.userFavoritePlaylistSectionTitle;
   }
 
+  /// 平台分组里的二级标题，如「我创建的」「追更合集」。
+  String _subSectionTitleOf(BaseProvider provider, _UserPlaylistType type) =>
+      _splitSectionTitle(_sectionTitleOf(provider, type)).$2;
+
+  /// 二级分组不再重复平台图标，用列表图标区分「创建」与「收藏」。
   Widget _sectionLeadingOf(BaseProvider provider, _UserPlaylistType type) {
-    return type == _UserPlaylistType.created
-        ? provider.userCreatedPlaylistSectionLeading
-        : provider.userFavoritePlaylistSectionLeading;
+    return Icon(
+      type == _UserPlaylistType.created
+          ? Icons.queue_music_rounded
+          : Icons.bookmark_border_rounded,
+      size: 18,
+    );
+  }
+
+  /// 分组为空时的一行说明，与分组标题文字左缘对齐。
+  Widget _buildSectionHint(String text) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(48, 0, 12, 8),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
   }
 
   Widget _buildSectionError(
@@ -434,7 +496,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
     final section = _sectionOf(provider, type);
     return _buildExpandableSection(
       leading: _sectionLeadingOf(provider, type),
-      title: _sectionTitleOf(provider, type),
+      title: _subSectionTitleOf(provider, type),
       isExpanded: section.isExpanded,
       availableWidth: availableWidth,
       trailing: IconButton(
@@ -500,6 +562,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
   }
 
   Widget _buildExpandableSection({
+    Key? key,
     required Widget leading,
     required String title,
     required bool isExpanded,
@@ -512,6 +575,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
     final controller = ExpandableController(initialExpanded: isExpanded);
     final onRefresh = onLongPress;
     return ExpandableNotifier(
+      key: key,
       controller: controller,
       child: Builder(
         builder: (context) {
@@ -529,6 +593,7 @@ class _MyPlaylistState extends State<MyPlaylist> {
               availableWidth: availableWidth,
               centerLeadingWhenIconOnly: true,
               trailing: trailing,
+              expanded: ExpandableController.of(context, required: true)!.expanded,
               onLongPress: onRefresh == null
                   ? null
                   : () => _handleSectionLongPress(
@@ -550,6 +615,124 @@ class _MyPlaylistState extends State<MyPlaylist> {
     );
   }
 
+  /// 各平台登录后才有的推荐入口，放在平台分组里排在歌单前面。
+  List<({IconData icon, String title, String subtitle, String id})> _recommendsOf(
+    BaseProvider provider,
+  ) {
+    switch (provider.name) {
+      case 'netease':
+        return const [
+          (icon: Icons.today_rounded, title: '每日推荐', subtitle: '每天 6 点更新', id: 'nedaily_today'),
+          (icon: Icons.radio_rounded, title: '私人 FM', subtitle: '按口味连续推荐', id: 'nefm_personal'),
+        ];
+      case 'qq':
+        return const [
+          (icon: Icons.radar_rounded, title: '雷达推荐', subtitle: '按口味推荐的歌曲', id: 'qqradar_today'),
+          (icon: Icons.radio_rounded, title: '个性电台', subtitle: '猜你喜欢，连续播放', id: 'qqradio_personal'),
+        ];
+      case 'kugou':
+        return const [
+          (icon: Icons.today_rounded, title: '每日推荐', subtitle: '每天更新', id: 'kgdaily_today'),
+          (icon: Icons.radio_rounded, title: '私人 FM', subtitle: '按口味连续推荐', id: 'kgfm_personal'),
+        ];
+    }
+    return const [];
+  }
+
+  /// 「网易云 · 我创建的」→ 平台名「网易云」与二级标题「我创建的」。
+  static (String, String) _splitSectionTitle(String title) {
+    final i = title.indexOf(' · ');
+    if (i < 0) return (title, title);
+    return (title.substring(0, i), title.substring(i + 3));
+  }
+
+  /// 二级内容的缩进；只显示图标的窄侧栏不缩进。
+  double _childIndent(double width) =>
+      _isIconOnlyMode(width) ? 0 : (_isCompactMode(width) ? 8 : 16);
+
+  void _refreshPlatform(BaseProvider provider) {
+    unawaited(provider.getUser());
+    for (final type in _UserPlaylistType.values) {
+      final section = _sectionOf(provider, type);
+      if (section.loaded || section.isExpanded) {
+        _refreshProviderPlaylists(provider, type);
+      }
+    }
+  }
+
+  /// 一级：平台。二级：推荐入口、我创建的、我收藏的（歌单分组可再展开）。
+  Widget _buildPlatformGroup(BaseProvider provider, double availableWidth) {
+    final platformName = _splitSectionTitle(
+      provider.userCreatedPlaylistSectionTitle,
+    ).$1;
+    return Obx(() {
+      final status = provider.loginStatus.value;
+      final loggedIn = status == LoginStatus.loggedIn;
+      final expanded = _platformExpanded[provider.name] ?? loggedIn;
+      final indent = _childIndent(availableWidth);
+      final Widget body;
+      if (provider.supportLogin && status == LoginStatus.processing) {
+        body = Center(child: globalLoadingAnime);
+      } else if (provider.supportLogin && status == LoginStatus.failed) {
+        body = _buildSectionError('登录状态获取失败', () => provider.getUser());
+      } else if (provider.supportLogin && !loggedIn) {
+        body = _buildSectionError('未登录', null, needsLogin: true);
+      } else {
+        body = Padding(
+          padding: EdgeInsetsDirectional.only(start: indent),
+          child: Column(
+            children: [
+              for (final r in _recommendsOf(provider))
+                _buildShortcutTile(
+                  icon: r.icon,
+                  title: r.title,
+                  subtitle: r.subtitle,
+                  availableWidth: availableWidth - indent,
+                  onTap: () => Ro.toArg(PlaylistInfoArgs(
+                    playListInfo: PlayListInfo(id: r.id, title: r.title),
+                    isMy: false,
+                  )),
+                ),
+              if (provider.supportGetUserCreatedPlaylist)
+                _buildProviderSection(
+                  provider,
+                  _UserPlaylistType.created,
+                  availableWidth - indent,
+                ),
+              if (provider.supportGetUserFavoritePlaylist)
+                _buildProviderSection(
+                  provider,
+                  _UserPlaylistType.favorite,
+                  availableWidth - indent,
+                ),
+            ],
+          ),
+        );
+      }
+      return _buildExpandableSection(
+        // 登录状态变化会改变默认展开状态，用 key 让展开控件跟着重建。
+        key: ValueKey(
+          'platform_${provider.name}_'
+          '${_platformExpanded.containsKey(provider.name) ? 'user' : loggedIn}',
+        ),
+        leading: provider.userCreatedPlaylistSectionLeading,
+        title: platformName,
+        isExpanded: expanded,
+        availableWidth: availableWidth,
+        trailing: IconButton(
+          icon: const Icon(Icons.refresh, size: 18),
+          tooltip: '刷新',
+          onPressed: () => _refreshPlatform(provider),
+        ),
+        onLongPress: () => _refreshPlatform(provider),
+        onExpandedChanged: (value) {
+          setState(() => _platformExpanded[provider.name] = value);
+        },
+        body: body,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final settingsController = Get.find<SettingsController>();
@@ -559,7 +742,10 @@ class _MyPlaylistState extends State<MyPlaylist> {
       () => Scaffold(
         // 横屏布局（含桌面）里侧栏较窄，浮动按钮会压住平台行右侧的刷新按钮；
         // 此时由侧栏底部操作栏提供同一入口，浮动按钮只用于竖屏。
-        floatingActionButton: MediaQuery.orientationOf(context) == Orientation.landscape
+        // 桌面端窗口变窄进入竖屏布局时同理：浮动按钮会压住平台行右侧的刷新按钮，
+        // 入口改到顶部栏（见 main_widgets.dart 竖屏头部）。手机竖屏保留可配置的浮动按钮。
+        floatingActionButton: MediaQuery.orientationOf(context) == Orientation.landscape ||
+                isDesktop
             ? null
             : FloatingActionButton(
           heroTag: HeroTags.songReplaceFab,
@@ -603,12 +789,17 @@ class _MyPlaylistState extends State<MyPlaylist> {
                               _isExpandedMy = expanded;
                             });
                           },
-                          body: Obx(
-                            () => Column(
-                              children: Get.find<MyPlayListController>()
-                                  .playerlists
-                                  .values
-                                  .toList()
+                          body: Obx(() {
+                            final lists = Get.find<MyPlayListController>()
+                                .playerlists
+                                .values
+                                .toList();
+                            // 展开后没有内容时给一行说明，否则箭头翻转了却什么都没出现。
+                            if (lists.isEmpty) {
+                              return _buildSectionHint('还没有创建歌单');
+                            }
+                            return Column(
+                              children: lists
                                   .map(
                                     (playlist) => _buildPlaylistTile(
                                       playlist: playlist,
@@ -617,8 +808,8 @@ class _MyPlaylistState extends State<MyPlaylist> {
                                     ),
                                   )
                                   .toList(),
-                            ),
-                          ),
+                            );
+                          }),
                         ),
                         _buildExpandableSection(
                           leading: const Icon(Icons.star, size: 18),
@@ -630,11 +821,16 @@ class _MyPlaylistState extends State<MyPlaylist> {
                               _isExpandedFav = expanded;
                             });
                           },
-                          body: Obx(
-                            () => Column(
-                              children: Get.find<MyPlayListController>()
-                                  .favoriteplayerlists
-                                  .values
+                          body: Obx(() {
+                            final lists = Get.find<MyPlayListController>()
+                                .favoriteplayerlists
+                                .values
+                                .toList();
+                            if (lists.isEmpty) {
+                              return _buildSectionHint('还没有收藏歌单');
+                            }
+                            return Column(
+                              children: lists
                                   .map(
                                     (playlist) => _buildPlaylistTile(
                                       playlist: playlist,
@@ -643,169 +839,13 @@ class _MyPlaylistState extends State<MyPlaylist> {
                                     ),
                                   )
                                   .toList(),
-                            ),
-                          ),
+                            );
+                          }),
                         ),
-                        Obx(() {
-                          final netease = providers.firstWhereOrNull(
-                            (p) => p.name == 'netease',
-                          );
-                          if (netease == null ||
-                              netease.loginStatus.value != LoginStatus.loggedIn) {
-                            return const SizedBox.shrink();
-                          }
-                          return _buildExpandableSection(
-                            leading: const Icon(Icons.auto_awesome_rounded, size: 18),
-                            title: '网易云 · 为你推荐',
-                            isExpanded: _isExpandedRecommend,
-                            availableWidth: availableWidth,
-                            onExpandedChanged: (expanded) {
-                              setState(() => _isExpandedRecommend = expanded);
-                            },
-                            body: Column(
-                              children: [
-                                _buildShortcutTile(
-                                  icon: Icons.today_rounded,
-                                  title: '每日推荐',
-                                  subtitle: '每天 6 点更新',
-                                  availableWidth: availableWidth,
-                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
-                                    playListInfo: PlayListInfo(
-                                      id: 'nedaily_today',
-                                      title: '每日推荐',
-                                    ),
-                                    isMy: false,
-                                  )),
-                                ),
-                                _buildShortcutTile(
-                                  icon: Icons.radio_rounded,
-                                  title: '私人 FM',
-                                  subtitle: '按口味连续推荐',
-                                  availableWidth: availableWidth,
-                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
-                                    playListInfo: PlayListInfo(
-                                      id: 'nefm_personal',
-                                      title: '私人 FM',
-                                    ),
-                                    isMy: false,
-                                  )),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                        Obx(() {
-                          final qq = providers.firstWhereOrNull(
-                            (p) => p.name == 'qq',
-                          );
-                          if (qq == null ||
-                              qq.loginStatus.value != LoginStatus.loggedIn) {
-                            return const SizedBox.shrink();
-                          }
-                          return _buildExpandableSection(
-                            leading: qq.loginIcon,
-                            title: 'QQ 音乐 · 为你推荐',
-                            isExpanded: _isExpandedQQRecommend,
-                            availableWidth: availableWidth,
-                            onExpandedChanged: (expanded) {
-                              setState(() => _isExpandedQQRecommend = expanded);
-                            },
-                            body: Column(
-                              children: [
-                                _buildShortcutTile(
-                                  icon: Icons.radar_rounded,
-                                  title: '雷达推荐',
-                                  subtitle: '按口味推荐的歌曲',
-                                  availableWidth: availableWidth,
-                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
-                                    playListInfo: PlayListInfo(
-                                      id: 'qqradar_today',
-                                      title: '雷达推荐',
-                                    ),
-                                    isMy: false,
-                                  )),
-                                ),
-                                _buildShortcutTile(
-                                  icon: Icons.radio_rounded,
-                                  title: '个性电台',
-                                  subtitle: '猜你喜欢，连续播放',
-                                  availableWidth: availableWidth,
-                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
-                                    playListInfo: PlayListInfo(
-                                      id: 'qqradio_personal',
-                                      title: '个性电台',
-                                    ),
-                                    isMy: false,
-                                  )),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                        Obx(() {
-                          final kugou = providers.firstWhereOrNull(
-                            (p) => p.name == 'kugou',
-                          );
-                          if (kugou == null ||
-                              kugou.loginStatus.value != LoginStatus.loggedIn) {
-                            return const SizedBox.shrink();
-                          }
-                          return _buildExpandableSection(
-                            leading: kugou.loginIcon,
-                            title: '酷狗音乐 · 为你推荐',
-                            isExpanded: _isExpandedKugouRecommend,
-                            availableWidth: availableWidth,
-                            onExpandedChanged: (expanded) {
-                              setState(() => _isExpandedKugouRecommend = expanded);
-                            },
-                            body: Column(
-                              children: [
-                                _buildShortcutTile(
-                                  icon: Icons.today_rounded,
-                                  title: '每日推荐',
-                                  subtitle: '每天更新',
-                                  availableWidth: availableWidth,
-                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
-                                    playListInfo: PlayListInfo(
-                                      id: 'kgdaily_today',
-                                      title: '每日推荐',
-                                    ),
-                                    isMy: false,
-                                  )),
-                                ),
-                                _buildShortcutTile(
-                                  icon: Icons.radio_rounded,
-                                  title: '私人 FM',
-                                  subtitle: '按口味连续推荐',
-                                  availableWidth: availableWidth,
-                                  onTap: () => Ro.toArg(PlaylistInfoArgs(
-                                    playListInfo: PlayListInfo(
-                                      id: 'kgfm_personal',
-                                      title: '私人 FM',
-                                    ),
-                                    isMy: false,
-                                  )),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                        ...providers.expand(
-                          (p) => [
-                            if (p.supportGetUserCreatedPlaylist)
-                              _buildProviderSection(
-                                p,
-                                _UserPlaylistType.created,
-                                availableWidth,
-                              ),
-                            if (p.supportGetUserFavoritePlaylist)
-                              _buildProviderSection(
-                                p,
-                                _UserPlaylistType.favorite,
-                                availableWidth,
-                              ),
-                          ],
-                        ),
+                        for (final p in providers)
+                          if (p.supportGetUserCreatedPlaylist ||
+                              p.supportGetUserFavoritePlaylist)
+                            _buildPlatformGroup(p, availableWidth),
                         // 预留底部浮动按钮的位置，最后一个分组不会被遮住。
                         const SizedBox(height: 72),
                       ],
