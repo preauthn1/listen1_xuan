@@ -15,8 +15,10 @@ class _LoudnessGainInputState extends State<LoudnessGainInput> {
 
   @override
   Widget build(BuildContext context) {
+    // 它从属于上方的「响度均衡」开关：左边缘对齐开关行的标题文字
+    // （16 内边距 + 24 图标 + 16 间距），而不是对齐图标列。
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsetsDirectional.fromSTEB(56, 0, 16, 12),
       child: TextFormField(
         initialValue: widget.value.toString(),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),

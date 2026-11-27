@@ -287,10 +287,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           canTapOnHeader: true,
                           isExpanded: settingsController.settingsPageExpansion
                               .contains(3),
-                          body: Wrap(
-                            alignment: WrapAlignment.start,
-                            spacing: 12,
-                            runSpacing: 8,
+                          body: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [...cacheSettingsTiles],
                           ),
                         ),
@@ -664,7 +662,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                                   Get.find<SettingsController>()
                                                       .searchLastSource,
                                                 ),
-                                            icon: Icon(Icons.arrow_downward),
+                                            icon: Icon(Icons.arrow_drop_down_rounded),
                                             onChanged:
                                                 (BaseProvider? newValue) {
                                                   if (newValue == null) return;
@@ -744,7 +742,10 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ? '按问题的未读红点设置接收系统通知'
                                 : '开启后可接收关注问题的新消息通知')),
                             value: push.enabled,
-                            onChanged: push.busy ? null : push.setEnabled,
+                            // 构建里没有 Firebase 时开关不可用，显示成禁用态而不是普通的「关」。
+                            onChanged: push.busy || (!push.available && !push.enabled)
+                                ? null
+                                : push.setEnabled,
                           ),
                         ),
                       ListTile(
