@@ -282,7 +282,8 @@ class _MyPlaylistState extends State<MyPlaylist> {
               ),
               Positioned.fill(
                 left: leadingWidth + spacing,
-                right: (showTrailing ? 40 : 0) + (showChevron ? 24 : 0),
+                right: (_hasRoomForSectionTrailing(availableWidth) ? 40 : 0) +
+                    (showChevron ? 24 : 0),
                 child: IgnorePointer(
                   ignoring: iconOnly,
                   child: AnimatedOpacity(
@@ -306,7 +307,8 @@ class _MyPlaylistState extends State<MyPlaylist> {
               ),
               if (showChevron)
                 Positioned(
-                  right: showTrailing ? 40 : 0,
+                  // 所有分组的箭头放在同一列：没有刷新按钮的分组也留出按钮宽度。
+                  right: _hasRoomForSectionTrailing(availableWidth) ? 40 : 0,
                   top: 0,
                   bottom: 0,
                   child: Center(
@@ -424,6 +426,22 @@ class _MyPlaylistState extends State<MyPlaylist> {
           ? Icons.queue_music_rounded
           : Icons.bookmark_border_rounded,
       size: 18,
+    );
+  }
+
+  /// 分组为空时的一行说明，与分组标题文字左缘对齐。
+  Widget _buildSectionHint(String text) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(48, 0, 12, 8),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
     );
   }
 
@@ -771,12 +789,17 @@ class _MyPlaylistState extends State<MyPlaylist> {
                               _isExpandedMy = expanded;
                             });
                           },
-                          body: Obx(
-                            () => Column(
-                              children: Get.find<MyPlayListController>()
-                                  .playerlists
-                                  .values
-                                  .toList()
+                          body: Obx(() {
+                            final lists = Get.find<MyPlayListController>()
+                                .playerlists
+                                .values
+                                .toList();
+                            // 展开后没有内容时给一行说明，否则箭头翻转了却什么都没出现。
+                            if (lists.isEmpty) {
+                              return _buildSectionHint('还没有创建歌单');
+                            }
+                            return Column(
+                              children: lists
                                   .map(
                                     (playlist) => _buildPlaylistTile(
                                       playlist: playlist,
@@ -785,8 +808,8 @@ class _MyPlaylistState extends State<MyPlaylist> {
                                     ),
                                   )
                                   .toList(),
-                            ),
-                          ),
+                            );
+                          }),
                         ),
                         _buildExpandableSection(
                           leading: const Icon(Icons.star, size: 18),
@@ -798,11 +821,16 @@ class _MyPlaylistState extends State<MyPlaylist> {
                               _isExpandedFav = expanded;
                             });
                           },
-                          body: Obx(
-                            () => Column(
-                              children: Get.find<MyPlayListController>()
-                                  .favoriteplayerlists
-                                  .values
+                          body: Obx(() {
+                            final lists = Get.find<MyPlayListController>()
+                                .favoriteplayerlists
+                                .values
+                                .toList();
+                            if (lists.isEmpty) {
+                              return _buildSectionHint('还没有收藏歌单');
+                            }
+                            return Column(
+                              children: lists
                                   .map(
                                     (playlist) => _buildPlaylistTile(
                                       playlist: playlist,
@@ -811,8 +839,8 @@ class _MyPlaylistState extends State<MyPlaylist> {
                                     ),
                                   )
                                   .toList(),
-                            ),
-                          ),
+                            );
+                          }),
                         ),
                         for (final p in providers)
                           if (p.supportGetUserCreatedPlaylist ||
