@@ -100,6 +100,7 @@ Widget buildSongInfo({
   required double titleSize,
   required double artistSize,
   required bool isCollapsed,
+  double? collapsedHeight,
 }) {
   return Builder(
     builder: (context) => Obx(() {
@@ -111,8 +112,12 @@ Widget buildSongInfo({
         child: Container(
           key: ValueKey(mediaItem?.id ?? 'no-song'),
           color: Colors.transparent,
-          // 没有歌曲时只有一行「未播放」：去掉空的歌手行和底部留白，
-          // 否则这一行比封面和播放按钮高出一截。
+          // 没有歌曲时只有一行「未播放」：去掉空的歌手行和底部留白，并在封面高度内
+          // 垂直居中，否则这一行贴着顶部，比封面和播放按钮高出一截。
+          height: mediaItem == null && isCollapsed ? collapsedHeight : null,
+          alignment: mediaItem == null && isCollapsed && collapsedHeight != null
+              ? Alignment.center
+              : null,
           padding: EdgeInsets.only(bottom: mediaItem == null ? 0 : 20.w),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
