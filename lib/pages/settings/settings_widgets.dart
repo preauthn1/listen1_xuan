@@ -656,9 +656,9 @@ List<Widget> get cacheSettingsTiles {
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => openInnerPage(RouteName.trackDownloadsPage),
     ),
-    // 操作按钮放在一行里，并与上下行的文字列（16 px 内边距）对齐。
+    // 操作按钮与上下带图标行的文字列对齐（16 内边距 + 24 图标 + 16 间距）。
     Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      padding: const EdgeInsetsDirectional.fromSTEB(56, 4, 16, 4),
       child: Obx(() {
         final wscc = Get.find<WebSocketClientController>();
         final connected = wscc.isConnected;
@@ -710,8 +710,9 @@ List<Widget> get cacheSettingsTiles {
     ),
     Obx(
       () => SwitchListTile(
+        secondary: const Icon(Icons.music_off_outlined),
         title: const Text('不再下载歌曲缓存'),
-        subtitle: const Text('开启后新播放的歌曲不再写入缓存，已缓存的歌曲照常可用'),
+        subtitle: const Text('新播放的歌曲不再写入缓存，已有缓存照常使用'),
         value: Get.find<SettingsController>().disableSongDownload,
         onChanged: (bool value) {
           Get.find<SettingsController>().disableSongDownload = value;
@@ -720,8 +721,9 @@ List<Widget> get cacheSettingsTiles {
     ),
     Obx(
       () => SwitchListTile(
+        secondary: const Icon(Icons.subtitles_off_outlined),
         title: const Text('不再下载歌词缓存'),
-        subtitle: const Text('开启后不再保存新的歌词，已保存的歌词照常可用'),
+        subtitle: const Text('不再保存新的歌词，已有歌词照常使用'),
         value: Get.find<SettingsController>().disableLyricDownload,
         onChanged: (bool value) {
           Get.find<SettingsController>().disableLyricDownload = value;
@@ -733,6 +735,7 @@ List<Widget> get cacheSettingsTiles {
     tiles.add(
       Obx(
         () => SwitchListTile(
+          secondary: const Icon(Icons.label_outline),
           title: const Text('缓存保留元数据'),
           subtitle: const Text('开启后将写入歌曲信息'),
           value: Get.find<SettingsController>().cacheRetainMetadata,
