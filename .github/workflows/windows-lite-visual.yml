@@ -11,7 +11,7 @@ permissions:
 jobs:
   visual:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -22,7 +22,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
-          $url = 'https://api.github.com/repos/preauthn1/listen1_xuan/actions/artifacts/15142864705/zip'
+          $url = 'https://api.github.com/repos/preauthn1/listen1_xuan/actions/artifacts/15145795124/zip'
           Invoke-WebRequest -Headers $headers -Uri $url -OutFile artifact.zip
           New-Item -ItemType Directory -Force app | Out-Null
           Expand-Archive -Path artifact.zip -DestinationPath app -Force

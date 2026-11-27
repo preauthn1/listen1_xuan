@@ -56,6 +56,23 @@ Step supabase { Settings; Click 610 61 3; Snap '11-supabase'; Click 610 61 2 }
 $rows=@(@('12-thirdparty',117),@('13-playlist-config',174),@('14-cache',231),@('15-desktop',289),@('16-update',353),@('17-appearance',418),@('18-playback',475),@('19-misc',532))
 foreach($r in $rows){ Step $r[0] { Settings; Wheel 600 300 -60; Click 500 $r[1] 2; Snap ($r[0]+'-a'); Wheel 600 300 4; Snap ($r[0]+'-b'); Wheel 600 300 -60; Click 500 $r[1] 2 } }
 Step bottom { Settings; Wheel 600 400 60; Snap '20-settings-bottom' }
+# ---- 第三轮逐页：搜索、播放中、歌词、队列、设置子页 ----
+function TypeText($t){ Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($t); Start-Sleep 1 }
+function Enter(){ [UI]::keybd_event(0x0D,0,0,[UIntPtr]::Zero);[UI]::keybd_event(0x0D,0,2,[UIntPtr]::Zero);Start-Sleep 1 }
+Step search { Home; Click 118 74 2; TypeText 'jay chou'; Enter; Start-Sleep 8; Snap '50-search-results'; Wheel 600 400 5; Snap '50b-search-scrolled' }
+Step searchtab { Click 420 110 6; Snap '51-search-tab2' }
+Step playing { Home; Click 90 354 3; Snap '52-netease-section'; Home; Click 600 200 6; Snap '53-playlist-for-play'; Click 414 296 10; Snap '54-playing-bar' }
+Step queue2 { Click 743 661 4; Snap '55-queue-with-tracks'; Esc; Esc }
+Step lyric { Click 382 663 5; Snap '56-lyric-page'; Esc; Esc }
+Step trackmenu { Home; Click 600 200 6; Click 948 380 3; Snap '57-track-menu'; Esc }
+Step eq { Settings; Click 500 475 3; Click 610 542 5; Snap '58-equalizer'; Esc; Esc; Settings; Wheel 600 300 -60; Click 500 475 2 }
+Step quality { Settings; Click 500 475 3; Click 610 598 4; Snap '59-audio-quality'; Esc; Esc; Settings; Wheel 600 300 -60; Click 500 475 2 }
+Step cachegrp { Settings; Click 500 231 3; Snap '60-cache-group'; Wheel 600 300 4; Snap '60b-cache-group-scrolled'; Wheel 600 300 -60; Click 500 231 2 }
+Step changelog { Settings; Click 500 352 3; Wheel 600 300 3; Snap '61-update-scrolled'; Wheel 600 300 -60; Click 500 352 2 }
+Step feedback { Settings; Wheel 600 400 60; Snap '62-pre-feedback'; Click 500 403 6; Snap '63-feedback-page'; Esc; Esc }
+Step narrow { Home; [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,700,620,0x40)|Out-Null; Start-Sleep 3; Snap '64-narrow-home'; Click 20 20 2; Snap '64b-narrow-after-click' }
+Step narrowset { [UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,700,620,0x40)|Out-Null; Start-Sleep 2; Snap '65-narrow-state' }
+[UI]::SetWindowPos($w,[IntPtr]::Zero,0,0,1000,730,0x40)|Out-Null; Start-Sleep 2
 Stop-Process $p -Force -ErrorAction SilentlyContinue
 Start-Sleep 2
 # 第二轮：系统切到深色，应用以「跟随系统」启动
