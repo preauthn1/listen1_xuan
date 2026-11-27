@@ -287,10 +287,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           canTapOnHeader: true,
                           isExpanded: settingsController.settingsPageExpansion
                               .contains(3),
-                          body: Wrap(
-                            alignment: WrapAlignment.start,
-                            spacing: 12,
-                            runSpacing: 8,
+                          body: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [...cacheSettingsTiles],
                           ),
                         ),
@@ -664,7 +662,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                                   Get.find<SettingsController>()
                                                       .searchLastSource,
                                                 ),
-                                            icon: Icon(Icons.arrow_downward),
+                                            icon: Icon(Icons.arrow_drop_down_rounded),
                                             onChanged:
                                                 (BaseProvider? newValue) {
                                                   if (newValue == null) return;
