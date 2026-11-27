@@ -111,7 +111,9 @@ Widget buildSongInfo({
         child: Container(
           key: ValueKey(mediaItem?.id ?? 'no-song'),
           color: Colors.transparent,
-          padding: EdgeInsets.only(bottom: 20.w),
+          // 没有歌曲时只有一行「未播放」：去掉空的歌手行和底部留白，
+          // 否则这一行比封面和播放按钮高出一截。
+          padding: EdgeInsets.only(bottom: mediaItem == null ? 0 : 20.w),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -138,10 +140,12 @@ Widget buildSongInfo({
                   textAlign: TextAlign.center,
                   maxLines: 1,
                 ),
-              4.sbh,
-              if (isCollapsed)
+              if (mediaItem != null) 4.sbh,
+              if (mediaItem == null)
+                const SizedBox.shrink()
+              else if (isCollapsed)
                 Text(
-                  mediaItem?.artist ?? '',
+                  mediaItem.artist ?? '',
                   style: TextStyle(
                     fontSize: artistSize,
                     color: Theme.of(context).textTheme.bodySmall?.color,
@@ -152,7 +156,7 @@ Widget buildSongInfo({
                 )
               else
                 SelectableText(
-                  mediaItem?.artist ?? '',
+                  mediaItem.artist ?? '',
                   style: TextStyle(
                     fontSize: artistSize,
                     color: Theme.of(context).textTheme.bodySmall?.color,
