@@ -89,7 +89,7 @@ class _SearchlistinfoState extends State<Searchlistinfo>
             Obx(
               () => DropdownButton<BaseProvider>(
                 value: controller!.selectedProvider,
-                icon: const Icon(Icons.arrow_downward),
+                icon: const Icon(Icons.arrow_drop_down_rounded),
                 onChanged: (BaseProvider? newValue) {
                   if (newValue != null) {
                     controller!.updateSelectedProvider(newValue);
