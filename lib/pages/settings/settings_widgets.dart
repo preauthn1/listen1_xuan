@@ -712,7 +712,7 @@ List<Widget> get cacheSettingsTiles {
       () => SwitchListTile(
         secondary: const Icon(Icons.music_off_outlined),
         title: const Text('不再下载歌曲缓存'),
-        subtitle: const Text('新播放的歌曲不再写入缓存，已有缓存照常使用'),
+        subtitle: const Text('新歌曲不再写入缓存，已有缓存照常使用'),
         value: Get.find<SettingsController>().disableSongDownload,
         onChanged: (bool value) {
           Get.find<SettingsController>().disableSongDownload = value;
