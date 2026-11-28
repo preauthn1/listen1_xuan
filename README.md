@@ -50,6 +50,22 @@
 - **Lite**：体积更小，不包含 FFmpeg；
 - **FFmpeg**：包含额外音频处理能力，体积更大。
 
+#### Release 资产命名
+
+| 平台 | 文件名 | 说明 |
+|---|---|---|
+| Android | `app-<架构>-release[-without.embedded.Cronet][-ffmpeg]-<hash>.apk`，另有同名 `.zip` | 一般选 `arm64-v8a`；`.zip` 内是同一个已签名 APK |
+| Windows | `windows-build-artifact[-ffmpeg]-<hash>.zip`，Inno Setup 安装包为 `.exe` | 压缩包解压即用 |
+| macOS | `listen1_xuan-<版本>-macos-<apple-silicon\|intel>[-ffmpeg]-<hash>.zip` | 按芯片选择 |
+| iOS | `listen1_xuan-ios[-ffmpeg]-<hash>.app.zip` | 未签名，需自行签名 |
+
+Android 关于 Cronet：
+
+- **带 `without.embedded.Cronet`** 的包体积更小，网络库依赖设备上的 Google Play 服务，适合有 Google Play 服务的手机；
+- **没有 Google Play 服务**的设备（多数国行手机、部分模拟器）请选**不带** `without.embedded.Cronet` 的包，它内置了 Cronet。
+
+每个 Release 正文顶部的安装说明会按实际上传的文件列出推荐包和下载大小，见 `docs/release_installation_guide.md`。
+
 ### 首次使用
 
 1. 启动应用并进入 **设置 → 第三方平台登录**；
