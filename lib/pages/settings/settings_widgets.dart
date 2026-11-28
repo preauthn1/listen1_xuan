@@ -246,27 +246,20 @@ Widget _buildSupabasePanel() {
 }
 
 /// 「使用备用地址」开关：登录前后两个面板共用。
-/// 备用地址需要构建时注入的中转令牌，未注入时禁用开关并说明原因，
-/// 避免打开后下次启动失败。
 Widget _supabaseBackupUrlSwitch() => Obx(() {
       final settings = Get.find<SettingsController>();
       // 先读取开关值：Obx 内必须每次都访问到 observable，
       // 否则 Release 构建会抛错并显示成一大块灰色。
       final enabled = settings.supabaseUseBackupUrl;
-      final available = supabaseProxyToken.isNotEmpty;
       return SwitchListTile(
         contentPadding: EdgeInsets.zero,
         title: const Text('使用备用地址'),
-        subtitle: Text(available
-            ? '通过自建中转连接 Supabase，需重启应用生效'
-            : '此版本未配置中转令牌，无法使用备用地址'),
-        value: available && enabled,
-        onChanged: available
-            ? (bool value) {
-                settings.supabaseUseBackupUrl = value;
-                showSuccessSnackbar('设置成功', '重启生效');
-              }
-            : null,
+        subtitle: const Text('通过中转连接 Supabase，需重启应用生效'),
+        value: enabled,
+        onChanged: (bool value) {
+          settings.supabaseUseBackupUrl = value;
+          showSuccessSnackbar('设置成功', '重启生效');
+        },
       );
     });
 

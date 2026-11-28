@@ -847,7 +847,7 @@ class WebSocketServerController extends GetxController {
     if (missing) {
       _tokenlessRejections.value++;
       _logger.w(
-        '$_tag 拒绝了不带配对令牌的请求（可能是旧版或上游原版客户端）: '
+        '$_tag 拒绝了不带配对令牌的请求（可能是旧版客户端）: '
         '${request.method} ${request.uri.path}',
       );
     }

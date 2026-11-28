@@ -59,25 +59,23 @@ export default {
     const incomingUrl = new URL(request.url);
 
     // ---------- 健康检查 ----------
-    const healthPath = env.HEALTH_PATH ?? '';
+    const healthPath = env.HEALTH_PATH ?? '/__spx/health';
     if (healthPath && incomingUrl.pathname === healthPath) {
-      const token = (env.AUTH_TOKEN ?? '').trim();
-      if (!token || request.headers.get('x-proxy-token') !== token) {
-        return new Response('unauthorized', { status: 401 });
-      }
-      return Response.json({ ok: true });
+      return Response.json({
+        ok: true,
+        upstream: upstream.origin,
+        realtime: `${upstream.origin}/realtime/v1`,
+        auth: `${upstream.origin}/auth/v1`,
+      });
     }
 
     // ---------- 可选口令 ----------
     const token = (env.AUTH_TOKEN ?? '').trim();
-    if (!token || request.headers.get('x-proxy-token') !== token) {
-      return new Response(
-        token ? 'unauthorized' : 'proxy not configured',
-        {
-          status: token ? 401 : 503,
-          headers: { 'content-type': 'text/plain; charset=utf-8' },
-        },
-      );
+    if (token && request.headers.get('x-proxy-token') !== token) {
+      return new Response('unauthorized', {
+        status: 401,
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+      });
     }
 
     // ---------- 构造上游 URL：只换 origin，路径与 query 原样保留 ----------
@@ -92,10 +90,14 @@ export default {
     try {
       response = await fetch(outbound);
     } catch (error) {
-      return new Response('proxy error', {
-        status: 502,
-        headers: { 'content-type': 'text/plain; charset=utf-8' },
-      });
+      // 上游不可达 / TLS 失败等，给客户端一个可辨识的响应而不是 500 空体
+      return new Response(
+        `proxy error: ${error && error.message ? error.message : String(error)}`,
+        {
+          status: 502,
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
+        },
+      );
     }
 
     // ---------- WebSocket 握手：必须原样返回，重建 Response 会断掉套接字 ----------
@@ -157,33 +159,16 @@ function buildForwardRequest(request, targetUrl, isWebSocket, env) {
   const hasBody = !['GET', 'HEAD'].includes(request.method);
   const forceOrigin = (env.FORCE_ORIGIN ?? '').trim();
 
-  if (isWebSocket) {
+  if (isWebSocket || hasBody) {
     const cloned = new Request(targetUrl.toString(), request);
-    const headers = new Headers(cloned.headers);
-    for (const name of STRIP_REQUEST_HEADERS) {
-      if (name !== 'upgrade' && name !== 'connection') headers.delete(name);
-    }
-    headers.delete('x-proxy-token');
-    applyForcedOrigin(headers, forceOrigin);
-    return new Request(cloned, { headers });
-  }
-
-  if (hasBody) {
-    const headers = new Headers(request.headers);
-    for (const name of STRIP_REQUEST_HEADERS) headers.delete(name);
-    headers.delete('x-proxy-token');
-    applyForcedOrigin(headers, forceOrigin);
-    return new Request(targetUrl.toString(), {
-      method: request.method,
-      headers,
-      body: request.body,
-      redirect: 'manual',
-    });
+    applyForcedOrigin(cloned.headers, forceOrigin);
+    return cloned;
   }
 
   const headers = new Headers(request.headers);
-  for (const name of STRIP_REQUEST_HEADERS) headers.delete(name);
-  headers.delete('x-proxy-token');
+  for (const name of STRIP_REQUEST_HEADERS) {
+    headers.delete(name);
+  }
   applyForcedOrigin(headers, forceOrigin);
 
   return new Request(targetUrl.toString(), {

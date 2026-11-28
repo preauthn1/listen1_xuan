@@ -5,7 +5,7 @@
 #define MyAppName "listen1_xuan"
 #define MyAppVersion GetEnv("APP_VERSION")
 #define MyAppPublisher "HBWuChang"
-#define MyAppURL "https://github.com/preauthn1/listen1_xuan"
+#define MyAppURL "https://github.com/HBWuChang/listen1_xuan"
 #define MyAppExeName "listen1_xuan.exe"
 #define BuildDir GetEnv("BUILD_DIR")
 #define InstallerOutputDir GetEnv("INSTALLER_OUTPUT_DIR")

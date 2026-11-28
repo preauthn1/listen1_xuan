@@ -204,19 +204,15 @@ Future<void> _initializeAppForHome(SettingsController settingsController) async 
     await showStartupWindow(settingsController);
     _startupWindowConfigured = true;
   }
-  // 读取「使用备用地址」开关后，才能确定要连哪个 Supabase 地址
-  // 没有中转令牌的构建（fork、本地构建）即使开关曾被打开也回退到直连，
-  // 不在启动时抛错导致应用打不开。
-  final useBackupUrl =
-      settingsController.supabaseUseBackupUrl && supabaseProxyToken.isNotEmpty;
-  if (settingsController.supabaseUseBackupUrl && !useBackupUrl) {
-    debugPrint('未配置 SUPABASE_PROXY_TOKEN，已回退到 Supabase 直连地址');
-  }
+  // 读取「使用备用地址」开关后，才能确定要连哪个 Supabase 地址。
+  // 中转若配置了 AUTH_TOKEN，构建时用 --dart-define=SUPABASE_PROXY_TOKEN 注入，
+  // 请求会带上 x-proxy-token；未注入时不带（与原先开放中转的行为一致）。
+  final useBackupUrl = settingsController.supabaseUseBackupUrl;
   supabaseUrl = useBackupUrl ? supabaseBackupUrl : supabaseDefaultUrl;
   await Supabase.initialize(
     url: supabaseUrl,
     anonKey: supabaseKey,
-    headers: useBackupUrl
+    headers: useBackupUrl && supabaseProxyToken.isNotEmpty
         ? {'x-proxy-token': supabaseProxyToken}
         : const {},
     authOptions: FlutterAuthClientOptions(

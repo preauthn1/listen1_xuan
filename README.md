@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/preauthn1/listen1_xuan/actions/workflows/build.yml"><img src="https://github.com/preauthn1/listen1_xuan/actions/workflows/build.yml/badge.svg?branch=main" alt="Build status"></a>
-  <a href="https://github.com/preauthn1/listen1_xuan/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-blue.svg" alt="MPL-2.0 license"></a>
-  <a href="https://github.com/preauthn1/listen1_xuan/releases"><img src="https://img.shields.io/github/v/release/preauthn1/listen1_xuan?display_name=tag" alt="Latest release"></a>
+  <a href="https://github.com/HBWuChang/listen1_xuan/actions/workflows/build.yml"><img src="https://github.com/HBWuChang/listen1_xuan/actions/workflows/build.yml/badge.svg?branch=main" alt="Build status"></a>
+  <a href="https://github.com/HBWuChang/listen1_xuan/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-blue.svg" alt="MPL-2.0 license"></a>
+  <a href="https://github.com/HBWuChang/listen1_xuan/releases"><img src="https://img.shields.io/github/v/release/HBWuChang/listen1_xuan?display_name=tag" alt="Latest release"></a>
 </p>
 
 > 这是一个 Flutter 重写的 Listen1 客户端。项目仍在持续开发中，平台接口和登录流程可能随上游服务变化而调整。
@@ -38,7 +38,7 @@
 
 ### 使用预构建版本
 
-打开 [Releases](https://github.com/preauthn1/listen1_xuan/releases) 下载适合平台的构建包。
+打开 [Releases](https://github.com/HBWuChang/listen1_xuan/releases) 下载适合平台的构建包。
 
 - **Windows**：下载压缩包，解压后运行 `listen1_xuan.exe`；也可以使用 Inno Setup 安装包。
 - **macOS**：选择 Apple Silicon 或 Intel 架构对应的应用包。
@@ -87,7 +87,7 @@ Android 关于 Cronet：
 ### 获取依赖
 
 ```bash
-git clone https://github.com/preauthn1/listen1_xuan.git
+git clone https://github.com/HBWuChang/listen1_xuan.git
 cd listen1_xuan
 flutter pub get
 flutter analyze
@@ -157,12 +157,12 @@ lib/
 - 使用第三方平台时，请遵守对应平台的服务条款、版权规则和适用法律；
 - 遇到安全问题，请不要在公开 Issue 中粘贴令牌、Cookie 或完整请求头，先通过私下渠道联系维护者。
 
-### 与上游原版的互通
+### 与旧版本的互通
 
-本 fork 的 WebSocket 服务器（远程控制、缓存拉取、剪贴板传输）要求配对令牌，这是相对上游的**不兼容协议变更**：
+WebSocket 服务器（远程控制、缓存拉取、剪贴板传输）现在要求配对令牌，这是相对旧版本的**不兼容协议变更**：
 
-- 本 fork 客户端 → 上游原版服务器：可用（多出的令牌头会被忽略）；
-- 上游原版客户端 → 本 fork 服务器：不可用。服务器返回 401，并说明需要配对令牌；服务器卡片会显示被拒绝的次数。两端都更新到本 fork 后扫码配对即可；
+- 新版客户端 → 旧版服务器：可用（多出的令牌头会被忽略）；
+- 旧版客户端 → 新版服务器：不可用。服务器返回 401，并说明需要配对令牌；服务器卡片会显示被拒绝的次数。两端都更新后扫码配对即可；
 - 服务器默认只监听本机。开启「允许局域网设备连接」后，只监听所选的一个局域网地址，并拒绝公网来源；局域网内为明文传输，仅凭配对令牌鉴权，请只在可信网络中开启。
 
 ## 参与贡献
