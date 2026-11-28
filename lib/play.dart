@@ -392,11 +392,7 @@ Future<void> change_playback_state(
       title: track.title!,
       artist: track.artist,
       album: track.album,
-      artUri: Uri.parse(
-        track.img_url == null
-            ? 'https://s.040905.xyz/d/v/business-spirit-unit.gif?sign=uDy2k6zQMaZr8CnNBem03KTPdcQGX-JVOIRcEBcVOhk=:0'
-            : track.img_url!,
-      ),
+      artUri: AudioPlayerHandler.artUriFor(track.img_url),
       duration: _duration,
       artHeaders: kGlobalDefaultHeaders,
     );
@@ -747,12 +743,20 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   /// 浏览树与播放队列共用的 Track -> MediaItem 转换。
   /// id 直接使用 Track.id，供 playFromMediaId 反查曲目；
   /// extras 里带一份压缩后的 Track，使车机点播命中浏览树内容时无需重走网络解析。
+  /// iOS 的 ATS 会拦截锁屏封面的 http 请求；各平台的封面 CDN 都支持 https，
+  /// 统一升级。其它平台原样保留。
+  static Uri artUriFor(String? url) {
+    final uri = Uri.parse(url ?? fallbackArtUri);
+    if (Platform.isIOS && uri.scheme == 'http') return uri.replace(scheme: 'https');
+    return uri;
+  }
+
   MediaItem _trackToMediaItem(Track track) => MediaItem(
     id: track.id,
     title: track.title ?? '',
     artist: track.artist,
     album: track.album,
-    artUri: Uri.parse(track.img_url ?? fallbackArtUri),
+    artUri: artUriFor(track.img_url),
     artHeaders: kGlobalDefaultHeaders,
     playable: true,
     extras: {trackExtrasKey: track.toBase64WithGzip()},
