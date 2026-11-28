@@ -129,6 +129,32 @@ Future<Directory?> _androidBaseDirectory() async {
   return result;
 }
 
+/// 旧版公共目录（/Download/Listen1）是否在用。
+Future<bool> xuanIsUsingLegacyAndroidDirectory() async {
+  if (!isAndroid) return false;
+  final base = await _androidBaseDirectory();
+  return base?.path == _legacyAndroidDownloadRoot;
+}
+
+/// 找回旧版缓存：存储权限被系统自动收回后，应用会改用专属目录，旧缓存看起来
+/// 像「丢了」。这里重新申请权限，旧目录存在时切回旧目录。返回说明文字。
+Future<String> xuanAdoptLegacyAndroidDirectory() async {
+  if (!isAndroid) return '仅 Android 需要';
+  _storagePermissionRequested = false;
+  if (!await xuanEnsureStoragePermission()) {
+    return '未获得存储权限，仍使用应用专属目录';
+  }
+  final legacy = Directory(p.join(_legacyAndroidDownloadRoot, downDirName));
+  if (!await legacy.exists()) {
+    return '没有找到旧版缓存目录（${legacy.path}）';
+  }
+  _androidBaseDirectoryCache = null;
+  final base = await _androidBaseDirectory();
+  return base?.path == _legacyAndroidDownloadRoot
+      ? '已切回旧版缓存目录，重启应用后生效'
+      : '切换失败，仍使用应用专属目录';
+}
+
 ///若传入 path，则返回 dataDirectory/path 的字符串路径，否则返回 Directory 对象
 Future<dynamic> xuanGetdownloadDirectory({String? path}) async {
   Directory? tempDir;

@@ -656,6 +656,24 @@ List<Widget> get cacheSettingsTiles {
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => openInnerPage(RouteName.trackDownloadsPage),
     ),
+    if (isAndroid)
+      FutureBuilder<bool>(
+        future: xuanIsUsingLegacyAndroidDirectory(),
+        builder: (context, snap) {
+          // 已在用旧目录，或者还没查完：不显示。
+          if (snap.data != false) return const SizedBox.shrink();
+          return ListTile(
+            leading: const Icon(Icons.restore_page_outlined),
+            title: const Text('找回旧版缓存'),
+            subtitle: const Text('旧版本的缓存在 Download/Listen1。存储权限被系统收回后会看不到，授予权限即可切回'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () async {
+              final msg = await xuanAdoptLegacyAndroidDirectory();
+              showInfoSnackbar(msg, null);
+            },
+          );
+        },
+      ),
     // 操作按钮与上下带图标行的文字列对齐（16 内边距 + 24 图标 + 16 间距）。
     Padding(
       padding: const EdgeInsetsDirectional.fromSTEB(56, 4, 16, 4),
