@@ -40,6 +40,19 @@ class WebSocketServerController extends GetxController {
   final Logger _logger = createAppLogger();
   HttpServer? _server;
 
+  /// Shown to old (upstream) clients that connect without a pairing token.
+  /// The protocol now requires the x-listen1-pairing-token header, which
+  /// upstream builds never send; say so instead of a bare "Unauthorized".
+  static const String missingTokenBody =
+      'listen1_xuan: this server requires a pairing token '
+      '(header x-listen1-pairing-token). Update the client and scan the '
+      'pairing QR code. 此服务器需要配对令牌，请更新客户端后扫码配对。';
+
+  /// Requests rejected because they carried no pairing token at all
+  /// (typically an upstream client); shown in the server card.
+  final RxInt _tokenlessRejections = 0.obs;
+  int get tokenlessRejections => _tokenlessRejections.value;
+
   String _accessToken;
 
   /// Current pairing token required in the `x-listen1-pairing-token` header.
@@ -182,11 +195,13 @@ class WebSocketServerController extends GetxController {
           return;
         }
         if (WebSocketTransformer.isUpgradeRequest(request)) {
+          if (!authorized) {
+            _rejectUnauthorized(request);
+            return;
+          }
           request.response
-            ..statusCode = authorized
-                ? HttpStatus.serviceUnavailable
-                : HttpStatus.unauthorized
-            ..write(authorized ? 'Connection limit reached' : 'Unauthorized');
+            ..statusCode = HttpStatus.serviceUnavailable
+            ..write('Connection limit reached');
           await request.response.close();
           return;
         }
@@ -827,10 +842,22 @@ class WebSocketServerController extends GetxController {
   }
 
   void _rejectUnauthorized(HttpRequest request) {
+    final candidate = request.headers.value('x-listen1-pairing-token');
+    final missing = candidate == null || candidate.isEmpty;
+    if (missing) {
+      _tokenlessRejections.value++;
+      _logger.w(
+        '$_tag 拒绝了不带配对令牌的请求（可能是旧版或上游原版客户端）: '
+        '${request.method} ${request.uri.path}',
+      );
+    }
     request.response
       ..statusCode = HttpStatus.unauthorized
       ..headers.contentType = ContentType.json
-      ..write(jsonEncode({'error': 'Unauthorized'}));
+      ..write(jsonEncode({
+        'error': missing ? 'PairingTokenRequired' : 'Unauthorized',
+        if (missing) 'message': missingTokenBody,
+      }));
     unawaited(request.response.close());
   }
 
