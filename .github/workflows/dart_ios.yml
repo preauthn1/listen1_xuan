@@ -3,9 +3,6 @@ name: Build ios artifacts
 on:
   workflow_dispatch:
   workflow_call:
-    secrets:
-      SUPABASE_PROXY_TOKEN:
-        required: false
 
 permissions:
   contents: read
@@ -27,7 +24,6 @@ jobs:
           echo "提交作者: $COMMIT_AUTHOR"
           GITHASH="${COMMIT_SHA:0:7}"
           echo "GITHASH=$GITHASH" >> $GITHUB_ENV
-          echo "SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}" >> $GITHUB_ENV
           echo "GITHASH (前7位): $GITHASH"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -90,7 +86,7 @@ jobs:
 
       # 构建 iOS app (无签名版本，用于测试)
       - name: Build iOS app (no codesign, ffmpeg)
-        run: flutter build ios --release --no-codesign --dart-define=gitHash=${{ env.GITHASH }} --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
+        run: flutter build ios --release --no-codesign --dart-define=gitHash=${{ env.GITHASH }}
 
       # 打包为 .app 文件
       - name: Create .app archive (ffmpeg)
@@ -140,7 +136,7 @@ jobs:
 
       # 构建 iOS app (无签名版本，用于测试)
       - name: Build iOS app (no codesign, lite)
-        run: flutter build ios --release --no-codesign --dart-define=gitHash=${{ env.GITHASH }} --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
+        run: flutter build ios --release --no-codesign --dart-define=gitHash=${{ env.GITHASH }}
 
       # 打包为 .app 文件
       - name: Create .app archive (lite)

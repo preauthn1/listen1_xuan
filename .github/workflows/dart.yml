@@ -16,8 +16,6 @@ on:
         required: false
       KEY_PASSWORD:
         required: false
-      SUPABASE_PROXY_TOKEN:
-        required: false
 
 permissions:
   contents: read
@@ -86,7 +84,6 @@ jobs:
           echo "提交作者: $COMMIT_AUTHOR"
           GITHASH="${COMMIT_SHA:0:7}"
           echo "GITHASH=$GITHASH" >> "$GITHUB_ENV"
-          echo "SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}" >> "$GITHUB_ENV"
           echo "GITHASH (前7位): $GITHASH"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -162,7 +159,6 @@ jobs:
           flutter build apk --release --split-per-abi
           ${{ matrix.extra-define }}
           --dart-define=gitHash=${{ env.GITHASH }}
-          --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
         env:
           KEYSTORE: xuan.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -183,7 +179,6 @@ jobs:
           flutter build apk --release
           ${{ matrix.extra-define }}
           --dart-define=gitHash=${{ env.GITHASH }}
-          --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
         env:
           KEYSTORE: xuan.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
