@@ -58,7 +58,11 @@ Future<dynamic> song_dialog(
 }) async {
   final screenSize = MediaQuery.of(context).size;
   final dialogWidth = (screenSize.width * 0.5).clamp(360.0, 720.0).toDouble();
-  final dialogHeight = (screenSize.height * 0.86).clamp(420.0, 760.0).toDouble();
+  // 横屏矮屏（高度不足 420）时不超过屏幕高度，否则弹窗顶部会被推到屏幕外。
+  final dialogHeight = math.min(
+    (screenSize.height * 0.86).clamp(420.0, 760.0).toDouble(),
+    screenSize.height,
+  );
   bool horizon = screenSize.height > screenSize.width ? false : true;
   XSearchController xSearchController = Get.find<XSearchController>();
   return await showDialog(

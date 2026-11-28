@@ -279,18 +279,6 @@ class SettingsController extends GetxController {
     }
   }
 
-  static const String supabaseUseBackupUrlKey = 'supabaseUseBackupUrl';
-
-  /// 是否使用备用地址连接 Supabase
-  ///
-  /// 备用地址是自建的 Cloudflare Worker 透明反代，见
-  /// `workers/supabase-proxy/README.md`。
-  /// 该值只在 main() 初始化 Supabase 时读取一次，改动后需重启应用生效。
-  bool get supabaseUseBackupUrl => settings[supabaseUseBackupUrlKey] ?? false;
-  set supabaseUseBackupUrl(bool value) {
-    settings[supabaseUseBackupUrlKey] = value;
-  }
-
   // Deprecated compatibility keys: values are intentionally never persisted.
   static const String supabaseEmailKey = 'supabaseEmail';
   String get supabaseEmail => '';
@@ -452,17 +440,6 @@ class SettingsController extends GetxController {
 
   set getPreRelease(bool value) {
     settings[getPreReleaseKey] = value;
-  }
-
-  /// 更新包下载先走 h3.040905.xyz 镜像，失败再直连 GitHub。默认关闭；
-  /// 开启后仍对下载结果做 SHA-256 校验。
-  static const String useDownloadMirrorKey = 'useDownloadMirror';
-  bool get useDownloadMirror {
-    return settings[useDownloadMirrorKey] as bool? ?? false;
-  }
-
-  set useDownloadMirror(bool value) {
-    settings[useDownloadMirrorKey] = value;
   }
 
   static const String stopOnPlayListEndKey = 'stopOnPlayListEnd';

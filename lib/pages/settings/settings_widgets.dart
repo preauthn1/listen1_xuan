@@ -163,7 +163,6 @@ Widget _buildSupabasePanel() {
                 },
               ),
             ),
-            _supabaseBackupUrlSwitch(),
             Obx(
               () => ListTile(
                 leading: Icon(Icons.timelapse_rounded),
@@ -237,38 +236,12 @@ Widget _buildSupabasePanel() {
                 ),
               ],
             ),
-            _supabaseBackupUrlSwitch(),
           ],
         ),
       );
     }
   });
 }
-
-/// 「使用备用地址」开关：登录前后两个面板共用。
-/// 备用地址需要构建时注入的中转令牌，未注入时禁用开关并说明原因，
-/// 避免打开后下次启动失败。
-Widget _supabaseBackupUrlSwitch() => Obx(() {
-      final settings = Get.find<SettingsController>();
-      // 先读取开关值：Obx 内必须每次都访问到 observable，
-      // 否则 Release 构建会抛错并显示成一大块灰色。
-      final enabled = settings.supabaseUseBackupUrl;
-      final available = supabaseProxyToken.isNotEmpty;
-      return SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('使用备用地址'),
-        subtitle: Text(available
-            ? '通过自建中转连接 Supabase，需重启应用生效'
-            : '此版本未配置中转令牌，无法使用备用地址'),
-        value: available && enabled,
-        onChanged: available
-            ? (bool value) {
-                settings.supabaseUseBackupUrl = value;
-                showSuccessSnackbar('设置成功', '重启生效');
-              }
-            : null,
-      );
-    });
 
 const _noUnderline = TextStyle(decoration: TextDecoration.none);
 
@@ -656,6 +629,24 @@ List<Widget> get cacheSettingsTiles {
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => openInnerPage(RouteName.trackDownloadsPage),
     ),
+    if (isAndroid)
+      FutureBuilder<bool>(
+        future: xuanIsUsingLegacyAndroidDirectory(),
+        builder: (context, snap) {
+          // 已在用旧目录，或者还没查完：不显示。
+          if (snap.data != false) return const SizedBox.shrink();
+          return ListTile(
+            leading: const Icon(Icons.restore_page_outlined),
+            title: const Text('找回旧版缓存'),
+            subtitle: const Text('旧版本的缓存在 Download/Listen1。存储权限被系统收回后会看不到，授予权限即可切回'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () async {
+              final msg = await xuanAdoptLegacyAndroidDirectory();
+              showInfoSnackbar(msg, null);
+            },
+          );
+        },
+      ),
     // 操作按钮与上下带图标行的文字列对齐（16 内边距 + 24 图标 + 16 间距）。
     Padding(
       padding: const EdgeInsetsDirectional.fromSTEB(56, 4, 16, 4),

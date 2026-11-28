@@ -50,6 +50,22 @@
 - **Lite**：体积更小，不包含 FFmpeg；
 - **FFmpeg**：包含额外音频处理能力，体积更大。
 
+#### Release 资产命名
+
+| 平台 | 文件名 | 说明 |
+|---|---|---|
+| Android | `app-<架构>-release[-without.embedded.Cronet][-ffmpeg]-<hash>.apk`，另有同名 `.zip` | 一般选 `arm64-v8a`；`.zip` 内是同一个已签名 APK |
+| Windows | `windows-build-artifact[-ffmpeg]-<hash>.zip`，Inno Setup 安装包为 `.exe` | 压缩包解压即用 |
+| macOS | `listen1_xuan-<版本>-macos-<apple-silicon\|intel>[-ffmpeg]-<hash>.zip` | 按芯片选择 |
+| iOS | `listen1_xuan-ios[-ffmpeg]-<hash>.app.zip` | 未签名，需自行签名 |
+
+Android 关于 Cronet：
+
+- **带 `without.embedded.Cronet`** 的包体积更小，网络库依赖设备上的 Google Play 服务，适合有 Google Play 服务的手机；
+- **没有 Google Play 服务**的设备（多数国行手机、部分模拟器）请选**不带** `without.embedded.Cronet` 的包，它内置了 Cronet。
+
+每个 Release 正文顶部的安装说明会按实际上传的文件列出推荐包和下载大小，见 `docs/release_installation_guide.md`。
+
 ### 首次使用
 
 1. 启动应用并进入 **设置 → 第三方平台登录**；
@@ -140,6 +156,16 @@ lib/
 - 不要提交本地 `.env`、签名文件、Firebase 配置、导出的登录数据或带有个人信息的截图；
 - 使用第三方平台时，请遵守对应平台的服务条款、版权规则和适用法律；
 - 遇到安全问题，请不要在公开 Issue 中粘贴令牌、Cookie 或完整请求头，先通过私下渠道联系维护者。
+
+### 与上游原版的互通
+
+本 fork 的 WebSocket 服务器（远程控制、缓存拉取、剪贴板传输）要求配对令牌，这是相对上游的**不兼容协议变更**：
+
+- 本 fork 客户端 → 上游原版服务器：可用（多出的令牌头会被忽略）；
+- 上游原版客户端 → 本 fork 服务器：不可用。服务器返回 401，并说明需要配对令牌；服务器卡片会显示被拒绝的次数。两端都更新到本 fork 后扫码配对即可；
+- 服务器默认只监听本机。开启「允许局域网设备连接」后，只监听所选的一个局域网地址，并拒绝公网来源；局域网内为明文传输，仅凭配对令牌鉴权，请只在可信网络中开启。
+
+本 fork 不使用任何中转或镜像：Supabase、GitHub 更新包等都直连官方地址。
 
 ## 参与贡献
 
