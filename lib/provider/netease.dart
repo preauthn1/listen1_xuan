@@ -151,7 +151,7 @@ class Netease extends BaseProvider {
     final separator = url.contains('?') ? '&' : '?';
     final targetUrl =
         '$url$separator${Uri(queryParameters: {'csrf_token': csrf}).query}';
-    final response = await dioWithCookieManager.post(
+    Future<dynamic> send() => dioWithCookieManager.post(
       targetUrl,
       data: data,
       onReceiveProgress: (received, total) {
@@ -177,7 +177,21 @@ class Netease extends BaseProvider {
         contentType: 'application/x-www-form-urlencoded',
       ),
     );
-    return response;
+    // 上游在请求失败时会重试一次；这里只对网络错误、超时和 5xx 重试一次，
+    // 4xx 等确定性错误直接抛出。
+    try {
+      return await send();
+    } on DioException catch (e) {
+      final status = e.response?.statusCode ?? 0;
+      final transient = e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          status >= 500;
+      if (!transient) rethrow;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      return await send();
+    }
   }
 
   Uint8List _pad(Uint8List data, int blockSize) {
