@@ -76,6 +76,7 @@ import 'package:app_links/app_links.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:listen1_xuan/constants/network_defaults.dart';
+import 'package:listen1_xuan/constants/supabase_proxy.dart';
 part 'main_testBtn.dart';
 part 'pages/main/main_widgets.dart';
 part 'pages/main/main_utils.dart';
@@ -83,7 +84,13 @@ part 'pages/main/main_utils.dart';
 /// Supabase 项目默认地址（直连）
 const String supabaseDefaultUrl = 'https://jtvxrwybwvgpqobyhaoy.supabase.co';
 
-/// 只直连 Supabase，不经过任何中转。
+/// Supabase 备用地址：自建的 Cloudflare Worker 透明反代，用于绕过受限网络。
+/// 部署方式见 workers/supabase-proxy/README.md，部署后把这里改成实际域名。
+/// 注意必须是 **一级** 子域，Cloudflare 免费版证书不覆盖多层子域。
+/// 在「设置 - Supabase 账号 - 使用备用地址」开关切换，重启应用生效。
+const String supabaseBackupUrl = 'https://sb.040905.xyz';
+
+/// 实际使用的地址，在 main() 中按设置决定
 String supabaseUrl = supabaseDefaultUrl;
 
 String supabaseKey =
@@ -197,10 +204,21 @@ Future<void> _initializeAppForHome(SettingsController settingsController) async 
     await showStartupWindow(settingsController);
     _startupWindowConfigured = true;
   }
-  supabaseUrl = supabaseDefaultUrl;
+  // 读取「使用备用地址」开关后，才能确定要连哪个 Supabase 地址
+  // 没有中转令牌的构建（fork、本地构建）即使开关曾被打开也回退到直连，
+  // 不在启动时抛错导致应用打不开。
+  final useBackupUrl =
+      settingsController.supabaseUseBackupUrl && supabaseProxyToken.isNotEmpty;
+  if (settingsController.supabaseUseBackupUrl && !useBackupUrl) {
+    debugPrint('未配置 SUPABASE_PROXY_TOKEN，已回退到 Supabase 直连地址');
+  }
+  supabaseUrl = useBackupUrl ? supabaseBackupUrl : supabaseDefaultUrl;
   await Supabase.initialize(
     url: supabaseUrl,
     anonKey: supabaseKey,
+    headers: useBackupUrl
+        ? {'x-proxy-token': supabaseProxyToken}
+        : const {},
     authOptions: FlutterAuthClientOptions(
       localStorage: SharedPreferencesLocalStorage(
         persistSessionKey: 'sb-jtvxrwybwvgpqobyhaoy-auth-token',
@@ -258,9 +276,6 @@ Future<void> _initializeAppForHome(SettingsController settingsController) async 
 
   final settings = lengcyGetSettings();
   settings.remove('useHttpOverrides');
-  // 中转和下载镜像已移除，清掉旧开关。
-  settings.remove('supabaseUseBackupUrl');
-  settings.remove('useDownloadMirror');
   HttpOverrides.global = MyHttpOverrides(
     trustBadCertificates: false,
     userAgent: kGlobalDefaultUserAgent,

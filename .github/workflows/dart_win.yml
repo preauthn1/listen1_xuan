@@ -3,6 +3,9 @@ name: Build windows artifacts
 on:
   workflow_dispatch:
   workflow_call:
+    secrets:
+      SUPABASE_PROXY_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -32,6 +35,7 @@ jobs:
           echo "提交作者: $env:COMMIT_AUTHOR"
           $GITHASH = "$env:COMMIT_SHA".Substring(0,7)
           echo "GITHASH=$GITHASH" >> $env:GITHUB_ENV
+          echo "SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}" >> $env:GITHUB_ENV
           echo "GITHASH (前7位): $GITHASH"
         shell: pwsh
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -85,6 +89,7 @@ jobs:
       - name: Build Windows application (${{ matrix.label }})
         run: >-
           flutter build windows --dart-define=gitHash=${{ env.GITHASH }}
+          --dart-define=SUPABASE_PROXY_TOKEN=${{ secrets.SUPABASE_PROXY_TOKEN }}
       # Upload the portable build first: the canary updater extracts this
       # Actions archive directly, and an Inno Setup/choco failure must not
       # drop it.

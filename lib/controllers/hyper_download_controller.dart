@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:hyper_thread_downloader/hyper_thread_downloader.dart';
 import 'package:listen1_xuan/widgets/ext/ext_widget.dart';
 
+import 'settings_controller.dart';
 
 /// 下载进度信息
 class DownloadProgressInfo {
@@ -83,13 +84,34 @@ class HyperDownloadController extends GetxController {
         _showDownloadDialog();
       }
 
-      // 只直连下载源，不经过任何镜像或中转。
-      final failure = await _runDownload(
-        url: url,
-        savePath: savePath,
-        threadCount: threadCount,
-        onProgress: onProgress,
-      );
+      // 默认直连，不把签名地址交给第三方。用户主动开启镜像后先走镜像、失败再
+      // 直连；镜像下载的文件同样要过调用方 onComplete 里的 SHA-256 校验。
+      final mirrorUrl = useDownloadMirror ? mirroredUrl(url) : null;
+      String? failure;
+      if (mirrorUrl != null) {
+        failure = await _runDownload(
+          url: mirrorUrl,
+          savePath: savePath,
+          threadCount: threadCount,
+          onProgress: onProgress,
+        );
+        if (!isDownloading.value) return; // 用户已取消
+        if (failure != null) {
+          debugPrint('Mirror download failed, retrying direct: $failure');
+          _resetDownloadState();
+          try {
+            if (File(savePath).existsSync()) await File(savePath).delete();
+          } catch (_) {}
+        }
+      }
+      if (mirrorUrl == null || failure != null) {
+        failure = await _runDownload(
+          url: url,
+          savePath: savePath,
+          threadCount: threadCount,
+          onProgress: onProgress,
+        );
+      }
       if (!isDownloading.value) return; // 用户已取消
       if (failure != null) {
         reportFailure('下载失败: $failure');
@@ -110,6 +132,20 @@ class HyperDownloadController extends GetxController {
       debugPrint('Download error: $e');
       reportFailure(e.toString());
     }
+  }
+
+  static const String _mirrorPrefix = 'https://h3.040905.xyz/default/https/';
+
+  /// 设置里的「使用下载镜像」，默认关闭。
+  static bool get useDownloadMirror =>
+      Get.isRegistered<SettingsController>() &&
+      Get.find<SettingsController>().useDownloadMirror;
+
+  /// 镜像地址；只处理 https 地址，其它情况返回 null（直连）。
+  static String? mirroredUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return null;
+    return '$_mirrorPrefix${url.substring('https://'.length)}';
   }
 
   Completer<String?>? _activeAttempt;
