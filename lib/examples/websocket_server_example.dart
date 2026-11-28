@@ -524,6 +524,20 @@ class _WebSocketControlContentState extends State<WebSocketControlContent> {
                 ),
               ),
 
+            Obx(() {
+              final n = ctrl.tokenlessRejections.value;
+              if (n == 0 || !ctrl.isServerRunning) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  '已拒绝 $n 次不带配对令牌的连接。旧版或上游原版 Listen1 客户端'
+                  '不支持配对令牌，需要更新到本版本后扫码配对。',
+                  style: const TextStyle(fontSize: 12, color: Colors.orange),
+                ),
+              );
+            }),
             _buildConfigSection('网络配置', [
               Row(
                 children: [

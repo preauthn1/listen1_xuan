@@ -59,6 +59,10 @@ class WebSocketCardController extends GetxController {
 
   /// 是否允许局域网设备连接（默认关闭，仅本机回环）
   final RxBool _allowLan = false.obs;
+
+  /// 本次运行中被拒绝的「不带配对令牌」请求数。旧版或上游原版客户端不发令牌，
+  /// 连接会一直失败；在服务器卡片里提示原因。
+  final RxInt tokenlessRejections = 0.obs;
   final RxInt _port = 25917.obs;
   final RxInt _pingInterval = 30.obs; // 秒
   final RxInt _pongTimeout = 5.obs; // 秒
@@ -595,6 +599,7 @@ class WebSocketCardController extends GetxController {
       // 更新响应式状态
       _isServerRunning.value = wsServerController!.isRunning;
       i_clientCount.value = wsServerController!.clientCount;
+      tokenlessRejections.value = wsServerController!.tokenlessRejections;
       _serverUrl.value = wsServerController!.serverUrl;
       _updateStatusMessage();
     });
