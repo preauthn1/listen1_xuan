@@ -158,6 +158,15 @@ class WebSocketServerController extends GetxController {
       }
       // 监听请求
       _server!.listen((HttpRequest request) async {
+        // 只接受本机和局域网（私有网段）来源；公网来源在校验令牌前直接拒绝。
+        final peer = request.connectionInfo?.remoteAddress;
+        if (peer == null || !isPrivateNetworkAddress(peer)) {
+          request.response
+            ..statusCode = HttpStatus.forbidden
+            ..write('Forbidden');
+          await request.response.close();
+          return;
+        }
         final authorized = _isAuthorizedRequest(request);
         final connectionSlot = _connections.length + _pendingConnections;
         if (WebSocketTransformer.isUpgradeRequest(request) &&
