@@ -103,12 +103,6 @@ class SupabaseAuthController extends GetxController {
     super.onClose();
   }
 
-  /// 使用保存的凭证尝试自动重连
-  Future<void> _tryReconnectWithSavedCredentials() async {
-    // Deprecated: passwords are never persisted or replayed.
-    return;
-  }
-
   /// 检查当前会话
   Future<void> _checkCurrentSession() async {
     try {
