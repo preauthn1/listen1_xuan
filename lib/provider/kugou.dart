@@ -322,10 +322,19 @@ class Kugou extends BaseProvider {
       'id': '${KgPlaylistType.album.prefix}_${infoData['albumid']}',
       'source_url': 'https://www.kugou.com/album/${infoData['albumid']}.html',
     };
-    final songResponse = await dioWithCookieManager.get(
-      'http://mobilecdnbj.kugou.com/api/v3/album/song?albumid=$albumId&page=1&pagesize=100',
-    );
-    final songs = decodeResponseData(songResponse.data)['data']['info'] as List;
+    // 接口每页最多返回 100 首（pagesize=-1 也一样），按 total 翻页取全。
+    // 上限 20 页（2000 首），防止异常 total 导致无限请求。
+    final songs = <dynamic>[];
+    for (var page = 1; page <= 20; page++) {
+      final songResponse = await dioWithCookieManager.get(
+        'http://mobilecdnbj.kugou.com/api/v3/album/song?albumid=$albumId&page=$page&pagesize=100',
+      );
+      final data = decodeResponseData(songResponse.data)['data'];
+      final batch = (data['info'] as List?) ?? const [];
+      songs.addAll(batch);
+      final total = (data['total'] as num?)?.toInt() ?? 0;
+      if (batch.isEmpty || songs.length >= total) break;
+    }
     final tracks = await _convertAll(
       songs,
       (item) => _convertAlbumItem(item, info['title']!, albumId),
