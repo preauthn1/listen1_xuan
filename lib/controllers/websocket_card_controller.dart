@@ -9,6 +9,7 @@ import 'package:listen1_xuan/global_settings_animations.dart';
 import 'package:listen1_xuan/main.dart';
 import 'package:logger/logger.dart';
 import 'package:listen1_xuan/services/app_logger.dart';
+import 'package:listen1_xuan/services/websocket_listener.dart';
 import 'package:listen1_xuan/controllers/controllers.dart';
 import '../utils/websocket_address.dart';
 
@@ -102,21 +103,29 @@ class WebSocketCardController extends GetxController {
   static bool _isLoopback(String host) =>
       InternetAddress.tryParse(host)?.isLoopback ?? false;
 
-  /// The address the server actually listens on. Loopback unless the user
-  /// explicitly enabled LAN access, in which case it listens dual-stack.
+  /// The address the server actually listens on.
+  ///
+  /// LAN off: loopback only. LAN on: the one private-network address the user
+  /// picked (the same one shown in the QR code), never every interface, so a
+  /// public or VPN-facing interface on the same machine is not exposed.
   String get bindHost {
-    if (_allowLan.value) return '::';
+    if (_allowLan.value) {
+      // 选中的地址：已保存的地址，或保存的地址不可用时 refreshIpAddresses 选出的最优局域网地址。
+      final selected = selectBestAvailableAddress.value;
+      final parsed = InternetAddress.tryParse(selected);
+      if (parsed != null &&
+          !_isWildcard(parsed) &&
+          isPrivateNetworkAddress(parsed)) {
+        return selected;
+      }
+      return '127.0.0.1';
+    }
     return _isLoopback(_host.value) ? _host.value : '127.0.0.1';
   }
 
-  /// The address put into the QR code / copied pairing string.
-  String get advertisedHost {
-    if (!_allowLan.value) return bindHost;
-    final selected = selectBestAvailableAddress.value;
-    final parsed = InternetAddress.tryParse(selected);
-    if (parsed != null && !_isWildcard(parsed)) return selected;
-    return '127.0.0.1';
-  }
+  /// The address put into the QR code / copied pairing string. It is always
+  /// the address the server is bound to.
+  String get advertisedHost => bindHost;
 
   static bool _isWildcard(InternetAddress address) =>
       address.address == InternetAddress.anyIPv4.address ||
@@ -305,9 +314,15 @@ class WebSocketCardController extends GetxController {
       ipList.addAll(otherIps);
       ipList.addAll(loopbackIps);
 
-      // 未开启局域网访问时只展示回环地址，避免给出不可达的配对地址。
+      // 未开启局域网访问时只展示回环地址；开启后只列出局域网（私有网段）地址，
+      // 不提供公网地址，避免服务器暴露在公网接口上。
       final bindableIps = _allowLan.value
           ? ipList
+              .where((ip) {
+                final parsed = InternetAddress.tryParse(ip);
+                return parsed != null && isPrivateNetworkAddress(parsed);
+              })
+              .toList()
           : ipList.where(_isLoopback).toList();
       availableIpAddresses.value = bindableIps.isEmpty
           ? <String>['127.0.0.1']
@@ -339,6 +354,8 @@ class WebSocketCardController extends GetxController {
     try {
       _isStarting.value = true;
       _updateStatusMessage('正在启动...');
+      // 局域网模式只监听一个具体地址，启动前刷新网卡列表，避免用到已失效的地址。
+      if (_allowLan.value) await refreshIpAddresses();
 
       // 创建新的服务器实例
       wsServerController = WebSocketServerController(
@@ -422,8 +439,12 @@ class WebSocketCardController extends GetxController {
       _showError('请先开启“允许局域网设备连接”');
       return;
     }
-    // LAN 模式下服务器监听所有网卡，选择的地址只影响二维码，可随时修改。
-    if (isServerRunning && !_allowLan.value) {
+    if (_allowLan.value && !isPrivateNetworkAddress(parsed)) {
+      _showError('只能监听局域网地址，不能使用公网地址');
+      return;
+    }
+    // 服务器只监听选中的这一个地址，运行中修改需要先停止。
+    if (isServerRunning) {
       _showError('服务器运行时不能更改监听地址');
       return;
     }
